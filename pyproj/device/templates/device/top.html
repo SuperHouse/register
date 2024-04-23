@@ -1,0 +1,42 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    <h1>SuperHouse Device Register</h1>
+{% endblock h1 %}
+
+{% block body %}
+    <p>Let's track some devices.</p>
+    {% if devices %}
+        <table border="1">
+            <tr>
+                <th>Headings</th>
+            </tr>
+            {% for device in devices %}
+                <tr>
+                    <td align="center">
+                        {% comment %} <a href="{% url 'device:detail' device.id %}">{{ device.id }}</a> {% endcomment %}
+                        {{ device.id }}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>
+            <i>There are no devices.</i>
+        </p>
+    {% endif %}
+
+    <h2>Actions</h2>
+    <p>
+        General action 1: <a href="{% url 'device:general_action' %}">link</a>
+    </p>
+
+    <h2>Admin</h2>
+    <p>
+        Admin: <a href="{% url 'admin:index' %}">link</a>
+    </p>
+{% endblock body %}
