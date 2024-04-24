@@ -1,0 +1,20 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Device action
+{% endblock title %}
+
+{% block h1 %}
+    <h1>SuperHouse Device Register: Device action</h1>
+{% endblock h1 %}
+
+{% block body %}
+    <p>Put some code here regarding an action on a particular device.</p>
+
+    <h2>Actions</h2>
+    <p>
+        Up: <a href="{% url 'device:device_detail' device.pk %}">link</a>
+        Top: <a href="{% url 'device:top' %}">link</a>
+    </p>
+
+{% endblock body %}
