@@ -62,6 +62,27 @@
         </p>
     {% endif %}
 
+    <p>Let's track some devices.</p>
+    {% if devices %}
+        <table border="1">
+            <tr>
+                <th>Device</th>
+            </tr>
+            {% for device in devices %}
+                <tr>
+                    <td>
+                        {{ device.design.name }}
+                        <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>
+            <i>There are no devices.</i>
+        </p>
+    {% endif %}
+
     <h2>Actions</h2>
     <p>
         General action 1: <a href="{% url 'device:general_action' %}">link</a>

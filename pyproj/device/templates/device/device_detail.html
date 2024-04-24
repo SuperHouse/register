@@ -1,0 +1,40 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Device detail
+{% endblock title %}
+
+{% block h1 %}
+    <h1>SuperHouse Device Register: Device detail</h1>
+{% endblock h1 %}
+
+{% block body %}
+    <p>Here's what we know about this device:</p>
+    <table border="1">
+        <tr>
+            <th>s/n</th>
+            <td>{{ device.id }}</td>
+        </tr>
+        <tr>
+            <th>SKU</th>
+            <td>{{ device.design.sku }}</td>
+        </tr>
+        <tr>
+            <th>Client</th>
+            <td>{{ device.design.client }}</td>
+        </tr>
+        <tr>
+            <th>Assembly date</th>
+            <td>{{ device.assembly_date }}</td>
+        </tr>
+        <tr>
+            <th>Notes</th>
+            <td>{{ device.notes }}</td>
+        </tr>
+    </table>
+
+    <h2>Actions</h2>
+    <ul>
+        <li>Top: <a href="{% url 'device:top' %}">link</a></li>
+    </ul>
+{% endblock body %}
