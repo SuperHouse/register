@@ -30,6 +30,38 @@
         </p>
     {% endif %}
 
+    <h2>Current designs:</h2>
+    {% if designs %}
+        <table border="1">
+            <tr>
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Version</th>
+                <th>Client</th>
+            </tr>
+            {% for design in designs %}
+                <tr>
+                    <td>
+                        {{ design.sku }}
+                    </td>
+                    <td>
+                        {{ design.name }}
+                    </td>
+                    <td>
+                        {{ design.version }}
+                    </td>
+                    <td>
+                        {{ design.client.company_name }}
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>
+            <i>There are no designs.</i>
+        </p>
+    {% endif %}
+
     <h2>Actions</h2>
     <p>
         General action 1: <a href="{% url 'device:general_action' %}">link</a>
