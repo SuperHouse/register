@@ -45,7 +45,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
 
     email = models.EmailField(blank=True, default="", unique=True)
-    name = models.CharField(max_length=200, blank=True, default="")
+    full_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Robert Menzies') # Eg, "Robert Menzies"
+    preferred_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Bob') # Eg, "Bob"
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -64,8 +65,5 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = "User"
         verbose_name_plural = "Users"
 
-    def get_full_name(self):
-        return self.name
-
     def get_short_name(self):
-        return self.name or self.email.split("@")[0]
+        return self.preferred_name or self.full_name or self.email.split("@")[0]
