@@ -9,24 +9,24 @@
 {% endblock h1 %}
 
 {% block body %}
-    <p>Let's track some devices.</p>
-    {% if devices %}
+    <h2>Current clients:</h2>
+    {% if clients %}
         <table border="1">
             <tr>
-                <th>Headings</th>
+                <th>Name</th>
             </tr>
-            {% for device in devices %}
+            {% for client in clients %}
                 <tr>
-                    <td align="center">
-                        {% comment %} <a href="{% url 'device:detail' device.id %}">{{ device.id }}</a> {% endcomment %}
-                        {{ device.id }}
+                    <td valign="middle">
+                        {% if client.logo %}<img src="{{ client.logo.url }}" alt="{{ client.name }} logo">{% endif %}
+                        {{ client.company_name }}
                     </td>
                 </tr>
             {% endfor %}
         </table>
     {% else %}
         <p>
-            <i>There are no devices.</i>
+            <i>There are no clients.</i>
         </p>
     {% endif %}
 
@@ -35,7 +35,7 @@
         General action 1: <a href="{% url 'device:general_action' %}">link</a>
     </p>
 
-    <h2>Admin</h2>
+    <h2>Actions</h2>
     <p>
         Admin: <a href="{% url 'admin:index' %}">link</a>
     </p>

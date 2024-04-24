@@ -1,11 +1,12 @@
 from django.shortcuts import render
 
-# Create your views here.
+from .models import Client
+
 def top(request):
-    devices = []
+    clients = Client.objects.all()
 
     context = {
-        'devices': devices,
+        'clients': clients,
     }
 
     return render(request, 'device/top.html', context)
