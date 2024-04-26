@@ -29,26 +29,3 @@ class Device(models.Model):
 
     def __str__(self):
         return f'{self.design.sku} (sn: {self.pk})'
-
-
-"""
-After import, assembly_date can be converted to YYYY-MM-DD format using the following sqlite code:
-UPDATE device_device
-SET assembly_date = 
-    substr(assembly_date, -4) || '-' || 
-    CASE substr(assembly_date, instr(assembly_date, '-') + 1, 3)
-        WHEN 'Jan' THEN '01'
-        WHEN 'Feb' THEN '02'
-        WHEN 'Mar' THEN '03'
-        WHEN 'Apr' THEN '04'
-        WHEN 'May' THEN '05'
-        WHEN 'Jun' THEN '06'
-        WHEN 'Jul' THEN '07'
-        WHEN 'Aug' THEN '08'
-        WHEN 'Sep' THEN '09'
-        WHEN 'Oct' THEN '10'
-        WHEN 'Nov' THEN '11'
-        WHEN 'Dec' THEN '12'
-    END || '-' ||
-    substr('0' || substr(assembly_date, 1, instr(assembly_date, '-') - 1), -2);
-"""
