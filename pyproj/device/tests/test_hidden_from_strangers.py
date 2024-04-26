@@ -1,3 +1,5 @@
+# Useful page on testing with pytest: https://djangostars.com/blog/django-pytest-testing/
+
 import pytest
 
 from django.urls import reverse
