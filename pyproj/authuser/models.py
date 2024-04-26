@@ -4,6 +4,7 @@ from django.utils import timezone
 
 # Replace this whole dir with this: https://github.com/sesh/django-authuser
 
+
 class CustomUserManager(UserManager):
     def _create_user(self, email, password, **extra_fields):
         """
@@ -45,8 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
 
     email = models.EmailField(blank=True, default="", unique=True)
-    full_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Robert Menzies') # Eg, "Robert Menzies"
-    preferred_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Bob') # Eg, "Bob"
+    full_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Robert Menzies')
+    preferred_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Bob')
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
