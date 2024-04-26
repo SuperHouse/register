@@ -84,8 +84,8 @@
     {% endif %}
 
     <h2>Actions</h2>
-    <p>
-        General action 1: <a href="{% url 'device:general_action' %}">link</a>
-        Admin: <a href="{% url 'admin:index' %}">link</a>
-    </p>
+    <ul>
+        <li>General action 1: <a href="{% url 'device:general_action' %}">link</a></li>
+        <li>Admin: <a href="{% url 'admin:index' %}">link</a></li>
+    </ul>
 {% endblock body %}
