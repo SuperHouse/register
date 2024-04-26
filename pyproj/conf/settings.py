@@ -57,6 +57,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'login_required.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'conf.middleware.TimezoneMiddleware',
@@ -108,8 +109,15 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 AUTH_USER_MODEL = 'authuser.User'
+LOGIN_URL = '/office/login/'
+LOGOUT_REDIRECT_URL = '/device/'
 
-
+LOGIN_REQUIRED_IGNORE_PATHS = [
+    '/office/login/',
+    '/office/logout/',
+    '/admin/',
+    '/static/',
+]
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
