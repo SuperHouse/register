@@ -5,6 +5,7 @@ from django.shortcuts import render
 
 from .models import Client, Design, Device
 
+
 def top(request):
     clients = Client.objects.all()
     designs = Design.objects.all()
