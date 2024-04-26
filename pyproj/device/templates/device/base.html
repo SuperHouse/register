@@ -31,7 +31,12 @@
         <div class="container">
             <div class="row">
                 <div class="twelve columns">
-                    <p>Welcome {{ user.preferred_name }} ({{ user.email }})!</p>
+                    <p>Welcome {{ user.preferred_name }} ({{ user.email }})!
+                        <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+                            {% csrf_token %}
+                            <button type="submit">Log out</button>
+                        </form>
+                    </p>
                     <h1>
                         {% block h1 %}
                         {% endblock h1 %}
