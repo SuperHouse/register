@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 
+from login_required import login_not_required
 
 from .models import Client, Design, Device
 
@@ -22,6 +23,11 @@ def top(request):
 
 def general_action(request):
     return render(request, 'device/general_action.html')
+
+
+@login_not_required
+def perm_report(request):
+    return render(request, 'device/perm_report.html')
 
 
 def device_detail(request, device_number):

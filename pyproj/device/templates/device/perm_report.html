@@ -1,0 +1,31 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Permissions report
+{% endblock title %}
+
+{% block h1 %}
+    <h1>SuperHouse Device Register: Permissions report</h1>
+{% endblock h1 %}
+
+{% block body %}
+    {% if not user.is_authenticated %}
+        <p>You're not logged in.</p>
+    {% else %}
+        <p>
+            Hi {{ user.preferred_name }}, your full name is {{ user.full_name }} (<a href="mailto:{{ user.email }}">{{ user.email }}</a>).
+        </p>
+        <p>Superuser? {{ user.is_superuser|yesno }}</p>
+        <p>Staff? {{ user.is_staff|yesno }}</p>
+
+        {% if user.is_staff %}
+            <h2>Staff-only actions</h2>
+
+            <p>
+                Admin: <a href="{% url 'admin:index' %}">link</a>
+            </p>
+        {% else %}
+            <p>No actions because you're not staff.</p>
+        {% endif %}
+    {% endif %}
+{% endblock body %}
