@@ -18,6 +18,10 @@
         <p>Superuser? {{ user.is_superuser|yesno }}</p>
         <p>Staff? {{ user.is_staff|yesno }}</p>
 
+        <h2>Actions</h2>
+        <p>
+            Top: <a href="{% url 'device:top' %}">link</a>
+        </p>
         {% if user.is_staff %}
             <h2>Staff-only actions</h2>
 
