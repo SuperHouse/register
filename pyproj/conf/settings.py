@@ -46,7 +46,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Apps in the venv
-    # Apps here
+    'hijack',
+    'hijack.contrib.admin',
+    # Apps in this project
     'authuser',
     'device',
 ]
@@ -61,6 +63,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'conf.middleware.TimezoneMiddleware',
+    'hijack.middleware.HijackUserMiddleware',
 ]
 
 ROOT_URLCONF = 'conf.urls'
@@ -110,6 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = 'authuser.User'
 LOGIN_URL = '/office/login/'
+LOGIN_REDIRECT_URL = '/device/'
 LOGOUT_REDIRECT_URL = '/device/'
 
 LOGIN_REQUIRED_IGNORE_PATHS = [
@@ -118,6 +122,9 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/admin/',
     '/static/',
 ]
+
+HIJACK_PERMISSION_CHECK = 'hijack.permissions.superusers_and_staff'
+
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
