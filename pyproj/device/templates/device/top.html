@@ -44,18 +44,10 @@
                 </tr>
                 {% for design in designs %}
                     <tr>
-                        <td>
-                            {{ design.sku }}
-                        </td>
-                        <td>
-                            {{ design.name }}
-                        </td>
-                        <td>
-                            {{ design.version }}
-                        </td>
-                        <td>
-                            {{ design.client.company_name }}
-                        </td>
+                        <td>{{ design.sku }}</td>
+                        <td>{{ design.name }}</td>
+                        <td>{{ design.version }}</td>
+                        <td>{{ design.client.company_name }}</td>
                     </tr>
                 {% endfor %}
             </table>
@@ -88,8 +80,12 @@
 
         <h2>Actions</h2>
         <ul>
-            <li>General action 1: <a href="{% url 'device:general_action' %}">link</a></li>
-            <li>Admin: <a href="{% url 'admin:index' %}">link</a></li>
+            <li>
+                General action 1: <a href="{% url 'device:general_action' %}">link</a>
+            </li>
+            <li>
+                Admin: <a href="{% url 'admin:index' %}">link</a>
+            </li>
         </ul>
     {% endif %}
-    {% endblock body %}
+{% endblock body %}
