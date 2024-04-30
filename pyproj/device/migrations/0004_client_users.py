@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddField(
             model_name="client",
-            name="user",
+            name="users",
             field=models.ManyToManyField(to=settings.AUTH_USER_MODEL),
         ),
     ]

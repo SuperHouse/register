@@ -7,7 +7,7 @@ from django.db import models
 class Client(models.Model):
     company_name = models.CharField(max_length=255)
     logo = models.ImageField(null=True, blank=True)
-    user = models.ManyToManyField(settings.AUTH_USER_MODEL)
+    users = models.ManyToManyField(settings.AUTH_USER_MODEL)
 
     def __str__(self):
         return self.company_name

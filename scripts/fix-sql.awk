@@ -27,14 +27,14 @@ SKIP == 0 {
     $0 = gensub(/(CREATE TABLE|INSERT INTO) `device_types`/, "\\1 `device_design`", "g", $0)
     $0 = gensub(/(CREATE TABLE|INSERT INTO) `devices`/, "\\1 `device_device`", "g", $0)
     $0 = gensub(/(CREATE TABLE|INSERT INTO) `users`/, "\\1 `authuser_user`", "g", $0)
-    $0 = gensub(/(CREATE TABLE|INSERT INTO) `users_clients`/, "\\1 `device_client_user`", "g", $0)
+    $0 = gensub(/(CREATE TABLE|INSERT INTO) `users_clients`/, "\\1 `device_client_users`", "g", $0)
 
     # Fix column names
     $0 = gensub(/(INSERT INTO `device_client`) \(`Serial`, `Company`, `Logo`\) (VALUES)/, "\\1 (`id`, `company_name`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `device_design`) \(`Serial`, `ClientSerial`, `SKU`, `Name`, `Version`\) (VALUES)/, "\\1 (`id`, `client_id`, `sku`, `name`, `version`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `device_device`) \(`Serial`, `DeviceTypeSerial`, `AssembledDate`, `Notes`\) (VALUES)/, "\\1 (`id`, `design_id`, `assembly_date`, `notes`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `authuser_user`) \(`Serial`, `FirstName`, `LastName`, `Email`, `PasswordHash`\) (VALUES)/, "\\1 (`id`, `preferred_name`, `full_name`, `email`, `password`, `is_active`, `is_staff`, `is_superuser`, `date_joined`) \\2", "g", $0)
-    $0 = gensub(/(INSERT INTO `device_client_user`) \(`Serial`, `UserSerial`, `ClientSerial`\) (VALUES)/, "\\1 (`id`, `user_id`, `client_id`) \\2", "g", $0)
+    $0 = gensub(/(INSERT INTO `device_client_users`) \(`Serial`, `UserSerial`, `ClientSerial`\) (VALUES)/, "\\1 (`id`, `user_id`, `client_id`) \\2", "g", $0)
 
     # Fix up of data
     $0 = gensub("'', 'Notes'\\),", "'1-Jan-1970', 'Notes'),", "g", $0) # Missing assembly dates

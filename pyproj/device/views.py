@@ -8,9 +8,14 @@ from .models import Client, Design, Device
 
 
 def top(request):
-    clients = Client.objects.all()
-    designs = Design.objects.all()
-    devices = Device.objects.all()
+    if request.user.is_staff:
+        clients = Client.objects.all()
+        designs = Design.objects.all()
+        devices = Device.objects.all()
+    else:
+        clients = Client.objects.filter(users=request.user)
+        designs = Design.objects.filter(client__in=clients).all()
+        devices = Device.objects.filter(design__client__in=clients).all()
 
     context = {
         'clients': clients,
@@ -31,7 +36,11 @@ def perm_report(request):
 
 
 def device_detail(request, device_number):
-    device = get_object_or_404(Device, pk=device_number)
+    if request.user.is_staff:
+        device = get_object_or_404(Device, pk=device_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
 
     context = {
         'device': device,
@@ -41,7 +50,11 @@ def device_detail(request, device_number):
 
 
 def device_action(request, device_number):
-    device = get_object_or_404(Device, pk=device_number)
+    if request.user.is_staff:
+        device = get_object_or_404(Device, pk=device_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
 
     context = {
         'device': device,
