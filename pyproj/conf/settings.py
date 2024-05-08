@@ -16,7 +16,6 @@ from pathlib import Path
 from django.contrib.messages import constants as messages
 
 from dotenv import load_dotenv
-import dj_database_url
 
 load_dotenv()  # take environment variables from .env.
 
@@ -31,9 +30,6 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
-# ALLOWED_HOSTS = ['*']
-
 
 # Application definition
 
@@ -89,8 +85,7 @@ WSGI_APPLICATION = 'conf.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-# https://utils.brntn.me/database-url/
-DATABASES = {'default': dj_database_url.config(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}')}
+# Moved to local_settings.py
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -154,7 +149,6 @@ STATICFILES_DIRS = [
     # "/var/www/static/",
 ]
 
-MEDIA_ROOT = BASE_DIR / 'media/'
 MEDIA_URL = 'media/'
 
 # Default primary key field type
