@@ -50,6 +50,13 @@
                         {% block h1 %}
                         {% endblock h1 %}
                     </h1>
+                    <a href="{% url 'device:top' %}">
+                        <img src="{% static 'img/home.png' %}" alt="Home" />
+                    </a>
+                    <a href="https://www.superhouse.tv/">
+                        <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse logo" />
+                    </a>
+                    <hr />
 
                     {% block body %}
                         <p>A fine body here.</p>
