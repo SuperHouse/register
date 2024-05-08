@@ -1,5 +1,7 @@
 # Useful page on testing with pytest: https://djangostars.com/blog/django-pytest-testing/
 
+import re
+
 import pytest
 
 from django.urls import reverse
@@ -90,7 +92,7 @@ def test_top_stranger_fails(stranger_client):
 def test_top_user_ok(logged_in_user_client):
     response = logged_in_user_client.get(reverse('device:top'))
     assert response.status_code == 200
-    assert '<h1>SuperHouse Device Register</h1>' in response.content.decode('utf-8')
+    assert re.search('<h1>\s*SuperHouse Device Register\s*</h1>', response.content.decode('utf-8'))
 
 
 # Is a non-existent page hidden from a stranger? (ie, not 404)

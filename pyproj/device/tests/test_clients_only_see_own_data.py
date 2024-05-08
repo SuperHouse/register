@@ -16,7 +16,7 @@ def create_users_and_user_data(django_user_model):
     user1.client = client1
     user1.save()
     client1.users.add(user1)
-    design1 = Design(client=client1, sku='C1A', name='Client One Design One', version='1.0')
+    design1 = Design(client=client1, sku='C1A', name='Client One Design One', hw_version='1.0')
     design1.save()
     mothers_day = date(2021, 5, 9)
     device1 = Device(design=design1, assembly_date=mothers_day, notes='Pink soldermask')
@@ -28,7 +28,7 @@ def create_users_and_user_data(django_user_model):
     user2.client = client2
     user2.save()
     client2.users.add(user2)
-    design2 = Design(client=client2, sku='C2A', name='Client Two Design One', version='1.0')
+    design2 = Design(client=client2, sku='C2A', name='Client Two Design One', hw_version='1.0')
     design2.save()
     halloween = date(2021, 10, 31)
     device2 = Device(design=design2, assembly_date=halloween, notes='Yellow soldermask, black silkscreen')
