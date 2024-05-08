@@ -9,27 +9,48 @@
 {% endblock h1 %}
 
 {% block body %}
-    <p>Here's what we know about this device:</p>
     <table border="1">
         <tr>
-            <th>s/n</th>
-            <td>{{ device.id }}</td>
+            <th>Device:</th>
+            <td>{{ device.design.name }}</td>
+            <td rowspan="7">
+                {% if device.design.client.logo %}
+                    <img src="{{ device.design.client.logo.url }}"
+                         alt="{{ device.design.client.name }} logo" />
+                {% else %}
+                    {{ device.design.client.name }}
+                {% endif %}
+            </td>
         </tr>
         <tr>
-            <th>SKU</th>
+            <th>SKU:</th>
             <td>{{ device.design.sku }}</td>
         </tr>
         <tr>
-            <th>Client</th>
-            <td>{{ device.design.client }}</td>
+            <th>Serial:</th>
+            <td>{{ device.id }}</td>
         </tr>
         <tr>
-            <th>Assembly date</th>
+            <th>H/W Version:</th>
+            <td>{{ device.design.hw_version }}</td>
+        </tr>
+        <tr>
+            <th>S/W Version:</th>
+            <td>{{ device.sw_version }}</td>
+        </tr>
+        <tr>
+            <th>Assembled:</th>
             <td>{{ device.assembly_date }}</td>
         </tr>
         <tr>
-            <th>Notes</th>
+            <th>Notes:</th>
             <td>{{ device.notes }}</td>
+        </tr>
+        <tr>
+            <th colspan="2">Test log:</th>
+            <td>
+                &nbsp;&nbsp;&nbsp;<i>Currently no test logs</i>
+            </td>
         </tr>
     </table>
 
