@@ -1,0 +1,26 @@
+from pathlib import Path
+import dj_database_url
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+ALLOWED_HOSTS = ['*']
+
+# https://utils.brntn.me/database-url/
+DATABASES = {
+    'default': dj_database_url.config(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'),
+}
+
+STATIC_ROOT = None
+MEDIA_ROOT = BASE_DIR / 'media/'
+
+# -- Above here is local sqlite.  Below, deployed mysql
+
+ALLOWED_HOSTS = ['192.168.100.154', 'example.org']
+
+# https://utils.brntn.me/database-url/
+DATABASES = {
+    'default': dj_database_url.config(default=f'mysql://dbuser:ridiculous-password@:/register'),
+}
+
+STATIC_ROOT = '/var/www/register-static/'
+MEDIA_ROOT = '/var/www/register-media/'
