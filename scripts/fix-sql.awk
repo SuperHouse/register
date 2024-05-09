@@ -12,15 +12,23 @@
 # Define the array of substitutions
 BEGIN {
     SKIP = 0
+    SQLITE = 1
+    MYSQL = 0
 }
 
 # Perform substitutions on each line
 SKIP == 0 {
-    # Remove statements sqlite doesn't understand
-    sub(/^SET .*/, "-- " $0)
+    if (SQLITE) {
+        # Remove statements sqlite doesn't understand
+        sub(/^SET .*/, "-- " $0)
 
-    # Modify statements sqlite nearly understands
-    sub(/^START TRANSACTION;/, "BEGIN TRANSACTION;")
+        # Modify statements sqlite nearly understands
+        sub(/^START TRANSACTION;/, "BEGIN TRANSACTION;")
+    if (MYSQL) {
+        if (match($0, /^START TRANSACTION;/)) {
+            print("SET FOREIGN_KEY_CHECKS=0;");
+        }
+    }
 
     # Fix table names
     $0 = gensub(/(CREATE TABLE|INSERT INTO) `clients`/, "\\1 `device_client`", "g", $0)
@@ -39,7 +47,12 @@ SKIP == 0 {
     # Fix up of data
     $0 = gensub("'', 'Notes'\\),", "'1-Jan-1970', 'Notes'),", "g", $0) # Missing assembly dates
     $0 = gensub("('[^']*'), ''\\)", "\\1\\)", "g", $0) # Empty logos for clients
-    $0 = gensub(/(\.tv|\.com\.au)'(\)[,;])$/, "\\1', 'invalid', 1, 0, 0, DATE('now')\\2", "g", $0) # Additional user info
+    if (SQLITE) {
+        $0 = gensub(/(\.tv|\.com\.au)'(\)[,;])$/, "\\1', 'invalid', 1, 0, 0, DATE('now')\\2", "g", $0) # Additional user info
+    }
+    if (MYSQL) {
+        $0 = gensub(/(\.tv|\.com\.au)'(\)[,;])$/, "\\1', 'invalid', 1, 0, 0, CURDATE()\\2", "g", $0) # Additional user info
+    }
 
     # Add some data fixing scripts
     if (match($0, /^COMMIT;/)) {
@@ -65,7 +78,12 @@ SKIP == 0 {
         print("UPDATE authuser_user SET full_name = preferred_name || ' ' || full_name;")
         print("UPDATE authuser_user SET preferred_name = 'Jon' WHERE preferred_name = 'Jonathan';");
         print("INSERT INTO `authuser_user` (`id`, `preferred_name`, `full_name`, `email`, `password`, `is_active`, `is_staff`, `is_superuser`, `date_joined`) VALUES")
-        print("(100, 'Mitch', 'Mitch Davis', 'mjd@afork.com', 'pbkdf2_sha256$720000$2ve6S2XB6rBLFEbJsd09vm$4ZnXsPDjUhq2JNtr7jiox0abT3yRCr5hFszzZw/WjbE=', 1, 1, 1, DATE('now'));")
+        if (SQLITE) {
+            print("(100, 'Mitch', 'Mitch Davis', 'mjd@afork.com', 'pbkdf2_sha256$720000$2ve6S2XB6rBLFEbJsd09vm$4ZnXsPDjUhq2JNtr7jiox0abT3yRCr5hFszzZw/WjbE=', 1, 1, 1, DATE('now'));")
+        }
+        if (MYSQL) {
+        print("(100, 'Mitch', 'Mitch Davis', 'mjd@afork.com', 'pbkdf2_sha256$720000$2ve6S2XB6rBLFEbJsd09vm$4ZnXsPDjUhq2JNtr7jiox0abT3yRCr5hFszzZw/WjbE=', 1, 1, 1, CURDATE());")
+        }
     }
 
     # Don't save transaction (optional, for testing)
