@@ -66,4 +66,10 @@ class TestRecord(models.Model):
         return classes.get(self.result, 'table-dark')
 
 
+class TestImage(models.Model):
+    test_record = models.ForeignKey(TestRecord, on_delete=models.CASCADE)
+    image = models.ImageField()
+
+    def __str__(self):
+        return f'{self.test_record} - {self.image}'
 

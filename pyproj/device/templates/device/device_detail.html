@@ -68,6 +68,9 @@
                 <tr class="collapse mt-3" id="collapseExample-{{ forloop.counter }}">
                     <td colspan="3">
                         <pre>{{ test_record.notes }}</pre>
+                        {% for test_image in test_record.testimage_set.all %}
+                            <img src="{{ test_image.image.url }}">
+                        {% endfor %}
                     </td>
                 </tr>
             {% empty %}
