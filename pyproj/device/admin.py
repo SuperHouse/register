@@ -1,10 +1,11 @@
 from django.contrib import admin
 
-from .models import Client, Design, Device, TestRecord
+from .models import Client, Design, Device, TestImage, TestRecord
 
 admin.site.register(Client)
 admin.site.register(Design)
 admin.site.register(Device)
+admin.site.register(TestImage)
 admin.site.register(TestRecord)
 
 admin.site.site_header = 'Device register'
