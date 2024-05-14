@@ -1,5 +1,7 @@
 {% extends "device/base.html" %}
 
+{% load thumbnail %}
+
 {% block title %}
     SuperHouse Device Register
 {% endblock title %}
@@ -21,7 +23,7 @@
                 {% for client in clients %}
                     <tr>
                         <td valign="middle">
-                            {% if client.logo %}<img src="{{ client.logo.url }}" alt="{{ client.name }} logo">{% endif %}
+                            {% if client.logo %}<img src="{{ client.logo|thumbnail_url:'vsmall' }}" alt="{{ client.name }} logo">{% endif %}
                             {{ client.company_name }}
                         </td>
                     </tr>

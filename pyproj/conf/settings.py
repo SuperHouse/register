@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Apps in the venv
+    'easy_thumbnails',
     'hijack',
     'hijack.contrib.admin',
     # Apps in this project
@@ -169,6 +170,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #         "level": "DEBUG",
 #     },
 # }
+
+THUMBNAIL_BASEDIR = 'thumbs'
+THUMBNAIL_DEBUG = True
+THUMBNAIL_ALIASES = {
+    '': {
+        'vsmall': {
+            'size': (32, 32),
+            # 'detail': True, 'crop': True, 'upscale': True, 'ALIAS': 'vsmall', 'ratio_field': 'crop_thumb',
+        },
+        'testimage-thumbs': {
+            'size': (270, 270),
+            # 'detail': True, 'crop': True, 'upscale': True, 'ALIAS': 'vsmall', 'ratio_field': 'crop_thumb',
+        },
+    },
+}
+
 
 try:
     from .local_settings import *

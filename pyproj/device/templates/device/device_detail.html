@@ -1,5 +1,7 @@
 {% extends "device/base.html" %}
 
+{% load thumbnail %}
+
 {% block title %}
     SuperHouse Device Register: Device detail
 {% endblock title %}
@@ -69,7 +71,7 @@
                     <td colspan="3">
                         <pre>{{ test_record.notes }}</pre>
                         {% for test_image in test_record.testimage_set.all %}
-                            <img src="{{ test_image.image.url }}">
+                            <img src="{{ test_image.image|thumbnail_url:'testimage-thumbs' }}">
                         {% endfor %}
                     </td>
                 </tr>

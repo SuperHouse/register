@@ -9,3 +9,5 @@ black==24.4.1
 pytest-django==4.8.0
 django-login-required-middleware==0.9.0
 django-hijack==3.4.5
+easy_thumbnails==2.8.5
+# gunicorn
