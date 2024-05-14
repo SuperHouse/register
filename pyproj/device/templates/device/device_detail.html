@@ -49,16 +49,23 @@
     </table>
 
     <h3>Test log</h3>
+
     <table class="table table-bordered">
         {% with test_records=device.testrecord_set.all %}
             {% for test_record in test_records %}
                 <tr class="{{ test_record.get_bootstrap_table_class }}">
                     <td>
+                        <button class="btn btn-primary"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#collapseExample-{{ forloop.counter }}"
+                                aria-expanded="false"
+                                aria-controls="collapseExample-{{ forloop.counter }}">Expand</button>
                         Test executed {{ test_record.test_dt }}
                     </td>
                     <td>{{ test_record.get_result_display }}</td>
                 </tr>
-                <tr>
+                <tr class="collapse mt-3" id="collapseExample-{{ forloop.counter }}">
                     <td colspan="3">
                         <pre>{{ test_record.notes }}</pre>
                     </td>
