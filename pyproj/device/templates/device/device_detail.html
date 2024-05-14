@@ -9,7 +9,7 @@
 {% endblock h1 %}
 
 {% block body %}
-    <table border="1">
+    <table class="table table-bordered">
         <tr>
             <th>Device:</th>
             <td>{{ device.design.name }}</td>
@@ -46,15 +46,35 @@
             <th>Notes:</th>
             <td>{{ device.notes }}</td>
         </tr>
-        <tr>
-            <th colspan="2">Test log:</th>
-            <td>
-                &nbsp;&nbsp;&nbsp;<i>Currently no test logs</i>
-            </td>
-        </tr>
+    </table>
+
+    <h3>Test log</h3>
+    <table class="table table-bordered">
+        {% with test_records=device.testrecord_set.all %}
+            {% for test_record in test_records %}
+                <tr class="{{ test_record.get_bootstrap_table_class }}">
+                    <td>
+                        Test executed {{ test_record.test_dt }}
+                    </td>
+                    <td>{{ test_record.get_result_display }}</td>
+                </tr>
+                <tr>
+                    <td colspan="3">
+                        <pre>{{ test_record.notes }}</pre>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td>
+                        &nbsp;&nbsp;&nbsp;<i>Currently no test logs</i>
+                    </td>
+                </tr>
+            {% endfor %}
+        {% endwith %}
     </table>
 
     <h2>Actions</h2>
+
     <ul>
         <li>
             Some sort of exciting action: <a href="{% url 'device:device_action' device.id %}">link</a>
