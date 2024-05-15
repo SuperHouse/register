@@ -21,7 +21,7 @@ class Design(models.Model):
     description = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return self.sku
+        return f'{self.sku}: {self.name} {self.hw_version}'
 
 
 class Device(models.Model):
