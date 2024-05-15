@@ -26,13 +26,13 @@ def top(request):
     return render(request, 'device/top.html', context)
 
 
-def general_action(request):
-    return render(request, 'device/general_action.html')
-
-
 @login_not_required
 def perm_report(request):
     return render(request, 'device/perm_report.html')
+
+
+def general_action(request):
+    return render(request, 'device/general_action.html')
 
 
 def device_detail(request, device_number):
