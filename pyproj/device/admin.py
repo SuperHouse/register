@@ -1,4 +1,7 @@
+from easy_thumbnails.files import get_thumbnailer
+
 from django.contrib import admin
+from django.utils.html import format_html
 
 from .models import Client, Design, Device, TestImage, TestRecord
 
@@ -19,6 +22,18 @@ class DeviceAdmin(admin.ModelAdmin):
     inlines = [TestRecordInline]
 
 
+class TestImageAdmin(admin.ModelAdmin):
+    list_display = ['test_record', 'image', 'thumbnail']
+    list_filter = ['test_record']
+    readonly_fields = ['thumbnail']
+
+    def thumbnail(self, obj):
+        thumb_url = get_thumbnailer(obj.image)['testimage-admin-thumbs'].url
+        return format_html(f'<img src="{thumb_url}" />')
+
+    thumbnail.short_description = 'thumbnail'
+
+
 class TestImageInline(admin.TabularInline):
     model = TestImage
     extra = 0
@@ -35,7 +50,7 @@ class TestRecordAdmin(admin.ModelAdmin):
 admin.site.register(Client)
 admin.site.register(Design, DesignAdmin)
 admin.site.register(Device, DeviceAdmin)
-admin.site.register(TestImage)
+admin.site.register(TestImage, TestImageAdmin)
 admin.site.register(TestRecord, TestRecordAdmin)
 
 admin.site.site_header = 'Device register'
