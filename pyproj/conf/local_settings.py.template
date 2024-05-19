@@ -3,6 +3,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = True
+
 ALLOWED_HOSTS = ['*']
 
 # https://utils.brntn.me/database-url/
@@ -14,6 +17,9 @@ STATIC_ROOT = None
 MEDIA_ROOT = BASE_DIR / 'media/'
 
 # -- Above here is local sqlite.  Below, deployed mysql
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = False
 
 ALLOWED_HOSTS = ['192.168.100.154', 'example.org']
 
