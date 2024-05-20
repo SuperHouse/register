@@ -68,7 +68,7 @@
                 {% for device in devices %}
                     <tr>
                         <td>
-                            {{ device.design.name }}
+                            {{ device.design.sku }} {{ device.design.name }} {{ device.design.hw_version }}
                             <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
                         </td>
                     </tr>
