@@ -46,7 +46,7 @@
         </tr>
         <tr>
             <th>Notes:</th>
-            <td>{{ device.notes }}</td>
+            <td>{{ device.notes|default_if_none:"" }}</td>
         </tr>
     </table>
 
@@ -69,7 +69,7 @@
                 </tr>
                 <tr class="collapse mt-3" id="collapseExample-{{ forloop.counter }}">
                     <td colspan="3">
-                        <pre>{{ test_record.notes }}</pre>
+                        <pre>{{ test_record.notes|default_if_none:"" }}</pre>
                         {% for test_image in test_record.testimage_set.all %}
                             <a href="{{ test_image.image.url }}" data-toggle="lightbox" data-gallery="gallery-{{test_record.pk}}" class="col-sm-4">
                                 <img src="{{ test_image.image|thumbnail_url:'testimage-thumbs' }}" class="img-fluid">
