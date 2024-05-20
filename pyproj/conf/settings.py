@@ -174,14 +174,12 @@ THUMBNAIL_ALIASES = {
     '': {
         'vsmall': {
             'size': (32, 32),
-            # 'detail': True, 'crop': True, 'upscale': True, 'ALIAS': 'vsmall', 'ratio_field': 'crop_thumb',
         },
         'testimage-admin-thumbs': {
             'size': (130, 130),
         },
         'testimage-thumbs': {
             'size': (270, 270),
-            # 'detail': True, 'crop': True, 'upscale': True, 'ALIAS': 'vsmall', 'ratio_field': 'crop_thumb',
         },
     },
 }
