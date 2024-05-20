@@ -32,7 +32,7 @@ class Device(models.Model):
     notes = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return f'{self.design.sku} (sn: {self.pk})'
+        return f'{self.design.sku} {self.design.hw_version} (sn: {self.pk})'
 
 
 class TestRecord(models.Model):
