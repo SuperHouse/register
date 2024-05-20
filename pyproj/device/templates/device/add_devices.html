@@ -1,0 +1,88 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Add devices
+{% endblock title %}
+
+{% block h1 %}
+    Add devices
+{% endblock h1 %}
+
+{% block body %}
+    {% if errors %}
+        <div class="alert alert-danger" role="alert">
+            <ul>
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <p>Errors occurred, so no changes have been made to the database.</p>
+    {% else %}
+        <p>Just manufactured some devices?  Great!  Let's allocate some serial numbers.</p>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form }}
+        <input type="submit" name="allocate" value="Allocate" />
+    </form>
+ 
+    <h2>Most recent 20 devices</h2>
+
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>Serial #</th>
+                <th>Design</th>
+                <th>HW version</th>
+                <th>Assembly date</th>
+                <th>SW version</th>
+            </tr>
+        </thead>
+        {% for device in last20 %}
+            <tr>
+                <td{% if forloop.first %} class="table-active"{% endif %}>{{ device.pk }}</td>
+                <td>
+                    {% ifchanged %}
+                        {{ device.design.name }}
+                    {% else %}
+                        &nbsp; &vellip;
+                    {% endifchanged %}
+                </td>
+                <td>
+                    {% ifchanged %}
+                        {{ device.design.hw_version }}
+                    {% else %}
+                        &nbsp; &vellip;
+                    {% endifchanged %}
+                </td>
+                <td>
+                    {% ifchanged %}
+                        {{ device.assembly_date }}
+                    {% else %}
+                        &nbsp; &vellip;
+                    {% endifchanged %}
+                </td>
+                <td>
+                    {% ifchanged %}
+                        {{ device.sw_version|default_if_none:"" }}
+                    {% else %}
+                        &nbsp; &vellip;
+                    {% endifchanged %}
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="4">No devices allocated yet</td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <h2>Actions</h2>
+    <p>
+        Top: <a href="{% url 'device:top' %}">link</a>
+    </p>
+
+{% endblock body %}

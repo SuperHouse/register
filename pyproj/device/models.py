@@ -34,6 +34,10 @@ class Device(models.Model):
     def __str__(self):
         return f'{self.design.sku} {self.design.hw_version} (sn: {self.pk})'
 
+    @classmethod
+    def first_free_serial(self):
+        return Device.objects.aggregate(models.Max('pk'))['pk__max'] + 1
+
 
 class TestRecord(models.Model):
     NEW = 'NEW'
