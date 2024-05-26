@@ -1,7 +1,6 @@
-from datetime import date, datetime
-
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Client(models.Model):
@@ -26,7 +25,7 @@ class Design(models.Model):
 
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
-    assembly_date = models.DateField(default=date.today)
+    assembly_date = models.DateField(default=timezone.localdate)
     sw_version = models.CharField(max_length=20, null=True, blank=True)
     # We may need to change notes to a TextField if we need multi-line
     notes = models.CharField(max_length=255, null=True, blank=True)
@@ -52,7 +51,7 @@ class TestRecord(models.Model):
         (INCONCLUSIVE, 'INCONCLUSIVE'),
     ]
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
-    test_dt = models.DateTimeField(default=datetime.now)
+    test_dt = models.DateTimeField(default=timezone.now)
     result = models.CharField(max_length=5, choices=RESULT_CHOICES, default='NEW')
     notes = models.TextField(null=True, blank=True)
 
