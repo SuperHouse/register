@@ -38,7 +38,9 @@
         </tr>
         <tr>
             <th>S/W Version:</th>
-            <td>{{ device.sw_version }}</td>
+            <td>
+                {{ device.sw_version|default_if_none:"<i>Not set</i>" }}
+            </td>
         </tr>
         <tr>
             <th>Assembled:</th>
