@@ -110,8 +110,12 @@
                     <td colspan="3">
                         <pre>{{ test_record.notes|default_if_none:"" }}</pre>
                         {% for test_image in test_record.testimage_set.all %}
-                            <a href="{{ test_image.image.url }}" data-toggle="lightbox" data-gallery="gallery-{{test_record.pk}}" class="col-sm-4">
-                                <img src="{{ test_image.image|thumbnail_url:'testimage-thumbs' }}" class="img-fluid">
+                            <a href="{{ test_image.image.url }}"
+                               data-toggle="lightbox"
+                               data-gallery="gallery-{{ test_record.pk }}"
+                               class="col-sm-4">
+                                <img src="{{ test_image.image|thumbnail_url:'testimage-thumbs' }}"
+                                     class="img-fluid">
                             </a>
                         {% endfor %}
                     </td>
