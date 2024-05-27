@@ -55,6 +55,9 @@ class TestRecord(models.Model):
     result = models.CharField(max_length=5, choices=RESULT_CHOICES, default='NEW')
     notes = models.TextField(null=True, blank=True)
 
+    class Meta:
+        ordering = ["test_dt"]
+
     def __str__(self):
         return f'{self.device} - {self.test_dt} - {self.result}'
 
