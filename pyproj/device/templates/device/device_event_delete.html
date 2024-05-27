@@ -1,0 +1,42 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Delete device event
+{% endblock title %}
+
+{% block h1 %}
+Delete device event
+{% endblock h1 %}
+
+{% block body %}
+    <h2>Event</h2>
+
+    <table class="table table-bordered">
+        <tr>
+            <th>Device</th>
+            <td>{{ event.device }}</td>
+        </tr>
+        <tr>
+            <th>When</th>
+            <td>{{ event.event_dt }}</td>
+        </tr>
+        <tr>
+            <th>Type</th>
+            <td>{{ event.get_event_type_icon }}{{ event.event_type }}</td>
+        </tr>
+        <tr>
+            <th>Description</th>
+            <td>{{ event.description }}</td>
+        </tr>
+    </table>
+
+    <form method="post">
+        {% csrf_token %}
+        <input type="submit" name="delete" value="Delete?" />
+    </form>
+ 
+    <h2>Actions</h2>
+    <p>
+        Up: <a href="{% url 'device:device_detail' event.device.pk %}">link</a>
+    </p>
+{% endblock body %}

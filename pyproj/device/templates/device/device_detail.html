@@ -52,6 +52,43 @@
         </tr>
     </table>
 
+    <h3>Device events</h3>
+
+    <table class="table table-bordered">
+        {% with events=device.deviceevent_set.all %}
+            {% for event in events %}
+                {% if forloop.first %}
+                    <thead>
+                        <tr>
+                            <th>Internal</th>
+                            <th>When</th>
+                            <th>Note</th>
+                            <th>Operation</th>
+                        </tr>
+                    </thead>
+                {% endif %}
+                <tr>
+                    <td>
+                        {{ event.internal|yesno:"🔒,🔊" }}
+                    </td>
+                    <td>{{ event.event_dt }}</td>
+                    <td>{{ event.get_event_type_icon }}{{ event.event_type }}: {{ event.description|default_if_none:"" }}</td>
+                    <td>
+                        <a href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
+                        <a href="{% url 'device:device_event_delete' event.pk %}">Del</a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="3">
+                        &nbsp;&nbsp;&nbsp;<i>Currently no device events.</i>    {% comment %} Add {% endcomment %}
+                    </td>
+                </tr>
+            {% endfor %}
+        {% endwith %}
+    </table>
+    <a href="{% url 'device:device_event_add' device.pk %}">Add</a>
+
     <h3>Test log</h3>
 
     <table class="table table-bordered">

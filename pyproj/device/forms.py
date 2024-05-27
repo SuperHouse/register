@@ -3,6 +3,7 @@ from datetime import date
 from django import forms
 from django.forms.widgets import HiddenInput
 
+from .models import Design, Device, DeviceEvent
 from .models import Design, Device
 
 
@@ -53,3 +54,14 @@ class AddDevicesForm(forms.Form):
             raise forms.ValidationError("Requested assembly date isn't today")
 
         return assembly_date
+
+
+class DeviceEventForm(forms.ModelForm):
+    class Meta:
+        model = DeviceEvent
+        fields = ['internal', 'event_type', 'description']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Set help text for event_type field.  For some reason, this help text doesn't render.
+        self.fields['event_type'].help_text = 'Recognised: "NOTE", "SHIP", "INV"'

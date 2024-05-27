@@ -4,8 +4,7 @@ import pytest
 from django.utils import timezone
 from django.urls import reverse
 
-
-from device.models import Client, Design, Device
+from device.models import Client, Design, Device, DeviceEvent
 
 
 # Helper: Create two users, and some corresponding client, design and device data
@@ -67,3 +66,61 @@ def test_admin_can_see_user1_and_user2_data(admin_client, create_users_and_user_
     assert response.status_code == 200
     response = admin_client.get(reverse('device:device_detail', args=[data['user2_device'].pk]))
     assert response.status_code == 200
+
+
+# Helper: Create two users, and some corresponding client, design and device data
+@pytest.fixture
+def create_some_device_events(django_user_model, create_users_and_user_data):
+    # Create a device event for user1, and a device event for user2
+    data = create_users_and_user_data
+    user1 = data['user1']
+    user1_device = data['user1_device']
+    event_dt = timezone.make_aware(datetime(2021, 5, 10))
+    user1_device_event1 = DeviceEvent(device=user1_device, event_dt=event_dt, description="User 1's first event")
+    user1_device_event1.save()
+    user2 = data['user2']
+    user2_device = data['user2_device']
+    event_dt = timezone.make_aware(datetime(2021, 5, 11))
+    user2_device_event1 = DeviceEvent(
+        device=user2_device,
+        event_dt=event_dt,
+        description="User 2's first event",
+        internal=True,
+        event_type='SHIP',
+    )
+    user2_device_event1.save()
+
+    updates = {
+        'user1_device_event1': user1_device_event1,
+        'user2_device_event1': user2_device_event1,
+    }
+
+    data.update(updates)
+
+    return data
+
+
+def test_device_event_user1_cant_see_user2_data(client, create_some_device_events):
+    data = create_some_device_events
+
+    client.force_login(data['user1'])
+
+    u1d = data['user1_device']
+    u2d = data['user2_device']
+
+    response = client.get(reverse('device:device_event_add', args=[u1d.pk]))
+    assert response.status_code == 200
+    response = client.get(reverse('device:device_event_add', args=[u2d.pk]))
+    assert response.status_code == 404
+
+    u1de = data['user1_device_event1']
+    u2de = data['user2_device_event1']
+
+    response = client.get(reverse('device:device_event_edit', args=[u1de.pk]))
+    assert response.status_code == 200
+    response = client.get(reverse('device:device_event_delete', args=[u1de.pk]))
+    assert response.status_code == 200
+    response = client.get(reverse('device:device_event_edit', args=[u2de.pk]))
+    assert response.status_code == 404
+    response = client.get(reverse('device:device_event_delete', args=[u2de.pk]))
+    assert response.status_code == 404

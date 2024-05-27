@@ -4,11 +4,12 @@ from django.db import DatabaseError, IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.shortcuts import redirect
 from django.shortcuts import render
+from django.utils import timezone
 
 from login_required import login_not_required
 
-from .forms import AddDevicesForm
-from .models import Client, Design, Device
+from .forms import AddDevicesForm, DeviceEventForm
+from .models import Client, Design, Device, DeviceEvent
 
 
 def top(request):
@@ -122,3 +123,102 @@ def device_action(request, device_number):
     messages.success(request, 'Action worked just fine!')
 
     return render(request, 'device/device_action.html', context)
+
+
+def device_event_add(request, device_number):
+    if request.user.is_staff:
+        device = get_object_or_404(Device, pk=device_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
+
+    if request.method == "POST":
+        form = DeviceEventForm(request.POST, initial={'device': device})
+        if form.is_valid():
+            form.instance.device = device
+            event = form.save()
+
+            messages.success(request, 'Event added.')
+
+            return redirect("device:device_detail", device_number=event.device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a blank form
+        form = DeviceEventForm()
+
+    ctx = {
+        'form': form,
+        'device': device,
+        'operation': 'Add',
+        'ts': None,
+    }
+
+    return render(request, "device/device_event_edit.html", ctx)
+
+    return redirect('device:device_detail', device_number=device.pk)
+
+
+def device_event_edit(request, device_event_number):
+    if request.user.is_staff:
+        event = get_object_or_404(DeviceEvent, pk=device_event_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        event = get_object_or_404(DeviceEvent, device__design__client__in=clients, pk=device_event_number)
+
+    if request.method == "POST":
+        form = DeviceEventForm(request.POST, instance=event)
+        if form.is_valid():
+            form.instance.event_dt = timezone.now()
+            event = form.save()
+
+            messages.success(request, 'Event saved.')
+
+            return redirect("device:device_detail", device_number=event.device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a blank form
+        form = DeviceEventForm(instance=event)
+
+    ctx = {
+        'form': form,
+        'device': event.device,
+        'operation': 'Edit',
+        'ts': event.event_dt,
+    }
+
+    return render(request, "device/device_event_edit.html", ctx)
+
+
+def device_event_delete(request, device_event_number):
+    if request.user.is_staff:
+        event = get_object_or_404(DeviceEvent, pk=device_event_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        event = get_object_or_404(DeviceEvent, device__design__client__in=clients, pk=device_event_number)
+
+    if request.method == "POST":
+        event.delete()
+        messages.success(
+            request,
+            "Device event deleted.",
+        )
+
+        return redirect("device:device_detail", device_number=event.device.pk)
+
+    ctx = {
+        'event': event,
+    }
+
+    return render(request, "device/device_event_delete.html", ctx)

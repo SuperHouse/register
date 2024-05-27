@@ -13,4 +13,7 @@ urlpatterns = [
     path('add/', views.add_devices, name='add_devices'),
     path('<int:device_number>/', views.device_detail, name='device_detail'),
     path('<int:device_number>/action/', views.device_action, name='device_action'),
+    path('event/<int:device_number>/de-add/', views.device_event_add, name='device_event_add'),
+    path('event/<int:device_event_number>/de-edit/', views.device_event_edit, name='device_event_edit'),
+    path('<int:device_event_number>/de-del/', views.device_event_delete, name='device_event_delete'),
 ]

@@ -1,0 +1,40 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: {{ operation }} device event
+{% endblock title %}
+
+{% block h1 %}
+    {{ operation }} device event
+{% endblock h1 %}
+
+{% block body %}
+    {% if errors %}
+        <div class="alert alert-danger" role="alert">
+            <ul>
+                {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+        </div>
+
+        <p>Errors occurred, so no changes have been made to the database.</p>
+    {% endif %}
+
+    <p>
+        {% if ts %}
+            <b>Current timestamp:</b> {{ ts }}.  <i>Editing note will update timestamp to the current time.</i>
+        {% else %}
+            <i>Saving note will set timestamp to the current time.</i>
+        {% endif %}
+    </p>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form }}
+        <input type="submit" name="save" value="Save" />
+    </form>
+ 
+    <h2>Actions</h2>
+    <p>
+        Up: <a href="{% url 'device:device_detail' device.pk %}">link</a>
+    </p>
+{% endblock body %}
