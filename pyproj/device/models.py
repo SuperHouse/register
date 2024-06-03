@@ -53,7 +53,7 @@ class TestRecord(models.Model):
     ]
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     test_dt = models.DateTimeField(default=timezone.now)
-    result = models.CharField(max_length=5, choices=RESULT_CHOICES, default='NEW')
+    result = models.CharField(max_length=20, choices=RESULT_CHOICES, default='NEW')
     notes = models.TextField(null=True, blank=True)
 
     __test__ = False  # Stop PyTest from treating this model as a test class.
