@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 import os
 
 from pathlib import Path
+
 from django.contrib.messages import constants as messages
 
 from dotenv import load_dotenv
@@ -56,8 +57,8 @@ MIDDLEWARE = [
     'login_required.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'conf.middleware.TimezoneMiddleware',
     'hijack.middleware.HijackUserMiddleware',
+    'conf.middleware.TimezoneMiddleware',
 ]
 
 ROOT_URLCONF = 'conf.urls'
@@ -73,6 +74,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'device.context_processor.background_processor',  # Variables for customising the background
             ],
         },
     },
@@ -192,6 +194,26 @@ THUMBNAIL_ALIASES = {
         'testimage-thumbs': {
             'size': (270, 270),
         },
+    },
+}
+
+DEPLOY_TYPE = os.environ.get("DEPLOY_TYPE")
+BACKGROUND_SETTINGS = {
+    'dev': {
+        'CSS_BODY_BACKGROUND_COLOUR': '#e5edf5',
+        'CSS_BODY_BACKGROUND_IMAGE': None,
+        # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': '#ffffff',
+    },
+    'test': {
+        'CSS_BODY_BACKGROUND_COLOUR': '#fff6f6',
+        'CSS_BODY_BACKGROUND_IMAGE': '/static/img/test-server-en.png',
+        # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
+    },
+    'prod': {
+        'CSS_BODY_BACKGROUND_COLOUR': None,
+        # 'CSS_BODY_BACKGROUND_IMAGE': '/static/img/live-data-dont-use-en.png',
+        'CSS_BODY_BACKGROUND_IMAGE': '/static/img/live-data-dont-use-en.png',
+        # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
     },
 }
 
