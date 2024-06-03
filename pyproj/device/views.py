@@ -8,8 +8,8 @@ from django.utils import timezone
 
 from login_required import login_not_required
 
-from .forms import AddDevicesForm, DeviceEventForm
-from .models import Client, Design, Device, DeviceEvent
+from .forms import AddDevicesForm, DeviceEventForm, TestRecordForm
+from .models import Client, Design, Device, DeviceEvent, TestRecord
 
 
 def top(request):
@@ -222,3 +222,37 @@ def device_event_delete(request, device_event_number):
     }
 
     return render(request, "device/device_event_delete.html", ctx)
+
+
+def test_record_edit(request, test_record_number):
+    if request.user.is_staff:
+        test_record = get_object_or_404(TestRecord, pk=test_record_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        test_record = get_object_or_404(TestRecord, device__design__client__in=clients, pk=test_record_number)
+
+    if request.method == "POST":
+        form = TestRecordForm(request.POST, instance=test_record)
+        if form.is_valid():
+            form.save()
+
+            messages.success(request, 'Test record saved.')
+
+            return redirect("device:device_detail", device_number=test_record.device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a blank form
+        form = TestRecordForm(instance=test_record)
+
+    ctx = {
+        'form': form,
+        'device': test_record.device,
+    }
+
+    return render(request, "device/test_record_edit.html", ctx)

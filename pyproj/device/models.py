@@ -1,3 +1,4 @@
+import zoneinfo
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -55,11 +56,20 @@ class TestRecord(models.Model):
     result = models.CharField(max_length=5, choices=RESULT_CHOICES, default='NEW')
     notes = models.TextField(null=True, blank=True)
 
+    __test__ = False  # Stop PyTest from treating this model as a test class.
+
     class Meta:
         ordering = ["test_dt"]
 
     def __str__(self):
-        return f'{self.device} - {self.test_dt} - {self.result}'
+        tzname = settings.TIME_ZONE
+        if tzname:
+            tz = zoneinfo.ZoneInfo(tzname)
+            test_dt_as_local_str = str(self.test_dt.astimezone(tz))  # .strftime('%Y-%m-%d %H:%M:%S %Z')
+        else:
+            test_dt_as_local_str = str(self.test_dt)
+
+        return f'{self.device} - {test_dt_as_local_str} - {self.result}'
 
     def get_bootstrap_table_class(self):
         classes = {

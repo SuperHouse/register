@@ -3,8 +3,7 @@ from datetime import date
 from django import forms
 from django.forms.widgets import HiddenInput
 
-from .models import Design, Device, DeviceEvent
-from .models import Design, Device
+from .models import Design, Device, DeviceEvent, TestRecord
 
 
 class AddDevicesForm(forms.Form):
@@ -65,3 +64,12 @@ class DeviceEventForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Set help text for event_type field.  For some reason, this help text doesn't render.
         self.fields['event_type'].help_text = 'Recognised: "NOTE", "SHIP", "INV"'
+
+
+class TestRecordForm(forms.ModelForm):
+    __test__ = False  # Stop PyTest from treating this model as a test class.
+
+    class Meta:
+        model = TestRecord
+        fields = '__all__'
+

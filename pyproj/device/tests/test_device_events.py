@@ -2,10 +2,7 @@ from django.urls import reverse
 
 from device.models import DeviceEvent
 
-from test_clients_only_see_own_data import (
-    create_users_and_user_data,
-    create_some_device_events,
-)
+from test_clients_only_see_own_data import create_some_device_events, create_users_and_user_data
 
 
 def test_device_event_add_edit_delete(client, create_some_device_events):

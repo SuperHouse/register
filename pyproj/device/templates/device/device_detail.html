@@ -103,6 +103,7 @@
                                 aria-expanded="false"
                                 aria-controls="collapseExample-{{ forloop.counter }}">Expand</button>
                         Test executed {{ test_record.test_dt }}
+                        {% comment %} <a href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a> {% endcomment %}
                     </td>
                     <td>{{ test_record.get_result_display }}</td>
                 </tr>

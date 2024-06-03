@@ -1,10 +1,11 @@
 from datetime import datetime
+
+from django.urls import reverse
+from django.utils import timezone
 import pytest
 
-from django.utils import timezone
-from django.urls import reverse
-
-from device.models import Client, Design, Device, DeviceEvent
+from device.forms import TestRecordForm
+from device.models import Client, Design, Device, DeviceEvent, TestRecord
 
 
 # Helper: Create two users, and some corresponding client, design and device data
