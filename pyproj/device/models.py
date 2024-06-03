@@ -20,6 +20,9 @@ class Design(models.Model):
     hw_version = models.CharField(max_length=20)
     description = models.TextField(null=True, blank=True)
 
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['sku', 'hw_version'], name='unique_sku_hwversion')]
+
     def __str__(self):
         return f'{self.sku}: {self.name} {self.hw_version}'
 

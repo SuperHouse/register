@@ -7,7 +7,7 @@ from .models import Client, Design, Device, DeviceEvent, TestImage, TestRecord
 
 
 class DesignAdmin(admin.ModelAdmin):
-    fields = ['client', 'sku', ('name', 'hw_version'), 'description']
+    fields = ['client', ('sku', 'hw_version'), 'name', 'description']
     list_filter = ['client', 'sku']
     search_fields = ['sku', 'name', 'hw_version']
 
