@@ -166,6 +166,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #         "handlers": ["console"],
 #         "level": "DEBUG",
 #     },
+#     'loggers': {
+#         'django.request': {
+#             'handlers': ['console'],
+#             'level': 'ERROR',
+#             'propagate': True,
+#         },
+#         'django.db.backends': {
+#             'handlers': ['console'],
+#             'level': 'DEBUG',
+#         },
+#     },
 # }
 
 THUMBNAIL_BASEDIR = 'thumbs'
