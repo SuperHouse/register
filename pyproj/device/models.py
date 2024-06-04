@@ -19,6 +19,8 @@ class Design(models.Model):
     name = models.CharField(max_length=255)
     hw_version = models.CharField(max_length=20)
     description = models.TextField(null=True, blank=True)
+    price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    price2 = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['sku', 'hw_version'], name='unique_sku_hwversion')]
