@@ -69,7 +69,7 @@ def test_admin_can_see_user1_and_user2_data(admin_client, create_users_and_user_
     assert response.status_code == 200
 
 
-# Helper: Create two users, and some corresponding client, design and device data
+# Helper: Create some device events for two users
 @pytest.fixture
 def create_some_device_events(django_user_model, create_users_and_user_data):
     # Create a device event for user1, and a device event for user2
@@ -124,4 +124,56 @@ def test_device_event_user1_cant_see_user2_data(client, create_some_device_event
     response = client.get(reverse('device:device_event_edit', args=[u2de.pk]))
     assert response.status_code == 404
     response = client.get(reverse('device:device_event_delete', args=[u2de.pk]))
+    assert response.status_code == 404
+
+
+# Helper: Create some test records for two users
+@pytest.fixture
+def create_some_test_records(django_user_model, create_users_and_user_data):
+    # Create a test record for user1, and a test record for user2
+    data = create_users_and_user_data
+    user1, user1_device, user2, user2_device = (data[k] for k in ('user1', 'user1_device', 'user2', 'user2_device'))
+    user1_tr1 = TestRecord(
+        device=user1_device,
+        test_dt=timezone.make_aware(datetime(2021, 5, 10)),
+        notes="User 1's first test record",
+    )
+    user1_tr1.save()
+    user2_tr1 = TestRecord(
+        device=user2_device,
+        test_dt=timezone.make_aware(datetime(2021, 5, 11)),
+        result='SHIP',
+        notes="User 2's first test record",
+    )
+    user2_tr1.save()
+
+    updates = {
+        'user1_test_record1': user1_tr1,
+        'user2_test_record1': user2_tr1,
+    }
+
+    data.update(updates)
+
+    return data
+
+
+def test_test_record_user1_cant_see_user2_data(client, create_some_test_records):
+    data = create_some_test_records
+
+    client.force_login(data['user1'])
+
+    u1d = data['user1_device']
+    u2d = data['user2_device']
+
+    response = client.get(reverse('device:test_record_add', args=[u1d.pk]))
+    assert response.status_code == 200
+    response = client.get(reverse('device:test_record_add', args=[u2d.pk]))
+    assert response.status_code == 404
+
+    u1tr = data['user1_test_record1']
+    u2tr = data['user2_test_record1']
+
+    response = client.get(reverse('device:test_record_edit', args=[u1tr.pk]))
+    assert response.status_code == 200
+    response = client.get(reverse('device:test_record_edit', args=[u2tr.pk]))
     assert response.status_code == 404
