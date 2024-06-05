@@ -10,6 +10,7 @@ cd register/pyproj
 . env/bin/activate
 git pull
 pip install -r requirements.txt
+# Check for changes to conf/.env.template and conf/local_settings.py_template
 ./manage.py migrate
 pytest
 ./manage.py collectstatic --noinput
