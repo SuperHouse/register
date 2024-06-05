@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import sys
 
 from pathlib import Path
 
@@ -222,3 +223,10 @@ try:
     from .local_settings import *
 except ImportError:
     print('Unable to load local_settings.py')
+
+TESTING = 'test' in sys.argv
+
+if DEBUG and not TESTING:
+    # 'django_extensions'
+    INSTALLED_APPS.append('debug_toolbar'),
+    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
