@@ -74,8 +74,8 @@
                     <td>{{ event.event_dt }}</td>
                     <td>{{ event.get_event_type_icon }}{{ event.event_type }}: {{ event.description|default_if_none:"" }}</td>
                     <td>
-                        <a href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
-                        <a href="{% url 'device:device_event_delete' event.pk %}">Del</a>
+                        <a role="button" class="btn btn-link" href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
+                        <a role="button" class="btn btn-link" href="{% url 'device:device_event_delete' event.pk %}">Del</a>
                     </td>
                 </tr>
             {% empty %}
@@ -87,7 +87,7 @@
             {% endfor %}
         {% endwith %}
     </table>
-    <a href="{% url 'device:device_event_add' device.pk %}">Add</a>
+    <a role="button" class="btn btn-link" href="{% url 'device:device_event_add' device.pk %}">Add</a>
 
     <h3>Test log</h3>
 
@@ -96,14 +96,14 @@
             {% for test_record in test_records %}
                 <tr class="{{ test_record.get_bootstrap_table_class }}">
                     <td>
-                        <button class="btn btn-primary"
+                        <button class="btn btn-default"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#collapseExample-{{ forloop.counter }}"
                                 aria-expanded="false"
                                 aria-controls="collapseExample-{{ forloop.counter }}">Expand</button>
                         Test executed {{ test_record.test_dt }}
-                        {% comment %} <a href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a> {% endcomment %}
+                        <a role="button" class="btn btn-link" href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a>
                     </td>
                     <td>{{ test_record.get_result_display }}</td>
                 </tr>
@@ -130,7 +130,7 @@
             {% endfor %}
         {% endwith %}
     </table>
-    <a href="{% url 'device:test_record_add' device.pk %}">Add</a>
+    <a role="button" class="btn btn-link" href="{% url 'device:test_record_add' device.pk %}">Add</a>
 
     <h2>Actions</h2>
 
