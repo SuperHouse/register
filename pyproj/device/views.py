@@ -222,6 +222,43 @@ def device_event_delete(request, device_event_number):
     return render(request, "device/device_event_delete.html", ctx)
 
 
+def test_record_add(request, device_number):
+    if request.user.is_staff:
+        device = get_object_or_404(Device, pk=device_number)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
+
+    if request.method == "POST":
+        form = TestRecordForm(request.POST, initial={'device': device})
+        if form.is_valid():
+            form.instance.device = device
+            event = form.save()
+
+            messages.success(request, 'Test record added.')
+
+            return redirect("device:device_detail", device_number=event.device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a blank form
+        form = TestRecordForm()
+
+    ctx = {
+        'form': form,
+        'device': device,
+        'operation': 'Add',
+        'ts': None,
+    }
+
+    return render(request, "device/device_event_edit.html", ctx)
+
+
 def test_record_edit(request, test_record_number):
     if request.user.is_staff:
         test_record = get_object_or_404(TestRecord, pk=test_record_number)
@@ -251,6 +288,8 @@ def test_record_edit(request, test_record_number):
     ctx = {
         'form': form,
         'device': test_record.device,
+        'operation': 'Edit',
+        'ts': test_record.test_dt,
     }
 
     return render(request, "device/test_record_edit.html", ctx)

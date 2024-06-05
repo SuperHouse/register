@@ -1,11 +1,11 @@
 {% extends "device/base.html" %}
 
 {% block title %}
-    SuperHouse Device Register: Edit test record
+    SuperHouse Device Register: {{ operation }}  test record
 {% endblock title %}
 
 {% block h1 %}
-    Edit test record
+    {{ operation }} test record
 {% endblock h1 %}
 
 {% block body %}
@@ -20,7 +20,8 @@
     {% endif %}
 
     <p>
-        <b>Device:</b> {{ device }}<br />
+        <b>Device:</b> {{ device }}
+        <br />
     </p>
 
     <form method="post">

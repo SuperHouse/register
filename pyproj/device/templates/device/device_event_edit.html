@@ -20,10 +20,12 @@
     {% endif %}
 
     <p>
+        <b>Device:</b> {{ device }}<br />
         {% if ts %}
-            <b>Current timestamp:</b> {{ ts }}.  <i>Editing note will update timestamp to the current time.</i>
+            <b>Current timestamp:</b> {{ ts }}.<br />
+            <i>Saving will update the timestamp to the current time.</i>
         {% else %}
-            <i>Saving note will set timestamp to the current time.</i>
+            <i>Saving will set the timestamp to the current time.</i>
         {% endif %}
     </p>
 
