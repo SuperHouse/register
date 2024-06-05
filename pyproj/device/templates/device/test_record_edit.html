@@ -19,6 +19,10 @@
         <p>Errors occurred, so no changes have been made to the database.</p>
     {% endif %}
 
+    <p>
+        <b>Device:</b> {{ device }}<br />
+    </p>
+
     <form method="post">
         {% csrf_token %}
         {{ form }}

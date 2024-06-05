@@ -71,5 +71,5 @@ class TestRecordForm(forms.ModelForm):
 
     class Meta:
         model = TestRecord
-        fields = '__all__'
+        exclude = ['device']
 
