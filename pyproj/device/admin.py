@@ -25,6 +25,7 @@ class DeviceEventInline(admin.StackedInline):
 class DeviceAdmin(admin.ModelAdmin):
     autocomplete_fields = ['design']
     inlines = [TestRecordInline, DeviceEventInline]
+    search_fields = ['id']
 
 
 class TestImageAdmin(admin.ModelAdmin):
