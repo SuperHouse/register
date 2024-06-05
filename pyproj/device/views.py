@@ -161,8 +161,6 @@ def device_event_add(request, device_number):
 
     return render(request, "device/device_event_edit.html", ctx)
 
-    return redirect('device:device_detail', device_number=device.pk)
-
 
 def device_event_edit(request, device_event_number):
     if request.user.is_staff:
