@@ -15,7 +15,7 @@
         <tr>
             <th>Device:</th>
             <td>{{ device.design.name }}</td>
-            <td rowspan="7">
+            <td rowspan="8">
                 {% if device.design.client.logo %}
                     <img src="{{ device.design.client.logo.url }}"
                          alt="{{ device.design.client.name }} logo" />
@@ -46,6 +46,9 @@
             <th>Assembled:</th>
             <td>{{ device.assembly_date }}</td>
         </tr>
+        <tr>
+            <th>Invoice:</th>
+            <td>{{ device.invoice }}</td>
         <tr>
             <th>Notes:</th>
             <td>{{ device.notes|default_if_none:"" }}</td>
