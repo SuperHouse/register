@@ -17,7 +17,7 @@ def test_datetimes_are_saved_correctly(client, create_users_and_user_data):
 
     # Does datetime get preserved through ORM save process?
     tz = timezone.get_current_timezone()
-    dt = timezone.make_aware(datetime(2024, 4, 21, 10, 42, 1))
+    dt = timezone.make_aware(datetime(2024, 4, 21, 10, 42, 1), tz)
     tr = TestRecord(device=data['user1_device'], result='PASS', notes='Test notes', test_dt=dt)
     tr.save()
     tr_ = TestRecord.objects.get(pk=tr.pk)

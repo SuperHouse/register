@@ -74,7 +74,7 @@
                     <td>
                         {{ event.internal|yesno:"🔒,🔊" }}
                     </td>
-                    <td>{{ event.event_dt }}</td>
+                    <td>{{ event.get_event_dt_as_string }}</td>
                     <td>{{ event.get_event_type_icon }}{{ event.event_type }}: {{ event.description|default_if_none:"" }}</td>
                     <td>
                         <a role="button" class="btn btn-link" href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
@@ -105,7 +105,7 @@
                                 data-bs-target="#collapseExample-{{ forloop.counter }}"
                                 aria-expanded="false"
                                 aria-controls="collapseExample-{{ forloop.counter }}">Expand</button>
-                        Test executed {{ test_record.test_dt }}
+                        Test executed {{ test_record.get_test_dt_as_string }}
                         <a role="button" class="btn btn-link" href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a>
                     </td>
                     <td>{{ test_record.get_result_display }}</td>

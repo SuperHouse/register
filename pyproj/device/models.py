@@ -1,7 +1,26 @@
+import datetime
 import zoneinfo
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+
+
+# A special time (essentially pi), to use which suppresses the time on a datetime.
+# If you're still awake at this time and doing stuff, go home!
+tz = zoneinfo.ZoneInfo(settings.TIME_ZONE)
+witching_hour = datetime.time(3, 14, 15, 9, tzinfo=tz)
+
+
+# Return a string representation of a date and time in the local timezone for use in templates.
+# Dates imported with no times will have a time of 4:20am.  In this case, we return just the date.
+def get_dt_as_string(dt):
+    if dt.tzinfo == datetime.timezone.utc:
+        dt = dt.astimezone(tz)
+    if dt.time() == witching_hour:
+        return dt.strftime('%-d %b %Y')
+    else:
+        return dt.strftime('%-d %b %Y, %H:%M:%S')
 
 
 class Client(models.Model):
@@ -87,6 +106,9 @@ class TestRecord(models.Model):
 
         return classes.get(self.result, 'table-dark')
 
+    def get_test_dt_as_string(self):
+        return get_dt_as_string(self.test_dt)
+
 
 class TestImage(models.Model):
     test_record = models.ForeignKey(TestRecord, on_delete=models.CASCADE)
@@ -118,3 +140,6 @@ class DeviceEvent(models.Model):
         }
 
         return icons.get(self.event_type, '🤷')
+
+    def get_event_dt_as_string(self):
+        return get_dt_as_string(self.event_dt)
