@@ -21,4 +21,8 @@ def test_no_duplicate_designs():
     another_design_z1 = Design(client=client1, sku='SKU', name='Zappatron 1.0 again!', hw_version='1.0')
     with pytest.raises(IntegrityError) as excinfo:
         another_design_z1.save()
-    assert str(excinfo.value) == 'UNIQUE constraint failed: device_design.sku, device_design.hw_version'
+    possible_errors = [
+        "UNIQUE constraint failed: device_design.sku, device_design.hw_version",  # SQLite
+        "(1062, \"Duplicate entry 'SKU-1.0' for key 'unique_sku_hwversion'\")",  # MySQL
+    ]
+    assert str(excinfo.value) in possible_errors

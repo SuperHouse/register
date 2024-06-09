@@ -24,8 +24,6 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     old_de_dt = u1de.event_dt
 
     assert u1de.internal == False
-    # , content_type="application/x-www-form-urlencoded"
-    # data = urlencode({"something": "something"})
     fields = ('internal', 'event_type', 'description')
     data = {f: getattr(u1de, f) for f in fields}
     data['internal'] = True
