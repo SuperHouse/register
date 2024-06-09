@@ -47,16 +47,19 @@ class Command(BaseCommand):
         # parser.add_argument('filename', nargs='?', help='XLSX file to import from')
         parser.add_argument('filename', help='XLSX file to import from')
         # parser.add_argument('dryrun', type=bool, help='Dry run (no db changes)')
+        pass
 
     def handle(self, *args, **options):
         filename = options['filename']
-        # filename = 'pyproj/stash/Device Serial Numbers.xlsx'
+        # filename = 'pyproj/stash/Device Serial Numbers-2.xlsx'
         self.stdout.write(f'Importing from {filename}')
 
         wb = load_workbook(filename=filename)
 
-        known_sheets = 'Devices/DeviceTypes/Patched Boards/Serials/Solarcam Devices/T-Rex Devices/Raw Serials'
-        assert set(known_sheets.split('/')) == set(wb.sheetnames), f'Expected sheets: {known_sheets}'
+        known_sheets = 'Devices/Queue/DeviceTypes/Raw Serials/Patched Boards'
+        assert set(known_sheets.split('/')) == set(
+            wb.sheetnames
+        ), f'Expected sheets: {known_sheets}; Actual sheets: {wb.sheetnames}'
 
         # Read from the second sheet, DeviceTypes
         ws_design = wb['DeviceTypes']
@@ -76,19 +79,11 @@ class Command(BaseCommand):
         for client_id, name in client_info:
             if name is None:
                 continue
-            # self.stdout.write(f'{serial=} {name=}')
+            # self.stdout.write(f'{client_id=} {name=}')
             if client_id in client_map:
                 assert client_map[client_id] == name
             else:
                 client_map[client_id] = name
-
-        # Fix Bubblepay, which doesn't have an id in the XLSX
-        # Is there any client with an id of None?
-        if None in client_map:
-            # Assign next id to Bubblepay
-            next_client_id = max(v for v in client_map.keys() if v) + 1
-            client_map[next_client_id] = client_map[None]
-            del client_map[None]
 
         # self.stdout.write(f'{client_map}')
 
@@ -164,25 +159,6 @@ class Command(BaseCommand):
                 except ValueError:
                     # Just take the string, may not have been a straight number.
                     invoice_from_column = str(row['Invoice'])
-
-            # FIXME: Take this code out when running on new spreadsheet
-            known_no_assembly_dates = [
-                {
-                    'start_id': 1204,
-                    'end_id': 1212,
-                    'assembly_date': '2023-09-14',
-                },
-                {
-                    'start_id': 1327,
-                    'end_id': 1334,
-                    'assembly_date': '2023-10-10',
-                },
-            ]
-
-            for k in known_no_assembly_dates:
-                if k['start_id'] <= device_id <= k['end_id']:
-                    assembly_date = k['assembly_date']
-                    notes = f'GUESSED ASSEMBLY DATE.  {notes}'
 
             if notes:
                 destination_matchers = (
