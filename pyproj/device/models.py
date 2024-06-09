@@ -105,7 +105,7 @@ class DeviceEvent(models.Model):
     description = models.TextField()
 
     class Meta:
-        ordering = ["event_dt"]
+        ordering = ["device__id", "event_dt"]
 
     def __str__(self):
         return f'{self.device}@{self.event_dt}: ({self.event_type}): {self.description}'
