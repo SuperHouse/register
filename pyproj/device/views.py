@@ -40,7 +40,7 @@ def general_action(request):
     return render(request, 'device/general_action.html')
 
 
-def add_devices(request):
+def device_add(request):
     errors = []
     if request.method == "POST":
         form = AddDevicesForm(request.POST, hide_override=False)
@@ -73,7 +73,7 @@ def add_devices(request):
             # redirect to a new URL:
             messages.success(request, f"Added {qty} {design} device{'s' if qty > 1 else ''}")
 
-            return redirect("device:add_devices")
+            return redirect("device:device_add")
         else:
             messages.warning(
                 request,
@@ -92,7 +92,7 @@ def add_devices(request):
         'errors': errors,
     }
 
-    return render(request, "device/add_devices.html", ctx)
+    return render(request, "device/device_add.html", ctx)
 
 
 def device_detail(request, device_number):
