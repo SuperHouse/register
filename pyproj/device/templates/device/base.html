@@ -48,14 +48,14 @@
 
                         <p>
                             Welcome {{ user.preferred_name }} ({{ user.email }})!
-                            <form id="logout-form" method="post" action="{% url 'admin:logout' %}">
+                            <form id="logout-form" method="post" action="{% url 'logout' %}">
                                 {% csrf_token %}
                                 <button type="submit">Log out</button>
                             </form>
                         </p>
-                    {% else %}
+                    {% elif request.path != '/accounts/login/' %}
                         <p>
-                            Welcome! <a href="{% url 'admin:login' %}">Log in</a>
+                            Welcome! <a href="{% url 'login' %}">Log in</a>
                         </p>
                     {% endif %}
                     <hr />

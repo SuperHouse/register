@@ -1,7 +1,6 @@
 # Useful page on testing with pytest: https://djangostars.com/blog/django-pytest-testing/
 
 import re
-
 import pytest
 
 from django.urls import reverse
@@ -32,7 +31,7 @@ def test_admin_stranger_fails(stranger_client):
     url = reverse('admin:index')
     response = stranger_client.get(url)
     assert response.status_code == 302
-    assert response['Location'] == reverse('admin:login') + '?next=' + url
+    assert response['Location'] == reverse('login') + '?next=' + url
 
 
 # Is the admin interface hidden from an ordinary user?
@@ -58,7 +57,7 @@ def test_admin_missing_stranger_fails(stranger_client):
     url = reverse('admin:index') + 'not-there/'
     response = stranger_client.get(url)
     assert response.status_code == 302
-    assert response['Location'] == reverse('admin:login') + '?next=' + url
+    assert response['Location'] == reverse('login') + '?next=' + url
 
 
 # Is a non-existent page in the admin interface hidden from an ordinary user?
@@ -84,7 +83,7 @@ def test_top_stranger_fails(stranger_client):
     url = reverse('device:top')
     response = stranger_client.get(url)
     assert response.status_code == 302
-    assert response['Location'] == reverse('admin:login') + '?next=' + url
+    assert response['Location'] == reverse('login') + '?next=' + url
 
 
 # Does the top level page succeed for a simple user who is logged in?
@@ -98,13 +97,13 @@ def test_top_user_ok(logged_in_user_client):
 # Is a non-existent page hidden from a stranger? (ie, not 404)
 @pytest.mark.django_db
 def test_404_stranger_fails(stranger_client):
-    url = reverse('device:top')
+    url = reverse('device:top') + 'not-there/'
     response = stranger_client.get(url)
     assert response.status_code == 302
-    assert response['Location'] == reverse('admin:login') + '?next=' + url
+    assert response['Location'] == reverse('login') + '?next=' + url
 
 
-# Does a non-existent page give a 404 to an ordinary superuser?
+# Does a non-existent page give a 404 to an ordinary user?
 def test_404_user_ok(logged_in_user_client):
     url = reverse('device:top') + 'not-there/'
     response = logged_in_user_client.get(url)
@@ -124,7 +123,7 @@ def test_not_logged_in_fails(stranger_client):
     url = reverse('device:general_action')
     response = stranger_client.get(url)
     assert response.status_code == 302
-    assert response['Location'] == reverse('admin:login') + '?next=' + url
+    assert response['Location'] == reverse('login') + '?next=' + url
 
 
 # Does the general action view succeed for a user who is logged in?

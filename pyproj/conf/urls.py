@@ -25,6 +25,7 @@ from django.views.static import serve
 
 urlpatterns = [
     path('office/', admin.site.urls),
+    path('accounts/', include('django.contrib.auth.urls')),
     path(r'favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),

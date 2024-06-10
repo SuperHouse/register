@@ -108,7 +108,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 AUTH_USER_MODEL = 'authuser.User'
-LOGIN_URL = '/office/login/'
+LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/device/'
 LOGOUT_REDIRECT_URL = '/device/'
 
@@ -117,6 +117,11 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/office/logout/',
     '/admin/',
     '/static/',
+]
+
+LOGIN_REQUIRED_IGNORE_VIEW_NAMES = [
+    'login',
+    'logout',
 ]
 
 HIJACK_PERMISSION_CHECK = 'hijack.permissions.superusers_and_staff'
