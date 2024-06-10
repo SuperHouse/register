@@ -36,6 +36,12 @@
         <div class="container">
             <div class="row">
                 <div class="twelve columns">
+                    <a href="{% url 'device:top' %}">
+                        <img src="{% static 'img/home.png' %}" alt="Home" />
+                    </a>
+                    <a href="https://www.superhouse.tv/">
+                        <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse logo" />
+                    </a>
                     {% if user.is_authenticated %}
                         <p>
                             Welcome {{ user.preferred_name }} ({{ user.email }})!
@@ -49,17 +55,12 @@
                             Welcome! <a href="{% url 'admin:login' %}">Log in</a>
                         </p>
                     {% endif %}
+                    <hr />
+
                     <h1>
                         {% block h1 %}
                         {% endblock h1 %}
                     </h1>
-                    <a href="{% url 'device:top' %}">
-                        <img src="{% static 'img/home.png' %}" alt="Home" />
-                    </a>
-                    <a href="https://www.superhouse.tv/">
-                        <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse logo" />
-                    </a>
-                    <hr />
 
                     {% block body %}
                         <p>A fine body here.</p>
