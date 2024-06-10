@@ -6,6 +6,15 @@
     SuperHouse Device Register
 {% endblock title %}
 
+{% block extra_topbar %}
+    <p>
+        Device search
+        <form method="get" action="{% url 'device:device_search' %}">
+            <input type="text" name="q" />
+        </form>
+    </p>
+{% endblock extra_topbar %}
+
 {% block h1 %}
     SuperHouse Device Register
 {% endblock h1 %}
