@@ -13,14 +13,13 @@ from .models import Client, Design, Device, DeviceEvent, TestRecord
 
 
 def top(request):
-    if request.user.is_staff:
-        clients = Client.objects.all()
-        designs = Design.objects.all()
-        devices = Device.objects.all()
-    else:
-        clients = Client.objects.filter(users=request.user)
-        designs = Design.objects.filter(client__in=clients).all()
-        devices = Device.objects.filter(design__client__in=clients).all()
+    clients = Client.objects.all()
+    designs = Design.objects.prefetch_related("client").all()
+    devices = Device.objects.prefetch_related("design").all()
+    if not request.user.is_staff:
+        clients = clients.filter(users=request.user)
+        designs = designs.filter(client__in=clients)
+        devices = devices.filter(design__client__in=clients)
 
     context = {
         'clients': clients,
