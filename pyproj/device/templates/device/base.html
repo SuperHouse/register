@@ -43,6 +43,9 @@
                         <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse logo" />
                     </a>
                     {% if user.is_authenticated %}
+                        {% block extra_topbar %}
+                        {% endblock extra_topbar %}
+
                         <p>
                             Welcome {{ user.preferred_name }} ({{ user.email }})!
                             <form id="logout-form" method="post" action="{% url 'admin:logout' %}">

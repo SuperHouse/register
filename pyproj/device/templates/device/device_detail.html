@@ -10,6 +10,16 @@
     Device detail
 {% endblock h1 %}
 
+{% block extra_topbar %}
+    <p>
+        Device search
+        <form method="get" action="{% url 'device:device_search' %}">
+            <input type="text" name="q" />
+            {% comment %} <button type="submit">Search</button> {% endcomment %}
+        </form>
+    </p>
+{% endblock extra_topbar %}
+
 {% block body %}
     <table class="table table-bordered">
         <tr>
@@ -49,6 +59,7 @@
         <tr>
             <th>Invoice:</th>
             <td>{{ device.invoice }}</td>
+        </tr>
         <tr>
             <th>Notes:</th>
             <td>{{ device.notes|default_if_none:"" }}</td>

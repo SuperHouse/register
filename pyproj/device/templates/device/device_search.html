@@ -1,0 +1,23 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Device search
+{% endblock title %}
+
+{% block h1 %}
+    Device search
+{% endblock h1 %}
+
+{% block body %}
+    <h2>Device search</h2>
+
+    <form method="get" action="{% url 'device:device_search' %}">
+        <input type="text" name="q" value="{{ q }}" />
+    </form>
+
+    <h2>Actions</h2>
+    <p>
+        Top: <a href="{% url 'device:top' %}">link</a>
+    </p>
+
+{% endblock body %}

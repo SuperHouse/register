@@ -3,8 +3,6 @@ from datetime import datetime
 from django.urls import reverse
 from django.utils import timezone
 
-from django.urls import reverse
-
 from device.models import DeviceEvent, TestRecord
 
 from test_clients_only_see_own_data import (

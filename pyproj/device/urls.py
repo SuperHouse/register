@@ -11,6 +11,7 @@ urlpatterns = [
     path('action/', views.general_action, name='general_action'),
     # Permanent URLs
     path('add/', views.device_add, name='device_add'),
+    path('search/', views.device_search, name='device_search'),
     path('<int:device_number>/', views.device_detail, name='device_detail'),
     path('<int:device_number>/action/', views.device_action, name='device_action'),
     path('<int:device_number>/de-add/', views.device_event_add, name='device_event_add'),
