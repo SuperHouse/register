@@ -1,0 +1,93 @@
+{% extends "device/base.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Device grid
+{% endblock title %}
+
+{% block extra_head %}
+    <link href="https://unpkg.com/frappe-datatable@0.0.5/dist/frappe-datatable.min.css"
+          rel="stylesheet">
+    <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
+    <script src="https://unpkg.com/clusterize.js@0.18.0/clusterize.min.js"></script>
+    <script src="https://unpkg.com/frappe-datatable@0.0.5/dist/frappe-datatable.min.js"></script>
+{% endblock extra_head %}
+
+{% block h1 %}
+    Device grid
+{% endblock h1 %}
+
+{% block body %}
+    {% if not warned %}
+        <p>
+            Experimental datagrid showing what the old spreadsheet showed.
+            <em>This page will take about two minutes to generate.</em>
+        </p>
+
+        <p>If you'd like to go ahead, click <a href="{% url 'device:device_grid' %}?warned=1">here</a>.</p>
+    {% else %}
+        {% comment %} Datatable: https://frappe.io/datatable {% endcomment %}
+
+        <ul class="nav nav-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active"
+                id="simple-tab-0"
+                data-bs-toggle="tab"
+                href="#simple-tabpanel-0"
+                role="tab"
+                aria-controls="simple-tabpanel-0"
+                aria-selected="true">Devices</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link"
+                id="simple-tab-1"
+                data-bs-toggle="tab"
+                href="#simple-tabpanel-1"
+                role="tab"
+                aria-controls="simple-tabpanel-1"
+                aria-selected="false">DeviceTypes</a>
+            </li>
+        </ul>
+        <div class="tab-content pt-5" id="tab-content">
+            <div class="tab-pane active"
+                id="simple-tabpanel-0"
+                role="tabpanel"
+                aria-labelledby="simple-tab-0">
+                <div id="datatable-0"></div>
+            </div>
+            <div class="tab-pane"
+                id="simple-tabpanel-1"
+                role="tabpanel"
+                aria-labelledby="simple-tab-1">
+                <h4>DeviceTypes</h4>
+                <div id="datatable-1"></div>
+            </div>
+        </div>
+    {% endif %}
+
+    <h2>Actions</h2>
+    <p>
+        Top: <a href="{% url 'device:top' %}">link</a>
+    </p>
+{% endblock body %}
+
+{% block extra_js %}
+    {% if warned %}
+        <script>
+            const datatable_0 = new DataTable('#datatable-0', {
+                serialNoColumn: false,
+                columns: [{% for f in headings1 %}'{{ f|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+                data: [
+                    {% for line in data1 %}[{% for f in line %}'{{ f|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}]{% if not forloop.last %},{% endif %}
+                {% endfor %}]
+            });
+
+            const datatable_1 = new DataTable('#datatable-1', {
+                serialNoColumn: false,
+                columns: [{% for f in headings2 %}'{{ f|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
+                data: [
+                    {% for line in data2 %}[{% for f in line %}'{{ f|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}]{% if not forloop.last %},{% endif %}
+                {% endfor %}]
+            });
+        </script>
+    {% endif %}
+{% endblock extra_js %}

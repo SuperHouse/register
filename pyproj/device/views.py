@@ -39,6 +39,74 @@ def general_action(request):
     return render(request, 'device/general_action.html')
 
 
+def device_grid(request):
+    # FIXME: Very slow to run, so the user has to agree first that
+    # they know it's going to be slow.  The slowdown isn't in the db.
+    # FIXME: Doesn't show device events.
+    # FIXME: Fix Frappe-datatable layout problem in second tab.
+    def provide1():
+        for device in (
+            Device.objects.select_related('design').prefetch_related('testrecord_set').all()
+        ):  # .select_related("testrecord_set")
+            tr_set = device.testrecord_set.all()
+            if tr_set:
+                if tr_set.count() > 1:
+                    tr_str = ', '.join([tr.get_test_dt_as_string() for tr in tr_set])
+                    tr_str = f'({tr_str})'
+                else:
+                    tr_str = tr_set.first().get_test_dt_as_string()
+            else:
+                tr_str = ''
+
+            row = (
+                device.pk,
+                device.design_id,
+                device.assembly_date,
+                tr_str,
+                device.sw_version or '',
+                device.notes or '',
+                device.design.name,
+                device.design.hw_version,
+                device.invoice or '',
+            )
+
+            yield row
+
+    def provide2():
+        for design in Design.objects.all():
+            row = (
+                design.pk,
+                design.client.pk,
+                design.sku,
+                design.name,
+                design.hw_version,
+                design.client.company_name,
+                design.price or '',
+                design.price2 or '',
+            )
+
+            yield row
+
+    context = {
+        'warned': False,
+    }
+
+    if request.GET.get('warned'):
+        context.update(
+            {
+                'warned': True,
+                'headings1': 'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice'.split(
+                    '/'
+                ),
+                'data1': provide1(),
+                'headings2': 'Serial/ClientSerial/SKU/Name/HW Version/Customer/Price/Price2'.split('/'),
+                'data2': provide2(),
+            }
+        )
+
+    return render(request, 'device/device_grid.html', context)
+
+
 def device_add(request):
     errors = []
     if request.method == "POST":
