@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.admin.views.decorators import staff_member_required
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.db import DatabaseError, IntegrityError, transaction
 from django.shortcuts import get_object_or_404
@@ -39,6 +40,7 @@ def general_action(request):
     return render(request, 'device/general_action.html')
 
 
+@staff_member_required
 def device_grid(request):
     # FIXME: Very slow to run, so the user has to agree first that
     # they know it's going to be slow.  The slowdown isn't in the db.
@@ -107,6 +109,7 @@ def device_grid(request):
     return render(request, 'device/device_grid.html', context)
 
 
+@staff_member_required
 def device_add(request):
     errors = []
     if request.method == "POST":
