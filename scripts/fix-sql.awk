@@ -24,6 +24,7 @@ SKIP == 0 {
 
         # Modify statements sqlite nearly understands
         sub(/^START TRANSACTION;/, "BEGIN TRANSACTION;")
+    }
     if (MYSQL) {
         if (match($0, /^START TRANSACTION;/)) {
             print("SET FOREIGN_KEY_CHECKS=0;");
@@ -39,7 +40,7 @@ SKIP == 0 {
 
     # Fix column names
     $0 = gensub(/(INSERT INTO `device_client`) \(`Serial`, `Company`, `Logo`\) (VALUES)/, "\\1 (`id`, `company_name`) \\2", "g", $0)
-    $0 = gensub(/(INSERT INTO `device_design`) \(`Serial`, `ClientSerial`, `SKU`, `Name`, `Version`\) (VALUES)/, "\\1 (`id`, `client_id`, `sku`, `name`, `version`) \\2", "g", $0)
+    $0 = gensub(/(INSERT INTO `device_design`) \(`Serial`, `ClientSerial`, `SKU`, `Name`, `Version`\) (VALUES)/, "\\1 (`id`, `client_id`, `sku`, `name`, `hw_version`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `device_device`) \(`Serial`, `DeviceTypeSerial`, `AssembledDate`, `Notes`\) (VALUES)/, "\\1 (`id`, `design_id`, `assembly_date`, `notes`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `authuser_user`) \(`Serial`, `FirstName`, `LastName`, `Email`, `PasswordHash`\) (VALUES)/, "\\1 (`id`, `preferred_name`, `full_name`, `email`, `password`, `is_active`, `is_staff`, `is_superuser`, `date_joined`) \\2", "g", $0)
     $0 = gensub(/(INSERT INTO `device_client_users`) \(`Serial`, `UserSerial`, `ClientSerial`\) (VALUES)/, "\\1 (`id`, `user_id`, `client_id`) \\2", "g", $0)
