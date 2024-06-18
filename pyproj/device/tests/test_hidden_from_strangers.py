@@ -91,7 +91,7 @@ def test_top_stranger_fails(stranger_client):
 def test_top_user_ok(logged_in_user_client):
     response = logged_in_user_client.get(reverse('device:top'))
     assert response.status_code == 200
-    assert re.search('<h1>\s*SuperHouse Device Register\s*</h1>', response.content.decode('utf-8'))
+    assert re.search(r'<h1>\s*SuperHouse Device Register\s*</h1>', response.content.decode('utf-8'), re.MULTILINE)
 
 
 # Is a non-existent page hidden from a stranger? (ie, not 404)
