@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     # Apps in the venv
     'hijack',
     'hijack.contrib.admin',
+    # See end of this file for debug tools
     'easy_thumbnails',
     # Apps in this project
     'authuser',
@@ -124,6 +125,10 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
 LOGIN_REQUIRED_IGNORE_VIEW_NAMES = [
     'login',
     'logout',
+    'password_reset',
+    'password_reset_done',
+    'password_reset_confirm',
+    'password_reset_complete',
 ]
 
 HIJACK_PERMISSION_CHECK = 'hijack.permissions.superusers_and_staff'
