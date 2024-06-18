@@ -225,7 +225,7 @@ BACKGROUND_SETTINGS = {
     'prod': {
         'CSS_BODY_BACKGROUND_COLOUR': None,
         # 'CSS_BODY_BACKGROUND_IMAGE': '/static/img/live-data-dont-use-en.png',
-        'CSS_BODY_BACKGROUND_IMAGE': '/static/img/live-data-dont-use-en.png',
+        'CSS_BODY_BACKGROUND_IMAGE': None,
         # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
     },
 }
