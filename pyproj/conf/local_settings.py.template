@@ -3,6 +3,8 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SITE_ID = 1
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -22,6 +24,8 @@ STATIC_ROOT = None
 MEDIA_ROOT = BASE_DIR / 'media/'
 
 # -- Above here is local sqlite.  Below, deployed mysql
+
+SITE_ID = 1
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
