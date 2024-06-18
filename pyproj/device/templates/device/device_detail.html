@@ -82,7 +82,7 @@
                     </thead>
                 {% endif %}
                 <tr>
-                    <td>{{ event.internal|yesno:"🔒,🔊" }}</td>
+                    <td>{{ event.internal|yesno:"🔒,🌏" }}</td>
                     <td>{{ event.get_event_dt_as_string }}</td>
                     <td>{{ event.get_event_type_icon }}{{ event.event_type }}: {{ event.description|default_if_none:"" }}</td>
                     <td>
