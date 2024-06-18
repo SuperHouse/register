@@ -41,9 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Apps in the venv
-    'easy_thumbnails',
     'hijack',
     'hijack.contrib.admin',
+    'easy_thumbnails',
     # Apps in this project
     'authuser',
     'device',
@@ -117,6 +117,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/office/logout/',
     '/admin/',
     '/static/',
+    '__debug__/',
 ]
 
 LOGIN_REQUIRED_IGNORE_VIEW_NAMES = [
@@ -229,9 +230,13 @@ try:
 except ImportError:
     print('Unable to load local_settings.py')
 
-TESTING = 'test' in sys.argv
+TESTING = any(word in sys.argv for word in ('test', 'pytest'))
 
-if DEBUG and not TESTING:
-    # 'django_extensions'
-    INSTALLED_APPS.append('debug_toolbar'),
-    MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
+if DEBUG:
+    if TESTING:
+        # EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+        pass
+    else:
+        INSTALLED_APPS.append('debug_toolbar')
+        INSTALLED_APPS.append('django_extensions')
+        MIDDLEWARE.insert(0, 'debug_toolbar.middleware.DebugToolbarMiddleware')
