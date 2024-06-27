@@ -1,5 +1,6 @@
 import datetime
 import re
+import string
 import zoneinfo
 
 from django.conf import settings
@@ -51,7 +52,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         filename = options['filename']
-        # filename = 'pyproj/stash/Device Serial Numbers-2.xlsx'
+        filename = 'pyproj/stash/Device Serial Numbers-3.xlsx'
         self.stdout.write(f'Importing from {filename}')
 
         wb = load_workbook(filename=filename)
@@ -69,7 +70,7 @@ class Command(BaseCommand):
         # self.stdout.write(f'{design_keys=}')
         assert design_keys == known_design_keys
 
-        col_map = {key: letter for letter, key in zip('ABCDEFGH', known_design_keys)}
+        col_map = {key: letter for letter, key in zip(string.ascii_uppercase, known_design_keys)}
         # self.stdout.write(f'{col_map=}')
 
         client_serials = tuple(int_map(cell.value) for cell in ws_design[col_map["ClientSerial"]][1:])
@@ -103,6 +104,7 @@ class Command(BaseCommand):
                 client.save()
 
         # Import designs
+        design_count = 0
         for row in ws_design.iter_rows(min_row=2, max_col=len(col_map.keys()), max_row=999):
             row = dict(zip(design_keys, (cell.value for cell in row)))
             # self.stdout.write(f'{row=}')
@@ -123,25 +125,26 @@ class Command(BaseCommand):
                 design_data['price2'] = row['Price2']
             design = Design(**design_data)
             design.save()
+            design_count += 1
 
         # Now read from the first sheet, Devices
         ws_device = wb['Devices']
 
         known_device_keys = tuple(
-            'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice'.split('/')
+            'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/Shipped'.split('/')
         )
         device_keys = tuple(cell.value for cell in ws_device['1'] if cell.value is not None)
         # self.stdout.write(f'{device_keys=}')
         assert device_keys == known_device_keys
 
-        col_map = {key: letter for letter, key in zip('ABCDEFGHI', known_device_keys)}
+        col_map = {key: letter for letter, key in zip(string.ascii_uppercase, known_device_keys)}
         # self.stdout.write(f'{col_map=}')
 
         # Import devices
         tr = []
         de_list = []
         tr_list = []
-        unmatched_notes = []
+        device_count = 0
         for row in ws_device.iter_rows(min_row=2, max_col=len(col_map.keys()), max_row=9999):
             row = dict(zip(device_keys, (cell.value for cell in row)))
             if row['DeviceTypeSerial'] is None:
@@ -151,95 +154,17 @@ class Command(BaseCommand):
             design_id = int(row['DeviceTypeSerial'])
             notes = row['Notes']
             assembly_date = row['Assembled']
-            invoice_from_column = row['Invoice'] or ''
-            if invoice_from_column:
+            invoice = row['Invoice'] or ''
+            shipping = row['Shipped'] or ''
+            if invoice:
                 try:
                     # If the invoice is a straight number, it'll have .0 on the end.  Convert to string via int.
-                    invoice_from_column = str(int(row['Invoice']))
+                    invoice = str(int(invoice))
                 except ValueError:
                     # Just take the string, may not have been a straight number.
-                    invoice_from_column = str(row['Invoice'])
+                    invoice = str(invoice)
 
             if notes:
-                destination_matchers = (
-                    r'(?P<action>(Sent to|Set to|Collected by) ?)(?P<client>.+?) (?P<date>[^ ]+202\d?)',
-                    r'(?P<action>(Sent to|Set to|Collected by) ?)(?P<client>.+?) (?P<date>2024-[0-9-]+)',
-                    r'(?P<action>(Collected|Posted to Simon) ?)(?P<client>) (?P<date>[^ ]+202\d?)',
-                )
-                for matcher in destination_matchers:
-                    match = re.search(matcher, notes)
-                    if match:
-                        # self.stdout.write(f'{row=}')
-                        # self.stdout.write(f'{notes=}')
-                        # d = match.groupdict()
-                        # d_str = f'{d=}'
-                        # self.stdout.write(d_str)
-                        client = match['client'] or ''
-                        de_data = {
-                            'device_id': device_id,
-                            'event_dt': date_from_str(match['date']),
-                            'event_type': 'SHIP',
-                            'description': f'{match["action"]}{client}',
-                        }
-                        de_list.append(de_data)
-
-                        head_pos, tail_pos = match.span()
-                        head = notes[0:head_pos].strip()
-                        tail = notes[tail_pos:].strip()
-                        notes = ' '.join((head, tail)).strip()
-                        # print(f'{notes=} {de_data}')
-                        break
-
-                postage_matchers = (
-                    r'(?P<agent>AusPost|TNT|Express Post) (?P<date>[^ ]+202\d?)(?P<connum> \w+[.]?)?',  # Agent date connum
-                    r'(?P<agent>AusPost|TNT|Express Post)(?P<connum> \w+)? (?P<date>[^ ]+202\d?)',  # Agent connum date
-                )
-
-                for matcher in postage_matchers:
-                    match = re.search(matcher, notes)
-                    if match:
-                        # self.stdout.write(f'{row=}')
-                        # self.stdout.write(f'{notes=}')
-                        # d = match.groupdict()
-                        # d_str = f'{d=}'
-                        # self.stdout.write(d_str)
-                        connum = match['connum'] or ''
-                        de_data = {
-                            'device_id': device_id,
-                            'event_dt': date_from_str(match['date']),
-                            'event_type': 'SHIP',
-                            'description': f'{match["agent"]}{connum}',
-                        }
-                        de_list.append(de_data)
-                        head_pos, tail_pos = match.span()
-                        head = notes[0:head_pos].strip()
-                        tail = notes[tail_pos:].strip()
-                        notes = ' '.join((head, tail)).strip()
-                        # print(f'{notes=} {de_data}')
-                        break
-
-                invoice_matchers = (r'[Ii]nvoice (?P<invoice>\d+[.])',)
-                for matcher in invoice_matchers:
-                    match = re.search(matcher, notes)
-                    if match:
-                        # self.stdout.write(f'{row=}')
-                        # self.stdout.write(f'{notes=}')
-                        # d = match.groupdict()
-                        # d_str = f'{d=}'
-                        # self.stdout.write(d_str)
-                        invoice_from_note = match['invoice'].strip()
-                        if invoice_from_note.endswith('.'):
-                            invoice_from_note = invoice_from_note[:-1]
-                        if invoice_from_column:
-                            assert invoice_from_note == invoice_from_column
-                        else:
-                            invoice_from_column = invoice_from_note
-                        head_pos, tail_pos = match.span()
-                        head = notes[0:head_pos].strip()
-                        tail = notes[tail_pos:].strip()
-                        notes = ' '.join((head, tail)).strip()
-                        break
-
                 dated_event_in_note_matchers = (
                     r'(\d{1,2}-[A-Z][a-z]{2}-202\d)',
                     r'(\d+/\d+/202\d)',
@@ -255,26 +180,18 @@ class Command(BaseCommand):
                         de_data = {
                             'device_id': device_id,
                             'event_dt': date_from_str(match.group()),
-                            'event_type': 'NOTE',
                             'description': f'<See device note for dated event, probably on this date>',
                         }
                         de_list.append(de_data)
                         break
-
-            known_notes_matchers = (r'^Melted connector', r'^Missing valve', r'^Direct mounted', r'^Old accel')
-            if notes:
-                notes = notes.strip()
-            if notes:
-                if not any(re.search(matcher, notes) for matcher in known_notes_matchers):
-                    if notes not in unmatched_notes:
-                        unmatched_notes.append(notes)
 
             device_data = {
                 'id': device_id,
                 'design_id': design_id,
                 'assembly_date': assembly_date,
                 'sw_version': row['Firmware'],
-                'invoice': invoice_from_column,
+                'invoice': invoice,
+                'shipping': shipping,
                 'notes': notes,
             }
 
@@ -292,6 +209,7 @@ class Command(BaseCommand):
 
             device = Device(**device_data)
             device.save()
+            device_count += 1
 
         for de_data in de_list:
             de = DeviceEvent(**de_data)
@@ -301,9 +219,6 @@ class Command(BaseCommand):
             tr = TestRecord(**tr_data)
             tr.save()
 
-        self.stdout.write(f'Unmatched notes:')
-        for u in unmatched_notes:
-            self.stdout.write(f'  {u}')
-        self.stdout.write(f'{len(unmatched_notes)} unmatched notes (which is ok)')
+        self.stdout.write(f'Imported {design_count} designs, and {device_count} devices.')
 
         self.stdout.write(self.style.SUCCESS('Done.'))

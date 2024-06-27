@@ -22,7 +22,7 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     old_de_dt = u1de.event_dt
 
     assert u1de.internal == False
-    fields = ('internal', 'event_type', 'description')
+    fields = ('internal', 'description')
     data = {f: getattr(u1de, f) for f in fields}
     data['internal'] = True
     response = client.post(reverse('device:device_event_edit', args=[u1de.pk]), data)
@@ -36,7 +36,6 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     assert u1d.deviceevent_set.count() == 1
     msg = 'Billed on invoice 31'
     data = {
-        'event_type': 'INV',
         'description': msg,
     }
     response = client.post(reverse('device:device_event_add', args=[u1d.pk]), data)
@@ -47,7 +46,6 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     assert new_de_set.count() == 1
     new_de = new_de_set.first()
     assert new_de.internal == False
-    assert new_de.event_type == 'INV'
     assert new_de.description == msg
 
     response = client.post(reverse('device:device_event_delete', args=[new_de.pk]))

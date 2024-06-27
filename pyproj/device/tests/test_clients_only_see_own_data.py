@@ -87,7 +87,6 @@ def create_some_device_events(django_user_model, create_users_and_user_data):
         event_dt=event_dt,
         description="User 2's first event",
         internal=True,
-        event_type='SHIP',
     )
     user2_device_event1.save()
 

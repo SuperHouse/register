@@ -53,6 +53,7 @@ class Device(models.Model):
     assembly_date = models.DateField(default=timezone.localdate)
     sw_version = models.CharField(max_length=20, null=True, blank=True)
     invoice = models.CharField(max_length=20, null=True, blank=True)
+    shipping = models.CharField(max_length=20, null=True, blank=True)
     # We may need to change notes to a TextField if we need multi-line
     notes = models.CharField(max_length=255, null=True, blank=True)
 
@@ -121,8 +122,6 @@ class TestImage(models.Model):
 class DeviceEvent(models.Model):
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     event_dt = models.DateTimeField(verbose_name='When', default=timezone.now)
-    # Types is free-form, except for some agreed values: ("NOTE", "SHIP", "INV")
-    event_type = models.CharField(max_length=50, default="NOTE")
     internal = models.BooleanField(default=False, help_text='Do not show this event to clients')
     description = models.TextField()
 
@@ -130,16 +129,7 @@ class DeviceEvent(models.Model):
         ordering = ["device__id", "event_dt"]
 
     def __str__(self):
-        return f'{self.device}@{self.event_dt}: ({self.event_type}): {self.description}'
-
-    def get_event_type_icon(self):
-        icons = {
-            'NOTE': '📝',
-            'SHIP': '🚢',
-            'INV': '🧾',
-        }
-
-        return icons.get(self.event_type, '🤷')
+        return f'{self.device}@{self.event_dt}: {self.description}'
 
     def get_event_dt_as_string(self):
         return get_dt_as_string(self.event_dt)
