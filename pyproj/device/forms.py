@@ -58,12 +58,7 @@ class AddDevicesForm(forms.Form):
 class DeviceEventForm(forms.ModelForm):
     class Meta:
         model = DeviceEvent
-        fields = ['internal', 'event_type', 'description']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Set help text for event_type field.  For some reason, this help text doesn't render.
-        self.fields['event_type'].help_text = 'Recognised: "NOTE", "SHIP", "INV"'
+        fields = ['internal', 'description']
 
 
 class TestRecordForm(forms.ModelForm):
