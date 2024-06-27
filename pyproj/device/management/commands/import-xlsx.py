@@ -52,7 +52,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         filename = options['filename']
-        filename = 'pyproj/stash/Device Serial Numbers-3.xlsx'
+        # filename = 'pyproj/stash/Device Serial Numbers-3.xlsx'
         self.stdout.write(f'Importing from {filename}')
 
         wb = load_workbook(filename=filename)
