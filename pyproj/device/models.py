@@ -53,7 +53,7 @@ class Device(models.Model):
     assembly_date = models.DateField(default=timezone.localdate)
     sw_version = models.CharField(max_length=20, null=True, blank=True)
     invoice = models.CharField(max_length=20, null=True, blank=True)
-    shipping = models.CharField(max_length=20, null=True, blank=True)
+    shipping = models.CharField(max_length=200, null=True, blank=True)
     # We may need to change notes to a TextField if we need multi-line
     notes = models.CharField(max_length=255, null=True, blank=True)
 
