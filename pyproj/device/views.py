@@ -162,7 +162,7 @@ def device_add(request):
         'errors': errors,
     }
 
-    return render(request, "device/device_add.html", ctx)
+    return render(request, 'device/device_add.html', ctx)
 
 
 def device_detail(request, device_number):

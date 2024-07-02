@@ -12,9 +12,7 @@
     {% if errors %}
         <div class="alert alert-danger" role="alert">
             <ul>
-                {% for error in errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
+                {% for error in errors %}<li>{{ error }}</li>{% endfor %}
             </ul>
         </div>
 
@@ -43,7 +41,9 @@
         </thead>
         {% for device in last20 %}
             <tr>
-                <td{% if forloop.first %} class="table-active"{% endif %}>{{ device.pk }}</td>
+                <td {% if forloop.first %}class="table-active"{% endif %}>
+                    {{ device.pk }}
+                </td>
                 <td>
                     {% ifchanged %}
                         {{ device.design.name }}

@@ -44,8 +44,8 @@ INSTALLED_APPS = [
     # Apps in the venv
     'hijack',
     'hijack.contrib.admin',
-    # See end of this file for debug tools
     'easy_thumbnails',
+    # See end of this file for debug tools
     # Apps in this project
     'authuser',
     'device',
