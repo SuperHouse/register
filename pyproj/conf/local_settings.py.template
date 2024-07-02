@@ -23,6 +23,13 @@ DATABASES = {
 STATIC_ROOT = None
 MEDIA_ROOT = BASE_DIR / 'media/'
 
+ADMINS = [("Mitch Davis", "mjd@afork.com")]
+
+DBBACKUP_HOSTNAME = 'website.example.com'
+DBBACKUP_FILENAME_TEMPLATE = '{servername}-app-{datetime}.sql'
+DBBACKUP_STORAGE = 'django.core.files.storage.FileSystemStorage'
+DBBACKUP_STORAGE_OPTIONS = {'location': '/var/www/myapp/'}
+
 # -- Above here is local sqlite.  Below, deployed mysql
 
 SITE_ID = 1
@@ -44,3 +51,11 @@ DATABASES = {
 
 STATIC_ROOT = '/var/www/register-static/'
 MEDIA_ROOT = '/var/www/register-media/'
+
+ADMINS = [("Mitch Davis", "mjd@afork.com")]
+
+DBBACKUP_HOSTNAME = 'website.example.com'
+DBBACKUP_FILENAME_TEMPLATE = '{servername}-app-{datetime}.sql'
+DBBACKUP_STORAGE = 'django.core.files.storage.FileSystemStorage'
+DBBACKUP_STORAGE_OPTIONS = {'location': '/var/www/myapp/'}
+

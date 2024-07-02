@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'hijack',
     'hijack.contrib.admin',
     'easy_thumbnails',
+    'dbbackup',
     # See end of this file for debug tools
     # Apps in this project
     'authuser',
