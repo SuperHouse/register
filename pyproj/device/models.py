@@ -26,7 +26,7 @@ def get_dt_as_string(dt):
 
 class Client(models.Model):
     company_name = models.CharField(max_length=255)
-    logo = models.ImageField(null=True, blank=True)
+    logo = models.ImageField(upload_to='clients/', null=True, blank=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
 
     def __str__(self):
@@ -129,7 +129,7 @@ class TestRecord(models.Model):
 
 class TestImage(models.Model):
     test_record = models.ForeignKey(TestRecord, on_delete=models.CASCADE)
-    image = models.ImageField()
+    image = models.ImageField(upload_to='test_images/')
 
     def __str__(self):
         return f'{self.test_record} - {self.image}'
