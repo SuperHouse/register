@@ -1,15 +1,11 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.db import DatabaseError, IntegrityError, transaction
-from django.shortcuts import get_object_or_404
-from django.shortcuts import redirect
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from login_required import login_not_required
 
-from .forms import AddDevicesForm, DeviceEventForm, TestRecordForm
+from .forms import DeviceEventForm, TestRecordForm
 from .models import Client, Design, Device, DeviceEvent, TestRecord
 
 
@@ -107,62 +103,6 @@ def device_grid(request):
         )
 
     return render(request, 'device/device_grid.html', context)
-
-
-@staff_member_required
-def device_add(request):
-    errors = []
-    if request.method == "POST":
-        form = AddDevicesForm(request.POST, hide_override=False)
-        if form.is_valid():
-            with transaction.atomic():
-                design = form.cleaned_data['design']
-                qty = form.cleaned_data['qty']
-                first_serial = form.cleaned_data['first_serial']
-                assembly_date = form.cleaned_data['assembly_date']
-
-                for i in range(qty):
-                    try:
-                        Device.objects.create(
-                            pk=first_serial + i,
-                            design=design,
-                            assembly_date=assembly_date,
-                        )
-                    except IntegrityError as e:
-                        errors.append(f"Integrity error occurred: {e}")
-                    except ValidationError as e:
-                        errors.append(f"Validation error occurred: {e}")
-                    except ObjectDoesNotExist as e:
-                        errors.append(f"Related object does not exist: {e}")
-                    except DatabaseError as e:
-                        errors.append(f"General database error occurred: {e}")
-                if errors:
-                    result = 'Found errors, no changes were saved'
-                    transaction.set_rollback(True)
-
-            # redirect to a new URL:
-            messages.success(request, f"Added {qty} {design} device{'s' if qty > 1 else ''}")
-
-            return redirect("device:device_add")
-        else:
-            messages.warning(
-                request,
-                "Some field values don't match expected defaults.  Please review, and if the values are correct, click the override before resubmitting.",
-            )
-            # Drop through to re-render the form with the error messages
-
-    # if a GET (or any other method) we'll create a blank form
-    else:
-        initial = AddDevicesForm.get_initials()
-        form = AddDevicesForm(hide_override=True, initial=initial)
-
-    ctx = {
-        'last20': Device.objects.order_by('-pk')[:20],
-        'form': form,
-        'errors': errors,
-    }
-
-    return render(request, 'device/device_add.html', ctx)
 
 
 def device_detail(request, device_number):
