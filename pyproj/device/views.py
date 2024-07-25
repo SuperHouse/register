@@ -61,7 +61,7 @@ def device_grid(request):
                 device.design_id,
                 device.get_dt_as_string(),
                 tr_str,
-                device.sw_version or '',
+                device.latest_sw_version() or '',
                 device.notes or '',
                 device.design.name,
                 device.design.hw_version,

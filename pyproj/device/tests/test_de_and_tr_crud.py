@@ -11,6 +11,8 @@ from test_clients_only_see_own_data import (
     create_users_and_user_data,
 )
 
+post_dt_fmt = '%Y-%m-%d %H:%M:%S'
+
 
 def test_device_event_add_edit_delete(client, create_some_device_events):
     data = create_some_device_events
@@ -25,6 +27,7 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     fields = ('internal', 'description')
     data = {f: getattr(u1de, f) for f in fields}
     data['internal'] = True
+    data['event_dt'] = datetime.now().strftime(post_dt_fmt)
     response = client.post(reverse('device:device_event_edit', args=[u1de.pk]), data)
     assert response.status_code == 302
 
@@ -34,9 +37,10 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     assert updated_u1de.event_dt != old_de_dt
 
     assert u1d.deviceevent_set.count() == 1
-    msg = 'Billed on invoice 31'
     data = {
-        'description': msg,
+        'event_dt': datetime.now().strftime(post_dt_fmt),
+        'event_type': 'NOTE',
+        'description': 'Billed on invoice 31',
     }
     response = client.post(reverse('device:device_event_add', args=[u1d.pk]), data)
     assert response.status_code == 302
@@ -46,7 +50,7 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     assert new_de_set.count() == 1
     new_de = new_de_set.first()
     assert new_de.internal == False
-    assert new_de.description == msg
+    assert new_de.description == data['description']
 
     response = client.post(reverse('device:device_event_delete', args=[new_de.pk]))
     assert response.status_code == 302
@@ -65,7 +69,7 @@ def test_test_record_add_edit(client, create_some_test_records):
     assert u1tr.result == TestRecord.NEW
 
     new_test_dt_str = '2023-06-05 12:34:56'
-    new_test_dt = timezone.make_aware(datetime.strptime(new_test_dt_str, '%Y-%m-%d %H:%M:%S'))
+    new_test_dt = timezone.make_aware(datetime.strptime(new_test_dt_str, post_dt_fmt))
     fields = ('result', 'notes')
     data = {f: getattr(u1tr, f) for f in fields}
     data['result'] = 'FAIL'

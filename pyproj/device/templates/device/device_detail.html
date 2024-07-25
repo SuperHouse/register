@@ -47,9 +47,9 @@
             <td>{{ device.design.hw_version }}</td>
         </tr>
         <tr>
-            <th>S/W Version:</th>
+            <th>Latest S/W Version:</th>
             <td>
-                {{ device.sw_version|default_if_none:"<i>Not set</i>" }}
+                {{ device.latest_sw_version|default_if_none:"<i>Not set</i>" }}
             </td>
         </tr>
         <tr>
@@ -62,7 +62,7 @@
         </tr>
         <tr>
             <th>Shipping:</th>
-            <td>{{ device.shipping }}</td>
+            <td>{{ device.latest_shipping|default_if_none:"" }}</td>
         </tr>
         <tr>
             <th>Notes:</th>

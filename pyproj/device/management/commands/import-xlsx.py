@@ -152,10 +152,12 @@ class Command(BaseCommand):
             # self.stdout.write(f'{row=}')
             device_id = int(row['Serial'])
             design_id = int(row['DeviceTypeSerial'])
-            notes = row['Notes']
+            tested = row['Tested']
+            sw_version = row['Firmware']
             creation_dt = row['Assembled']
-            invoice = row['Invoice'] or ''
-            shipping = row['Shipped'] or ''
+            notes = row['Notes']
+            invoice = row['Invoice']
+            shipping = row['Shipped']
             if invoice:
                 try:
                     # If the invoice is a straight number, it'll have .0 on the end.  Convert to string via int.
@@ -187,20 +189,25 @@ class Command(BaseCommand):
                         notes = None
                         break
 
-            device_data = {
-                'id': device_id,
-                'design_id': design_id,
-                'creation_dt': datetime.datetime.combine(creation_dt.date(), witching_hour, tzinfo=tz),
-                'sw_version': row['Firmware'],
-                'invoice': invoice,
-                'shipping': shipping,
-                'notes': notes,
-            }
+            if shipping:
+                match = re.search(r'(\d{1,2}-[A-Z][a-z]{2}-202\d) (.*)', shipping)
+                assert match
+                # self.stdout.write(f'{row=}')
+                # self.stdout.write(f'{shipping=}')
+                # d = match.groupdict()
+                # d_str = f'{d=}'
+                # self.stdout.write(d_str)
+                de_data = {
+                    'device_id': device_id,
+                    'event_dt': date_from_str(match.group(1)),
+                    'event_type': 'SHIPPING',
+                    'description': match.group(2),
+                }
+                de_list.append(de_data)
 
-            test_dt = row['Tested']
-            if test_dt:
-                assert type(test_dt) == datetime.datetime
-                test_dt = datetime.datetime.combine(test_dt.date(), witching_hour, tzinfo=tz)
+            if tested:
+                assert type(tested) == datetime.datetime
+                test_dt = datetime.datetime.combine(tested.date(), witching_hour, tzinfo=tz)
                 tr_data = {
                     'device_id': device_id,
                     'test_dt': test_dt,
@@ -208,6 +215,23 @@ class Command(BaseCommand):
                     'notes': 'Test date imported from spreadsheet.',
                 }
                 tr_list.append(tr_data)
+
+            if sw_version:
+                de_data = {
+                    'device_id': device_id,
+                    'event_dt': timezone.now(),
+                    'event_type': 'SW_VERSION',
+                    'description': sw_version,
+                }
+                de_list.append(de_data)
+
+            device_data = {
+                'id': device_id,
+                'design_id': design_id,
+                'creation_dt': datetime.datetime.combine(creation_dt.date(), witching_hour, tzinfo=tz),
+                'invoice': invoice,
+                'notes': notes,
+            }
 
             device = Device(**device_data)
             device.save()

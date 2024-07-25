@@ -52,9 +52,7 @@ class Design(models.Model):
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
     creation_dt = models.DateTimeField(default=timezone.now)
-    sw_version = models.CharField(max_length=20, null=True, blank=True)
     invoice = models.CharField(max_length=20, null=True, blank=True)
-    shipping = models.CharField(max_length=200, null=True, blank=True)
     # We may need to change notes to a TextField if we need multi-line
     notes = models.CharField(max_length=255, null=True, blank=True)
 
@@ -75,6 +73,12 @@ class Device(models.Model):
     def latest_deviceevent_description_of_type(self, event_type):
         dt = self.latest_deviceevent_of_type(event_type)
         return dt.description if dt else None
+
+    def latest_sw_version(self):
+        return self.latest_deviceevent_description_of_type('SW_VERSION')
+
+    def latest_shipping(self):
+        return self.latest_deviceevent_description_of_type('SHIPPING')
 
 
 class TestRecord(models.Model):
