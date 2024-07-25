@@ -21,7 +21,13 @@ from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic.base import RedirectView
 from django.views.static import serve
+from ninja import NinjaAPI
 
+from device.api import router as device_router
+
+api = NinjaAPI()
+
+api.add_router("/", device_router)
 
 urlpatterns = [
     path('office/', admin.site.urls),
@@ -29,6 +35,7 @@ urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),
+    path('api/', api.urls),
     # If we're running behind a web server, we won't see media requests, so this will do nothing.
     re_path(
         r'^media/(?P<path>.*)$',
