@@ -13,7 +13,8 @@ witching_hour = datetime.time(3, 14, 15, 9, tzinfo=tz)
 
 
 # Return a string representation of a date and time in the local timezone for use in templates.
-# Dates imported with no times will have a time of 4:20am.  In this case, we return just the date.
+# Dates imported with no times will use the witching hour (see above) as a time.
+# In this case, we return just the date.
 def get_dt_as_string(dt):
     if dt.tzinfo == datetime.timezone.utc:
         dt = dt.astimezone(tz)
@@ -50,7 +51,7 @@ class Design(models.Model):
 
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
-    creation_date = models.DateField(default=timezone.localdate)
+    creation_dt = models.DateTimeField(default=timezone.now)
     sw_version = models.CharField(max_length=20, null=True, blank=True)
     invoice = models.CharField(max_length=20, null=True, blank=True)
     shipping = models.CharField(max_length=200, null=True, blank=True)
@@ -63,6 +64,9 @@ class Device(models.Model):
     @classmethod
     def first_free_serial(self):
         return Device.objects.aggregate(models.Max('pk'))['pk__max'] + 1
+
+    def get_creation_dt_as_string(self):
+        return get_dt_as_string(self.creation_dt)
 
 
 class TestRecord(models.Model):

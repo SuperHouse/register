@@ -25,7 +25,7 @@
         <tr>
             <th>Device:</th>
             <td>{{ device.design.name }}</td>
-            <td rowspan="8">
+            <td rowspan="9">
                 {% if device.design.client.logo %}
                     <img src="{{ device.design.client.logo.url }}"
                          alt="{{ device.design.client.name }} logo" />
@@ -54,7 +54,7 @@
         </tr>
         <tr>
             <th>Created:</th>
-            <td>{{ device.creation_date }}</td>
+            <td>{{ device.get_creation_dt_as_string }}</td>
         </tr>
         <tr>
             <th>Invoice:</th>

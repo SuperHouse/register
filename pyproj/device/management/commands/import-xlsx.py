@@ -153,7 +153,7 @@ class Command(BaseCommand):
             device_id = int(row['Serial'])
             design_id = int(row['DeviceTypeSerial'])
             notes = row['Notes']
-            creation_date = row['Assembled']
+            creation_dt = row['Assembled']
             invoice = row['Invoice'] or ''
             shipping = row['Shipped'] or ''
             if invoice:
@@ -188,7 +188,7 @@ class Command(BaseCommand):
             device_data = {
                 'id': device_id,
                 'design_id': design_id,
-                'creation_date': creation_date,
+                'creation_dt': datetime.datetime.combine(creation_dt.date(), witching_hour, tzinfo=tz),
                 'sw_version': row['Firmware'],
                 'invoice': invoice,
                 'shipping': shipping,
