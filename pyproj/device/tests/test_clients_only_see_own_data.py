@@ -144,7 +144,7 @@ def create_some_test_records(django_user_model, create_users_and_user_data):
     user2_tr1 = TestRecord(
         device=user2_device,
         test_dt=timezone.make_aware(datetime(2021, 5, 11, 16, 20, 24)),
-        result='SHIP',
+        result='FAILED',
         notes="User 2's first test record",
     )
     user2_tr1.save()
