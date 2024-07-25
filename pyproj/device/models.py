@@ -68,6 +68,14 @@ class Device(models.Model):
     def get_creation_dt_as_string(self):
         return get_dt_as_string(self.creation_dt)
 
+    def latest_deviceevent_of_type(self, event_type):
+        qs = self.deviceevent_set.filter(event_type=event_type)
+        return qs.latest('event_dt') if qs.exists() else None
+
+    def latest_deviceevent_description_of_type(self, event_type):
+        dt = self.latest_deviceevent_of_type(event_type)
+        return dt.description if dt else None
+
 
 class TestRecord(models.Model):
     NEW = 'NEW'
@@ -124,8 +132,19 @@ class TestImage(models.Model):
 
 
 class DeviceEvent(models.Model):
+    NOTE = 'NOTE'
+    SW_VERSION = 'SW_VERSION'
+    SHIPPING = 'SHIPPING'
+
+    TYPE_CHOICES = [
+        (NOTE, 'NOTE'),
+        (SW_VERSION, 'SW_VERSION'),
+        (SHIPPING, 'SHIPPING'),
+    ]
+
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     event_dt = models.DateTimeField(verbose_name='When', default=timezone.now)
+    event_type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=NOTE)
     internal = models.BooleanField(default=False, help_text='Do not show this event to clients')
     description = models.TextField()
 
@@ -137,3 +156,10 @@ class DeviceEvent(models.Model):
 
     def get_event_dt_as_string(self):
         return get_dt_as_string(self.event_dt)
+
+    def get_type_display(self):
+        return {
+            'NOTE': '📝 Note',
+            'SW_VERSION': '🏷️ Firmware',
+            'SHIPPING': '🚚 Shipping',
+        }.get(self.event_type, '🤷 Unknown')

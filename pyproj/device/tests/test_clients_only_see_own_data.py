@@ -77,7 +77,9 @@ def create_some_device_events(django_user_model, create_users_and_user_data):
     user1 = data['user1']
     user1_device = data['user1_device']
     event_dt = timezone.make_aware(datetime(2021, 5, 10, 16, 20, 24))
-    user1_device_event1 = DeviceEvent(device=user1_device, event_dt=event_dt, description="User 1's first event")
+    user1_device_event1 = DeviceEvent(
+        device=user1_device, event_dt=event_dt, event_type='NOTE', description="User 1's first event"
+    )
     user1_device_event1.save()
     user2 = data['user2']
     user2_device = data['user2_device']
@@ -85,6 +87,7 @@ def create_some_device_events(django_user_model, create_users_and_user_data):
     user2_device_event1 = DeviceEvent(
         device=user2_device,
         event_dt=event_dt,
+        event_type='NOTE',
         description="User 2's first event",
         internal=True,
     )

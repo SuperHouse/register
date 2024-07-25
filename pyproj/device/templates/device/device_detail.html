@@ -80,6 +80,7 @@
                         <tr>
                             <th>Internal</th>
                             <th>When</th>
+                            <th>Type</th>
                             <th>Note</th>
                             <th>Operation</th>
                         </tr>
@@ -88,6 +89,7 @@
                 <tr>
                     <td>{{ event.internal|yesno:"🔒,🌏" }}</td>
                     <td>{{ event.get_event_dt_as_string }}</td>
+                    <td>{{ event.get_type_display }}</td>
                     <td>{{ event.description|default_if_none:"" }}</td>
                     <td>
                         <a role="button"

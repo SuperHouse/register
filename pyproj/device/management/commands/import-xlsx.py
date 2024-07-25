@@ -180,9 +180,11 @@ class Command(BaseCommand):
                         de_data = {
                             'device_id': device_id,
                             'event_dt': date_from_str(match.group()),
-                            'description': f'<See device note for dated event, probably on this date>',
+                            'event_type': 'NOTE',
+                            'description': notes,
                         }
                         de_list.append(de_data)
+                        notes = None
                         break
 
             device_data = {
