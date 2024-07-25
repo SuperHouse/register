@@ -25,7 +25,7 @@
         <tr>
             <th>Device:</th>
             <td>{{ device.design.name }}</td>
-            <td rowspan="9">
+            <td rowspan="10">
                 {% if device.design.client.logo %}
                     <img src="{{ device.design.client.logo.url }}"
                          alt="{{ device.design.client.name }} logo" />
@@ -59,6 +59,10 @@
         <tr>
             <th>Invoice:</th>
             <td>{{ device.invoice }}</td>
+        </tr>
+        <tr>
+            <th>Purchase order:</th>
+            <td>{{ device.po }}</td>
         </tr>
         <tr>
             <th>Shipping:</th>

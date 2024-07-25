@@ -53,6 +53,7 @@ class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
     creation_dt = models.DateTimeField(default=timezone.now)
     invoice = models.CharField(max_length=20, null=True, blank=True)
+    po = models.CharField('Purchase order', max_length=20, null=True, blank=True)
     # We may need to change notes to a TextField if we need multi-line
     notes = models.CharField(max_length=255, null=True, blank=True)
 

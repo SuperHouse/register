@@ -131,7 +131,7 @@ class Command(BaseCommand):
         ws_device = wb['Devices']
 
         known_device_keys = tuple(
-            'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/Shipped'.split('/')
+            'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/PO/Shipped'.split('/')
         )
         device_keys = tuple(cell.value for cell in ws_device['1'] if cell.value is not None)
         # self.stdout.write(f'{device_keys=}')
@@ -158,6 +158,8 @@ class Command(BaseCommand):
             notes = row['Notes']
             invoice = row['Invoice']
             shipping = row['Shipped']
+            porder = row['PO']
+
             if invoice:
                 try:
                     # If the invoice is a straight number, it'll have .0 on the end.  Convert to string via int.
@@ -165,6 +167,14 @@ class Command(BaseCommand):
                 except ValueError:
                     # Just take the string, may not have been a straight number.
                     invoice = str(invoice)
+
+            if porder:
+                try:
+                    # If the porder is a straight number, it'll have .0 on the end.  Convert to string via int.
+                    porder = str(int(porder))
+                except ValueError:
+                    # Just take the string, may not have been a straight number.
+                    porder = str(porder)
 
             if notes:
                 dated_event_in_note_matchers = (
@@ -230,6 +240,7 @@ class Command(BaseCommand):
                 'design_id': design_id,
                 'creation_dt': datetime.datetime.combine(creation_dt.date(), witching_hour, tzinfo=tz),
                 'invoice': invoice,
+                'po': porder,
                 'notes': notes,
             }
 
