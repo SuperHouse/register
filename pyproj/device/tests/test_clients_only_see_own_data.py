@@ -20,7 +20,7 @@ def create_users_and_user_data(django_user_model):
     design1 = Design(client=client1, sku='C1A', name='Client One Design One', hw_version='1.0')
     design1.save()
     mothers_day = timezone.make_aware(datetime(2021, 5, 9))
-    device1 = Device(design=design1, assembly_date=mothers_day, notes='Pink soldermask')
+    device1 = Device(design=design1, creation_date=mothers_day, notes='Pink soldermask')
     device1.save()
 
     client2 = Client(company_name='Client Two')
@@ -32,7 +32,7 @@ def create_users_and_user_data(django_user_model):
     design2 = Design(client=client2, sku='C2A', name='Client Two Design One', hw_version='1.0')
     design2.save()
     halloween = timezone.make_aware(datetime(2021, 10, 31))
-    device2 = Device(design=design2, assembly_date=halloween, notes='Yellow soldermask, black silkscreen')
+    device2 = Device(design=design2, creation_date=halloween, notes='Yellow soldermask, black silkscreen')
     device2.save()
 
     results = {

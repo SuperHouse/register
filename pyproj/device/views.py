@@ -59,7 +59,7 @@ def device_grid(request):
             row = (
                 device.pk,
                 device.design_id,
-                device.assembly_date,
+                device.creation_date,
                 tr_str,
                 device.sw_version or '',
                 device.notes or '',

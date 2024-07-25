@@ -50,7 +50,7 @@ class Design(models.Model):
 
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
-    assembly_date = models.DateField(default=timezone.localdate)
+    creation_date = models.DateField(default=timezone.localdate)
     sw_version = models.CharField(max_length=20, null=True, blank=True)
     invoice = models.CharField(max_length=20, null=True, blank=True)
     shipping = models.CharField(max_length=200, null=True, blank=True)
