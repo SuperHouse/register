@@ -21,12 +21,6 @@
 
     <p>
         <b>Device:</b> {{ device }}<br />
-        {% if ts %}
-            <b>Current timestamp:</b> {{ ts }}.<br />
-            <i>Saving will update the timestamp to the current time.</i>
-        {% else %}
-            <i>Saving will set the timestamp to the current time.</i>
-        {% endif %}
     </p>
 
     <form method="post">

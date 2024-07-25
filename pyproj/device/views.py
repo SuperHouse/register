@@ -232,7 +232,6 @@ def device_event_edit(request, device_event_number):
         'form': form,
         'device': event.device,
         'operation': 'Edit',
-        'ts': event.event_dt,
     }
 
     return render(request, "device/device_event_edit.html", ctx)
