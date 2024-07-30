@@ -28,7 +28,7 @@ class AuthByApiKey(APIKeyHeader):
     param_name = 'X-API-Key'
 
     # https://stackoverflow.com/questions/4581789/how-do-i-get-user-ip-address-in-django
-    def get_client_ip(request):
+    def get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
             ip = x_forwarded_for.split(',')[0]
@@ -37,22 +37,13 @@ class AuthByApiKey(APIKeyHeader):
         return ip
 
     def authenticate(self, request, key):
-        """
-        # Finish this when it's deployed
-
         request_from = self.get_client_ip(request)
         ip_addr = ipaddress.ip_address(request_from)
 
         if settings.API_ALLOW_IPV4_SUBNET:
-            allowed_ipv4_network = address.ip_network(settings.API_ALLOW_IPV4_SUBNET)
+            allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET)
             if ip_addr not in allowed_ipv4_network:
                 return
-
-        if settings.API_ALLOW_IPV6_SUBNET:
-            allowed_ipv6_network = address.ip_network(settings.API_ALLOW_IPV6_SUBNET)
-            if ip_addr not in allowed_ipv6_network:
-                return
-        """
 
         if key and Client.objects.filter(api_key=key).exists():
             return key
@@ -62,8 +53,16 @@ header_key_auth = AuthByApiKey()
 router = Router(auth=header_key_auth)
 
 
+@router.get('test-endpoint-noauth/', auth=None, response=Message)
+def endpoint_test_noauth(request):
+    return {'message': 'Success.'}
 
-# FIXME: If we make all these endpoints staff-only, we don't need to check for cross-client access.
+
+@router.get('test-endpoint/', response=Message)
+def endpoint_test_withauth(request):
+    return {'message': 'Success.'}
+
+
 @router.get('clients/', response=list[ClientSchema])
 def get_clients(request):
     return Client.objects.all()
