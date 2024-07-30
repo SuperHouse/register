@@ -35,7 +35,7 @@ urlpatterns = [
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),
-    path('api/', api.urls),
+    path('api/v1/', api.urls),
     # If we're running behind a web server, we won't see media requests, so this will do nothing.
     re_path(
         r'^media/(?P<path>.*)$',
