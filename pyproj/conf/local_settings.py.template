@@ -15,6 +15,9 @@ INTERNAL_IPS = [
     '127.0.0.1',
 ]
 
+API_ALLOW_IPV4_SUBNET = '1.2.3.4/32'
+API_ALLOW_IPV6_SUBNET = None
+
 # https://utils.brntn.me/database-url/
 DATABASES = {
     'default': dj_database_url.config(default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'),

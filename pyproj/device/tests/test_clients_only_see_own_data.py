@@ -11,7 +11,7 @@ from device.models import Client, Design, Device, DeviceEvent, TestRecord
 # Helper: Create two users, and some corresponding client, design and device data
 @pytest.fixture
 def create_users_and_user_data(django_user_model):
-    client1 = Client(company_name='Client One')
+    client1 = Client(company_name='Client One', api_key='api-key-for-testing-1')
     client1.save()
     user1 = django_user_model.objects.create_user(email='user1@example.com', password='pass1')
     user1.client = client1
@@ -40,6 +40,7 @@ def create_users_and_user_data(django_user_model):
         'user1_device': device1,
         'user2': user2,
         'user2_device': device2,
+        'api-key': client1.api_key,
     }
 
     return results

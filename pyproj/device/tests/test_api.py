@@ -1,6 +1,7 @@
 import datetime
 import io
 from PIL import Image
+from urllib.parse import urlencode
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -15,32 +16,51 @@ from device.tests.test_clients_only_see_own_data import (
 from device.api import router
 from device.models import Device
 
-api_prefix = 'api-1.0.0'
-api_root = reverse(f'{api_prefix}:api-root')
-
-
-def api_reverse(label, *args, **kwargs):
-    label2 = f'{api_prefix}:{label}'
-    url = reverse(label2, *args, **kwargs)
-    return url.replace(api_root, '')
-
 
 def dt_as_utc_in_json(dt):
     return dt.astimezone(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ')
 
 
-# def test_list_clients(client, admin_client, create_users_and_user_data):
+class TestClientWithAuth(TestClient):
+    api_prefix = 'api-1.0.0'
+    api_root = reverse(f'{api_prefix}:api-root')
+
+    def __init__(self, router, api_key):
+        super().__init__(router)
+        self.api_key = api_key
+
+    def get(self, endpoint, params=None, kwargs=None, **other_args):
+        url = self.api_reverse(endpoint, kwargs)
+        if params:
+            url = ''.join((url, '?', urlencode(params)))
+        headers = other_args.pop('headers', {})
+        headers['X-API-Key'] = self.api_key
+
+        return super().get(url, headers=headers, **other_args)
+
+    def post(self, endpoint, kwargs=None, **other_args):
+        url = self.api_reverse(endpoint, kwargs)
+        headers = other_args.pop('headers', {})
+        headers['X-API-Key'] = self.api_key
+
+        return super().post(url, headers=headers, **other_args)
+
+    @classmethod
+    def api_reverse(cls, endpoint, kwargs=None):
+        label2 = f'{cls.api_prefix}:{endpoint}'
+        url = reverse(label2, kwargs=kwargs)
+
+        return url.replace(cls.api_root, '')
+
+
 def test_list_clients(create_users_and_user_data):
     data = create_users_and_user_data
 
     u1c = data['user1'].client
     u2c = data['user2'].client
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
-    response = client.get(api_reverse('get_clients'))
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_clients')
     assert response.status_code == 200
 
     expected_json = [
@@ -60,11 +80,8 @@ def test_list_all_designs(create_users_and_user_data):
     u1design = data['user1_device'].design
     u2design = data['user2_device'].design
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
-    response = client.get(api_reverse('get_designs'))
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_designs')
     assert response.status_code == 200
 
     expected_json = [
@@ -96,11 +113,8 @@ def test_list_designs_for_client(create_users_and_user_data):
     u2c = data['user2'].client
     u2design = data['user2_device'].design
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
-    response = client.get(api_reverse('get_designs') + '?client_pk=' + str(u2c.pk))
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_designs', params={'client_pk': str(u2c.pk)})
     assert response.status_code == 200
 
     expected_json = [
@@ -123,11 +137,8 @@ def test_get_existing_device(create_users_and_user_data):
 
     u2d = data['user2_device']
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
-    response = client.get(api_reverse('get_existing_device', kwargs={'device_pk': u2d.pk}))
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_existing_device', kwargs={'device_pk': u2d.pk})
     assert response.status_code == 200
 
     expected_json = {
@@ -144,13 +155,10 @@ def test_get_nonexistent_device_fails(create_users_and_user_data):
 
     u2d = data['user2_device']
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
+    api_client = TestClientWithAuth(router, data['api-key'])
     fictional_pk = u2d.first_free_serial()
 
-    response = client.get(api_reverse('get_existing_device', kwargs={'device_pk': fictional_pk}))
+    response = api_client.get('get_existing_device', kwargs={'device_pk': fictional_pk})
     assert response.status_code == 404
 
 
@@ -160,10 +168,7 @@ def test_add_or_update_device(create_users_and_user_data):
     u2d = data['user2_device']
     u1design = data['user1_device'].design
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
+    api_client = TestClientWithAuth(router, data['api-key'])
 
     # Test that we get a 400 for an existing device,
     # but with a design that doesn't exist
@@ -171,8 +176,7 @@ def test_add_or_update_device(create_users_and_user_data):
         'pk': u2d.pk,
         'design_pk': 999,
     }
-    url = api_reverse('add_or_update_device')
-    response = client.post(api_reverse('add_or_update_device'), json=data)
+    response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 400
 
     # For a device that already exists, test that the creation date changes
@@ -181,7 +185,7 @@ def test_add_or_update_device(create_users_and_user_data):
         'pk': u2d.pk,
         'design_pk': u2d.design.pk,
     }
-    response = client.post(api_reverse('add_or_update_device'), json=data)
+    response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert new_u2d.creation_dt != u2d.creation_dt
@@ -192,7 +196,7 @@ def test_add_or_update_device(create_users_and_user_data):
         'pk': u2d.pk,
         'design_pk': u1design.pk,
     }
-    response = client.post(api_reverse('add_or_update_device'), json=data)
+    response = api_client.post('add_or_update_device', json=data)
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert new_u2d.design.pk == u1design.pk
 
@@ -204,7 +208,7 @@ def test_add_or_update_device(create_users_and_user_data):
         'design_pk': u2d.design.pk,
         'creation_dt': dt_as_utc_in_json(day_after),
     }
-    response = client.post(api_reverse('add_or_update_device'), json=data)
+    response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert new_u2d.creation_dt == day_after
@@ -215,7 +219,7 @@ def test_add_or_update_device(create_users_and_user_data):
         'pk': new_pk,
         'design_pk': u2d.design.pk,
     }
-    response = client.post(api_reverse('add_or_update_device'), json=data)
+    response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 201
 
     new_u2d = Device.objects.get(pk=new_pk)
@@ -230,10 +234,7 @@ def test_program_device(create_users_and_user_data):
 
     u2d = data['user2_device']
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
+    api_client = TestClientWithAuth(router, data['api-key'])
 
     # Test that a non-existent device returns 404
     new_pk = Device.first_free_serial()
@@ -241,14 +242,14 @@ def test_program_device(create_users_and_user_data):
         'sw_version': sw_version_a,
     }
 
-    response = client.post(api_reverse('post_device_program', args=[new_pk]), json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': new_pk}, json=data)
     assert response.status_code == 404
 
     # Test that an existing device has no software version
     assert u2d.latest_sw_version() is None
 
     # Test that we can add a software version to the device
-    response = client.post(api_reverse('post_device_program', args=[u2d.pk]), json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert new_u2d.latest_sw_version() == sw_version_a
@@ -257,7 +258,7 @@ def test_program_device(create_users_and_user_data):
     data = {
         'sw_version': sw_version_b,
     }
-    response = client.post(api_reverse('post_device_program', args=[u2d.pk]), json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert new_u2d.latest_sw_version() == sw_version_b
@@ -271,7 +272,7 @@ def test_program_device(create_users_and_user_data):
     data = {
         'sw_version': sw_version_a,
     }
-    response = client.post(api_reverse('post_device_program', args=[u2d.pk]), json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     # The device should now have three versions
@@ -287,10 +288,7 @@ def test_add_test_record(create_users_and_user_data):
 
     u2d = data['user2_device']
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
+    api_client = TestClientWithAuth(router, data['api-key'])
 
     # Test that a non-existent device returns 404
     new_pk = Device.first_free_serial()
@@ -302,7 +300,7 @@ def test_add_test_record(create_users_and_user_data):
         'notes': 'Results nominal',
     }
 
-    response = client.post(api_reverse('add_test_record', args=[new_pk]), json=data)
+    response = api_client.post('add_test_record', kwargs={'device_pk': new_pk}, json=data)
     assert response.status_code == 404
 
     # Test that an existing device has no test records
@@ -310,12 +308,13 @@ def test_add_test_record(create_users_and_user_data):
 
     # Test that an invalid test type causes a fault
     data['result'] = 'SILLY'
-    response = client.post(api_reverse('add_test_record', args=[u2d.pk]), json=data)
+    response = api_client.post('add_test_record', kwargs={'device_pk': u2d.pk}, json=data)
     assert response.status_code == 422
+    assert u2d.testrecord_set.count() == 0
 
     # Test that we can add a test record to the device
     data['result'] = 'PASS'
-    response = client.post(api_reverse('add_test_record', args=[u2d.pk]), json=data)
+    response = api_client.post('add_test_record', kwargs={'device_pk': u2d.pk}, json=data)
     assert response.status_code == 200
     new_u2d = Device.objects.get(pk=u2d.pk)
     assert u2d.testrecord_set.count() == 1
@@ -342,18 +341,16 @@ def test_add_image_to_test_record(create_some_test_records):
 
     u2tr = data['user2_test_record1']
 
-    # client.force_login(data['user1'])
-    # FIXME: We gonna need this after we add authorization
-
-    client = TestClient(router)
+    api_client = TestClientWithAuth(router, data['api-key'])
 
     img = generate_tinypic()
     uploaded_file = SimpleUploadedFile('test.png', img.read(), content_type='image/png')
     data = {}
 
     # Test that adding an image to a non-existent test record fails
-    response = client.post(
-        api_reverse('add_test_image', args=[999999]),
+    response = api_client.post(
+        'add_test_image',
+        kwargs={'testrecord_pk': 999999},
         data=data,
         FILES={'file': uploaded_file},
     )
@@ -363,10 +360,8 @@ def test_add_image_to_test_record(create_some_test_records):
     assert u2tr.testimage_set.count() == 0
 
     # Test that we can add a test image to the test record
-    response = client.post(
-        api_reverse('add_test_image', args=[u2tr.pk]),
-        data=data,
-        FILES={'file': uploaded_file},
+    response = api_client.post(
+        'add_test_image', kwargs={'testrecord_pk': u2tr.pk}, data=data, FILES={'file': uploaded_file}
     )
     assert response.status_code == 200
 
@@ -390,11 +385,3 @@ def test_add_image_to_test_record(create_some_test_records):
 
     # Remove the saved image file from storage
     new_ti.image.delete()
-
-
-# FIXME: Put auth test here
-# def test_api_device_add(create_users_and_user_data, django_user_model, client):
-#     # Create a staff user
-#     staff = django_user_model.objects.create_user(email='staff@example.com', password='staffy', is_staff=True)
-#     staff.save()
-#     client.force_login(staff)

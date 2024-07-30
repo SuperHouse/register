@@ -119,6 +119,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/office/login/',
     '/office/logout/',
     '/admin/',
+    '/api/',
     '/static/',
     '__debug__/',
 ]

@@ -17,6 +17,7 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
+from django.contrib.admin.views.decorators import staff_member_required
 from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic.base import RedirectView
@@ -25,7 +26,7 @@ from ninja import NinjaAPI
 
 from device.api import router as device_router
 
-api = NinjaAPI()
+api = NinjaAPI(docs_decorator=staff_member_required)
 
 api.add_router("/", device_router)
 
