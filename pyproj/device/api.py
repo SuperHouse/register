@@ -27,6 +27,9 @@ from .schemas import (
 class AuthByApiKey(APIKeyHeader):
     param_name = 'X-API-Key'
 
+    allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
+    local_network = ipaddress.ip_network('127.0.0.0/24')
+
     # https://stackoverflow.com/questions/4581789/how-do-i-get-user-ip-address-in-django
     def get_client_ip(self, request):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -40,10 +43,14 @@ class AuthByApiKey(APIKeyHeader):
         request_from = self.get_client_ip(request)
         ip_addr = ipaddress.ip_address(request_from)
 
-        if settings.API_ALLOW_IPV4_SUBNET:
-            allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET)
-            if ip_addr not in allowed_ipv4_network:
-                return
+        allow = False
+        if ip_addr in self.local_network:
+            allow = True
+        if self.allowed_ipv4_network and ip_addr in self.allowed_ipv4_network:
+            allow = True
+
+        if not allow:
+            return
 
         if key and Client.objects.filter(api_key=key).exists():
             return key
