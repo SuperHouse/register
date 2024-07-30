@@ -1,14 +1,46 @@
-# Unauthorized request
+# This file uses the REST Client extension for VS Code to send requests from within VS Code.
+https://github.com/Huachao/vscode-restclient
 
-GET http://localhost:8000/api/v1/clients/
+###
+# Test request that doesn't need authorisation
+
+GET http://localhost:8000/api/v1/test-endpoint-noauth/
 Content-Type: application/json
 
-# Example response:
+# Example response: HTTP 200
+#
+# {
+#   "message": "Success."
+# }
+
+###
+# Test request that needs authentication, but the key is wrong
+
+GET http://localhost:8000/api/v1/test-endpoint/
+Content-Type: application/json
+X-API-Key: wrong-key
+
+# Example response: HTTP 401
 #
 # {
 #   "detail": "Unauthorized"
 # }
 
+###
+# Test request that needs authentication, but the key is fine
+# (key must match something stored in Client.api_key)
+
+GET http://localhost:8000/api/v1/test-endpoint/
+Content-Type: application/json
+X-API-Key: supersecret
+
+# Example response: HTTP 200
+#
+# {
+#   "message": "Success."
+# }
+
+###
 # Fetch a list of clients
 
 GET http://localhost:8000/api/v1/clients/
