@@ -1,0 +1,219 @@
+# Unauthorized request
+
+GET http://localhost:8000/api/v1/clients/
+Content-Type: application/json
+
+# Example response:
+#
+# {
+#   "detail": "Unauthorized"
+# }
+
+# Fetch a list of clients
+
+GET http://localhost:8000/api/v1/clients/
+Content-Type: application/json
+X-API-Key: supersecret
+
+# Example response:
+#
+# [
+#   {
+#     "id": 1,
+#     "company_name": "Very Spiffy Wardrobe Co."
+#   },
+#   {
+#     "id": 2,
+#     "company_name": "Rent-a-Tent"
+#   }
+# ]
+
+###
+# Fetch all designs for all clients
+
+GET http://localhost:8000/api/v1/designs/
+Content-Type: application/json
+X-API-Key: supersecret
+
+# Example response:
+#
+# [
+#   {
+#     "client": {
+#       "id": 7,
+#       "company_name": "RobinCo"
+#     },
+#     "id": 79,
+#     "sku": "BPM",
+#     "name": "Mouse RMD",
+#     "hw_version": "1.0",
+#     "description": null
+#   },
+#   {
+#     "client": {
+#       "id": 4,
+#       "company_name": "IPA Beers"
+#     },
+#     "id": 67,
+#     "sku": "BREWBOARD",
+#     "name": "Brewing Controller Board",
+#     "hw_version": "2.8.0",
+#     "description": null
+#   },
+#   {
+#     "client": {
+#       "id": 4,
+#       "company_name": "IPA Beers"
+#     },
+#     "id": 67,
+#     "sku": "SPARGEBOARD",
+#     "name": "Sparging Controller Board",
+#     "hw_version": "1.2.3",
+#     "description": null
+#   }
+# ]
+
+###
+# Fetch all designs for a specific client
+
+GET http://localhost:8000/api/v1/designs/?client=4
+Content-Type: application/json
+X-API-Key: supersecret
+
+# Example response:
+#
+# []
+#   {
+#     "client": {
+#       "id": 4,
+#       "company_name": "IPA Beers"
+#     },
+#     "id": 67,
+#     "sku": "BREWBOARD",
+#     "name": "Brewing Controller Board",
+#     "hw_version": "2.8.0",
+#     "description": null
+#   },
+#   {
+#     "client": {
+#       "id": 4,
+#       "company_name": "IPA Beers"
+#     },
+#     "id": 67,
+#     "sku": "SPARGEBOARD",
+#     "name": "Sparging Controller Board",
+#     "hw_version": "1.2.3",
+#     "description": null
+#   }
+# ]
+
+###
+# A "check device" call
+
+GET http://localhost:8000/api/v1/device/2000/
+Content-Type: application/json
+X-API-Key: supersecret
+
+# Example response (device exists): HTTP 200
+# {
+#   "design_id": 78,
+#   "creation_dt": "2024-04-04T16:14:15.000Z",
+# }
+
+# Example response (device does not exist): HTTP 404
+#
+# {
+#   "detail": "Not Found: No Device matches the given query."
+# }
+
+###
+# A "create device" call
+# Response indicates whether the device was created or not
+
+POST http://localhost:8000/api/v1/device/add/
+Content-Type: application/json
+X-API-Key: supersecret
+
+{
+    "pk": 2000,
+    "design_pk": 78,
+    "creation_dt": "2024-04-04T16:14:15.000Z"
+}
+
+# Example response (device updated): HTTP 200
+#
+# {
+#   "message": "Ok"
+# }
+#
+# Example response (device created): HTTP 201
+#
+# {
+#   "message": "Created"
+# }
+#
+# Example response (bad design): HTTP 400
+#
+# {
+#  "message": "Design not found"
+#}
+
+###
+# A "program w/ sw_version" call
+# A new sw_version record will be created, even if that
+# version already exists.
+POST http://localhost:8000/api/v1/device/4000/program/
+Content-Type: application/json
+X-API-Key: supersecret
+
+{
+    "sw_version": "1.0.0"
+}
+
+# Example response: HTTP 200
+#
+# {
+#   "message": "Ok"
+# }
+#
+# Example response: HTTP 404
+#
+# {
+#   "detail": "Not Found: No Device matches the given query."
+# }
+
+###
+# Add "test record" call
+# Response includes pk of the new test record
+POST http://localhost:8000/api/v1/device/2000/add-tr/
+Content-Type: application/json
+X-API-Key: supersecret
+
+{
+    "result": "PASS",
+    "notes": "Great news, no smoke",
+    "test_dt": "2024-04-04T16:14:15.000Z"
+}
+
+###
+# Add "test image" call
+POST http://localhost:8000/api/tr/3/add-image
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="image"; filename="1.png"
+Content-Type: image/png
+
+< ./1.png
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+###
+# Add device event call
+POST http://localhost:8000/api/device/2000/add-de/
+Content-Type: application/json
+
+{
+    "event_dt": "2023-06-05 12:34:56", # FIXME: Optional
+    "event_type": "NOTE",
+    "description": "This is a device event"
+}
