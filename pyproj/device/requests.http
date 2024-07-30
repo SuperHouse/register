@@ -195,9 +195,18 @@ X-API-Key: supersecret
     "test_dt": "2024-04-04T16:14:15.000Z"
 }
 
+# Example response: HTTP 200
+#
+# {
+#   "pk": 1911
+# }
+
 ###
 # Add "test image" call
-POST http://localhost:8000/api/tr/3/add-image
+# Image is sent as a multipart form-data request
+# (the example below injects a file (here called 1.png) into the request
+# as raw bytes. The boundary string is arbitrary and can be anything.
+POST http://localhost:8000/api/tr/1911/add-image
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
 
 ------WebKitFormBoundary7MA4YWxkTrZu0gW
@@ -207,13 +216,3 @@ Content-Type: image/png
 < ./1.png
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--
 
-###
-# Add device event call
-POST http://localhost:8000/api/device/2000/add-de/
-Content-Type: application/json
-
-{
-    "event_dt": "2023-06-05 12:34:56", # FIXME: Optional
-    "event_type": "NOTE",
-    "description": "This is a device event"
-}
