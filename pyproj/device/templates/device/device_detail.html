@@ -58,15 +58,15 @@
         </tr>
         <tr>
             <th>Invoice:</th>
-            <td>{{ device.invoice }}</td>
+            <td>{{ device.invoice|default_if_none:"<i>Not set</i>" }}</td>
         </tr>
         <tr>
             <th>Purchase order:</th>
-            <td>{{ device.po }}</td>
+            <td>{{ device.po|default_if_none:"<i>Not set</i>" }}</td>
         </tr>
         <tr>
             <th>Shipping:</th>
-            <td>{{ device.latest_shipping|default_if_none:"" }}</td>
+            <td>{{ device.latest_shipping|default_if_none:"<i>Not set</i>" }}</td>
         </tr>
         <tr>
             <th>Notes:</th>
