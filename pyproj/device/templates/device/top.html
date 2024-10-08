@@ -20,10 +20,8 @@
 {% endblock h1 %}
 
 {% block content %}
-    {% if not user.is_authenticated %}
-        <p>Welcome, new user. Please log in.</p>
-    {% else %}
-        <h2>Current clients:</h2>
+    {% if user.is_staff %}
+        <h2>Clients</h2>
         {% if clients %}
             <table border="1">
                 <tr>
@@ -43,52 +41,60 @@
                 <i>There are no clients.</i>
             </p>
         {% endif %}
+    {% endif %}
 
-        <h2>Current designs:</h2>
-        {% if designs %}
-            <table border="1">
-                <tr>
-                    <th>SKU</th>
-                    <th>Name</th>
-                    <th>Version</th>
+    <h2>Designs</h2>
+    {% if designs %}
+        <table border="1">
+            <tr>
+                {% if user.is_staff %}
                     <th>Client</th>
-                </tr>
-                {% for design in designs %}
-                    <tr>
-                        <td>{{ design.sku }}</td>
-                        <td>{{ design.name }}</td>
-                        <td>{{ design.version }}</td>
-                        <td>{{ design.client.company_name }}</td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% else %}
-            <p>
-                <i>There are no designs.</i>
-            </p>
-        {% endif %}
-
-        <p>Let's track some devices.</p>
-        {% if devices %}
-            <table border="1">
+                {% endif %}
+                <th>SKU</th>
+                <th>Name</th>
+                <th>Version</th>
+            </tr>
+            {% for design in designs %}
                 <tr>
-                    <th>Device</th>
-                </tr>
-                {% for device in devices %}
-                    <tr>
-                        <td>
-                            {{ device.design.sku }} {{ device.design.name }} {{ device.design.hw_version }}
-                            <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
+                    {% if user.is_staff %}
+                        <td>&nbsp;
+                        {% ifchanged design.client %}{{ design.client.company_name }}{% endifchanged %}
                         </td>
-                    </tr>
-                {% endfor %}
-            </table>
-        {% else %}
-            <p>
-                <i>There are no devices.</i>
-            </p>
-        {% endif %}
+                    {% endif %}
+                    <td>{{ design.sku }}</td>
+                    <td>{{ design.name }}</td>
+                    <td>{{ design.hw_version }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>
+            <i>There are no designs.</i>
+        </p>
+    {% endif %}
 
+    <p>Let's track some devices.</p>
+    {% if devices %}
+        <table border="1">
+            <tr>
+                <th>Device</th>
+            </tr>
+            {% for device in devices %}
+                <tr>
+                    <td>
+                        {{ device.design.sku }} {{ device.design.name }} {{ device.design.hw_version }}
+                        <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% else %}
+        <p>
+            <i>There are no devices.</i>
+        </p>
+    {% endif %}
+
+    {% if user.is_staff %}
         <h2>Actions</h2>
         <ul>
             <li>

@@ -82,40 +82,51 @@
                 {% if forloop.first %}
                     <thead>
                         <tr>
-                            <th>Internal</th>
+                            {% if user.is_staff %}
+                                <th>Internal</th>
+                            {% endif %}
                             <th>When</th>
                             <th>Type</th>
                             <th>Note</th>
-                            <th>Operation</th>
+                            {% if user.is_staff %}
+                                <th>Operation</th>
+                            {% endif %}
                         </tr>
                     </thead>
                 {% endif %}
                 <tr>
-                    <td>{{ event.internal|yesno:"🔒,🌏" }}</td>
+                    {% if user.is_staff %}
+                        <td>{{ event.internal|yesno:"🔒,🌏" }}</td>
+                    {% endif %}
                     <td>{{ event.get_event_dt_as_string }}</td>
                     <td>{{ event.get_type_display }}</td>
                     <td>{{ event.description|default_if_none:"" }}</td>
-                    <td>
-                        <a role="button"
-                           class="btn btn-link"
-                           href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
-                        <a role="button"
-                           class="btn btn-link"
-                           href="{% url 'device:device_event_delete' event.pk %}">Del</a>
-                    </td>
+                    {% if user.is_staff %}
+                        <td>
+                            <a role="button"
+                            class="btn btn-link"
+                            href="{% url 'device:device_event_edit' event.pk %}">Edit</a>
+                            <a role="button"
+                            class="btn btn-link"
+                            href="{% url 'device:device_event_delete' event.pk %}">Del</a>
+                        </td>
+                    {% endif %}
                 </tr>
             {% empty %}
                 <tr>
                     <td colspan="3">
-                        &nbsp;&nbsp;&nbsp;<i>Currently no device events.</i>    {% comment %} Add {% endcomment %}
+                        &nbsp;&nbsp;&nbsp;<i>Currently no device events.</i>
                     </td>
                 </tr>
             {% endfor %}
         {% endwith %}
     </table>
-    <a role="button"
-       class="btn btn-link"
-       href="{% url 'device:device_event_add' device.pk %}">Add</a>
+
+    {% if user.is_staff %}
+        <a role="button"
+        class="btn btn-link"
+        href="{% url 'device:device_event_add' device.pk %}">Add</a>
+    {% endif %}
 
     <h3>Test log</h3>
 
@@ -124,16 +135,18 @@
             {% for test_record in test_records %}
                 <tr class="{{ test_record.get_bootstrap_table_class }}">
                     <td>
-                        <button class="btn btn-default"
+                        <button class="btn btn-light"
                                 type="button"
                                 data-bs-toggle="collapse"
                                 data-bs-target="#collapseExample-{{ forloop.counter }}"
                                 aria-expanded="false"
                                 aria-controls="collapseExample-{{ forloop.counter }}">Expand</button>
                         Test executed {{ test_record.get_test_dt_as_string }}
-                        <a role="button"
-                           class="btn btn-link"
-                           href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a>
+                        {% if user.is_staff %}
+                            <a role="button"
+                            class="btn btn-link"
+                            href="{% url 'device:test_record_edit' test_record.pk %}">Edit</a>
+                        {% endif %}
                     </td>
                     <td>{{ test_record.get_result_display }}</td>
                 </tr>
@@ -160,20 +173,26 @@
             {% endfor %}
         {% endwith %}
     </table>
-    <a role="button"
-       class="btn btn-link"
-       href="{% url 'device:test_record_add' device.pk %}">Add</a>
+    {% comment %}
+    {% if user.is_staff %}
+       <a role="button"
+          class="btn btn-link"
+          href="{% url 'device:test_record_add' device.pk %}">Add</a>
+    {% endif %}
+    {% endcomment %} 
 
-    <h2>Actions</h2>
+        <h2>Actions</h2>
 
-    <ul>
-        <li>
-            <a href="{% url 'admin:device_device_change' device.pk %}">Admin</a> for this device.
-        </li>
-        <li>
-            Top: <a href="{% url 'device:top' %}">link</a>
-        </li>
-    </ul>
+        <ul>
+            {% if user.is_staff %}
+                <li>
+                    <a href="{% url 'admin:device_device_change' device.pk %}">Admin</a> for this device.
+                </li>
+            {% endif %}
+            <li>
+                Top: <a href="{% url 'device:top' %}">link</a>
+            </li>
+        </ul>
 {% endblock content %}
 
 {% block extra_js %}

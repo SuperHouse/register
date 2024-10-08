@@ -111,17 +111,21 @@ def device_grid(request):
 def device_detail(request, device_number):
     if request.user.is_staff:
         device = get_object_or_404(Device, pk=device_number)
+        events = device.deviceevent_set.all()
     else:
         clients = Client.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
+        events = device.deviceevent_set.exclude(internal=True)
 
     context = {
         'device': device,
+        'events': events,
     }
 
     return render(request, 'device/device_detail.html', context)
 
 
+@staff_member_required
 def device_action(request, device_number):
     if request.user.is_staff:
         device = get_object_or_404(Device, pk=device_number)
@@ -167,12 +171,9 @@ def device_search(request):
     return render(request, 'device/device_search.html', context)
 
 
+@staff_member_required
 def device_event_add(request, device_number):
-    if request.user.is_staff:
-        device = get_object_or_404(Device, pk=device_number)
-    else:
-        clients = Client.objects.filter(users=request.user)
-        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
+    device = get_object_or_404(Device, pk=device_number)
 
     if request.method == "POST":
         form = DeviceEventForm(request.POST, initial={'device': device})
@@ -204,12 +205,9 @@ def device_event_add(request, device_number):
     return render(request, "device/device_event_edit.html", ctx)
 
 
+@staff_member_required
 def device_event_edit(request, device_event_number):
-    if request.user.is_staff:
-        event = get_object_or_404(DeviceEvent, pk=device_event_number)
-    else:
-        clients = Client.objects.filter(users=request.user)
-        event = get_object_or_404(DeviceEvent, device__design__client__in=clients, pk=device_event_number)
+    event = get_object_or_404(DeviceEvent, pk=device_event_number)
 
     if request.method == "POST":
         form = DeviceEventForm(request.POST, instance=event)
@@ -240,12 +238,9 @@ def device_event_edit(request, device_event_number):
     return render(request, "device/device_event_edit.html", ctx)
 
 
+@staff_member_required
 def device_event_delete(request, device_event_number):
-    if request.user.is_staff:
-        event = get_object_or_404(DeviceEvent, pk=device_event_number)
-    else:
-        clients = Client.objects.filter(users=request.user)
-        event = get_object_or_404(DeviceEvent, device__design__client__in=clients, pk=device_event_number)
+    event = get_object_or_404(DeviceEvent, pk=device_event_number)
 
     if request.method == "POST":
         event.delete()
@@ -263,12 +258,9 @@ def device_event_delete(request, device_event_number):
     return render(request, "device/device_event_delete.html", ctx)
 
 
+@staff_member_required
 def test_record_add(request, device_number):
-    if request.user.is_staff:
-        device = get_object_or_404(Device, pk=device_number)
-    else:
-        clients = Client.objects.filter(users=request.user)
-        device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
+    device = get_object_or_404(Device, pk=device_number)
 
     if request.method == "POST":
         form = TestRecordForm(request.POST, initial={'device': device})
@@ -300,12 +292,9 @@ def test_record_add(request, device_number):
     return render(request, "device/device_event_edit.html", ctx)
 
 
+@staff_member_required
 def test_record_edit(request, test_record_number):
-    if request.user.is_staff:
-        test_record = get_object_or_404(TestRecord, pk=test_record_number)
-    else:
-        clients = Client.objects.filter(users=request.user)
-        test_record = get_object_or_404(TestRecord, device__design__client__in=clients, pk=test_record_number)
+    test_record = get_object_or_404(TestRecord, pk=test_record_number)
 
     if request.method == "POST":
         form = TestRecordForm(request.POST, instance=test_record)
