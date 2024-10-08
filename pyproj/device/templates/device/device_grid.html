@@ -16,7 +16,7 @@
     Device grid
 {% endblock h1 %}
 
-{% block body %}
+{% block content %}
     {% if not warned %}
         <p>
             Experimental datagrid showing what the old spreadsheet showed.
@@ -68,7 +68,7 @@
     <p>
         Top: <a href="{% url 'device:top' %}">link</a>
     </p>
-{% endblock body %}
+{% endblock content %}
 
 {% block extra_js %}
     {% if warned %}

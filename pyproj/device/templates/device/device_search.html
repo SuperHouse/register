@@ -8,7 +8,7 @@
     Device search
 {% endblock h1 %}
 
-{% block body %}
+{% block content %}
     <h2>Device search</h2>
 
     <form method="get" action="{% url 'device:device_search' %}">
@@ -20,4 +20,4 @@
         Top: <a href="{% url 'device:top' %}">link</a>
     </p>
 
-{% endblock body %}
+{% endblock content %}

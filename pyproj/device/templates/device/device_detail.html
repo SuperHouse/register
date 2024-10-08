@@ -20,7 +20,7 @@
     </p>
 {% endblock extra_topbar %}
 
-{% block body %}
+{% block content %}
     <table class="table table-bordered">
         <tr>
             <th>Device:</th>
@@ -174,7 +174,7 @@
             Top: <a href="{% url 'device:top' %}">link</a>
         </li>
     </ul>
-{% endblock body %}
+{% endblock content %}
 
 {% block extra_js %}
     <script src="https://cdn.jsdelivr.net/npm/bs5-lightbox@1.8.3/dist/index.bundle.min.js"></script>

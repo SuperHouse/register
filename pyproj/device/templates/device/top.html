@@ -19,7 +19,7 @@
     SuperHouse Device Register
 {% endblock h1 %}
 
-{% block body %}
+{% block content %}
     {% if not user.is_authenticated %}
         <p>Welcome, new user. Please log in.</p>
     {% else %}
@@ -102,4 +102,4 @@
             </li>
         </ul>
     {% endif %}
-{% endblock body %}
+{% endblock content %}

@@ -8,7 +8,7 @@
     {{ operation }} device event
 {% endblock h1 %}
 
-{% block body %}
+{% block content %}
     {% if errors %}
         <div class="alert alert-danger" role="alert">
             <ul>
@@ -34,4 +34,4 @@
     <p>
         Up: <a href="{% url 'device:device_detail' device.pk %}">link</a>
     </p>
-{% endblock body %}
+{% endblock content %}
