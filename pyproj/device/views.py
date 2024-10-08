@@ -30,7 +30,9 @@ def top(request):
 
 @login_not_required
 def perm_report(request):
-    return render(request, 'device/perm_report.html')
+    context = {}
+
+    return render(request, 'device/perm_report.html', context)
 
 
 def general_action(request):
