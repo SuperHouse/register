@@ -79,6 +79,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'device.context_processor.background_processor',  # Variables for customising the background
+                'device.context_processor.get_client_logo_processor',  # Variables for the client logo
             ],
         },
     },

@@ -22,17 +22,15 @@
 
 {% block content %}
     <table class="table table-bordered">
+        {% if user.is_staff %}   {% comment %} Only show client if we're staff (if we're a customer, we know who we are {% endcomment %}
+            <tr>
+                <th>Client:</th>
+                <td>{{ device.design.client.company_name }}</td>
+            </tr>
+        {% endif %}
         <tr>
             <th>Device:</th>
             <td>{{ device.design.name }}</td>
-            <td rowspan="10">
-                {% if device.design.client.logo %}
-                    <img src="{{ device.design.client.logo.url }}"
-                         alt="{{ device.design.client.name }} logo" />
-                {% else %}
-                    {{ device.design.client.name }}
-                {% endif %}
-            </td>
         </tr>
         <tr>
             <th>SKU:</th>
