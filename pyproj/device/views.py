@@ -11,8 +11,9 @@ from .models import Client, Design, Device, DeviceEvent, TestRecord
 
 def top(request):
     clients = Client.objects.all()
-    designs = Design.objects.prefetch_related("client").all()
+    designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
     devices = Device.objects.prefetch_related("design").order_by('pk').all()
+
     if not request.user.is_staff:
         clients = clients.filter(users=request.user)
         designs = designs.filter(client__in=clients)
