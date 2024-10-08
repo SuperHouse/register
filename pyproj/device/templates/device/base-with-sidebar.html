@@ -1,0 +1,18 @@
+{% extends 'device/base.html' %}
+
+{% block main %}
+<main class="content px-3 py-4">
+    <div class="container-fluid">
+        <div class="mb-3">
+            <h1>
+                {% block h1 %}
+                {% endblock h1 %}
+            </h1>
+
+            {% block content %}
+            <p>A fine body here.</p>
+            {% endblock content %}
+        </div>
+    </div>
+</main>
+{% endblock main %}
