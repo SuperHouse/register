@@ -29,6 +29,37 @@ def top(request):
     return render(request, 'device/top.html', context)
 
 
+def bootstrap_demo(request):
+    context = {}
+
+    return render(request, 'device/bootstrap-demo.html', context)
+
+
+def inc_demo(request):
+    demo_names = (
+        'normal',
+        'sldemo',
+        'b5demo',
+    )
+
+    demo_level = request.session.get('demo')
+    if demo_level is None:
+        demo_level = 1
+    else:
+        demo_level += 1
+    if demo_level >= len(demo_names):
+        demo_level = 0
+
+    request.session['demo'] = demo_level
+    request.session['demo_name'] = demo_names[demo_level]
+
+    from_url = request.headers['Referer']
+    if from_url:
+        return HttpResponseRedirect(from_url)
+    else:
+        return redirect('device:top')
+
+
 @login_not_required
 def perm_report(request):
     context = {}

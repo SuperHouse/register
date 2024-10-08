@@ -10,15 +10,36 @@
         <ul class="navbar-nav ms-auto">
             <li class="nav-item dropdown">
                 <a href="#" class="nav-icon pe-md-0" data-bs-toggle="dropdown">
-                    {% if client_logo %}
-                        <img src="{{ client_logo }}" class="avatar img-fluid" alt=""><br>
-                        <span>
-                            {{ client_name }}
-                        </span>
+                    {% if demo_name != 'b5demo' %}
+                        {% if client_logo %}
+                            <img src="{{ client_logo }}" class="avatar img-fluid" alt=""><br>
+                            <span>
+                                {{ client_name }}
+                            </span>
+                        {% else %}
+                            <i class="lni lni-user"></i>
+                        {% endif %}
                     {% else %}
                         <i class="lni lni-user"></i>
                     {% endif %}
                 </a>
+                {% if demo_name == 'b5demo' %}
+                    <div class="dropdown-menu dropdown-menu-end rounded">
+                        <a href="#" class="dropdown-item">
+                            <i class="lni lni-timer"></i>
+                            <span>Analytics</span>
+                        </a>
+                        <a href="#" class="dropdown-item">
+                            <i class="lni lni-cog"></i>
+                            <span>Settings</span>
+                        </a>
+                        <div class="dropdown-divider"></div>
+                        <a href="#" class="dropdown-item">
+                            <i class="lni lni-question-circle"></i>
+                            <span>Help</span> <!-- FIXME -->
+                        </a>
+                    </div>
+                {% endif %}
             </li>
         </ul>
     </div>

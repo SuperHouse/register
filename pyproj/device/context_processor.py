@@ -11,6 +11,17 @@ def background_processor(request):
     return bg
 
 
+def demo_processor(request):
+    # FIXME: Do something different if not in demo mode?
+    context = {
+        # FIXME: Handle demo session var being unset?
+        'demo': request.session.get('demo'),
+        'demo_name': request.session.get('demo_name', 'normal'),
+    }
+
+    return context
+
+
 def get_client_logo_processor(request):
     context = {
         'client_logo': None,

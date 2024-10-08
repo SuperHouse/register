@@ -6,9 +6,11 @@ app_name = 'device'
 
 urlpatterns = [
     path('', views.top, name='top'),
+    path('bootstrap-demo/', views.bootstrap_demo, name='bootstrap_demo'),
     # Test code uses this, not for actual people to use, except for demos
     path('perm-report/', views.perm_report, name='perm_report'),
     path('action/', views.general_action, name='general_action'),
+    path('incdemo/', views.inc_demo, name='inc_demo'),
     # Permanent URLs
     path('grid/', views.device_grid, name='device_grid'),
     path('search/', views.device_search, name='device_search'),
