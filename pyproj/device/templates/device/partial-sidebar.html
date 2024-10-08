@@ -1,0 +1,35 @@
+<aside id="sidebar">
+    <div class="d-flex">
+        <button class="toggle-btn" type="button">
+            <i class="lni lni-grid-alt"></i>
+        </button>
+        <div class="sidebar-logo">
+            <a href="#">SuperHouse</a>
+        </div>
+    </div>
+    <ul class="sidebar-nav">
+        <li class="sidebar-item">
+            <a href="{% url 'device:top' %}" class="sidebar-link">
+                <i class="lni lni-calculator-alt"></i>
+                <span>Devices</span>
+            </a>
+        </li>
+        {% if user.is_staff %}
+            <li class="sidebar-item">
+                <a href="{% url 'admin:index' %}" class="sidebar-link">
+                    <i class="lni lni-cog"></i>
+                    <span>Admin</span>
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+    <div class="sidebar-footer">
+        <form id="logout-form" method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button class="toggle-btn" type="submit">
+                <i class="lni lni-exit"></i>
+            </button>
+            <span>Logout</span>
+        </form>
+    </div>
+</aside>

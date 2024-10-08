@@ -1,18 +1,44 @@
 {% extends 'device/base.html' %}
 
 {% block main %}
-<main class="content px-3 py-4">
-    <div class="container-fluid">
-        <div class="mb-3">
-            <h1>
-                {% block h1 %}
-                {% endblock h1 %}
-            </h1>
+    {# base-with-sidebar, in main #}
+    {# base-with-sidebar, including partial-sidebar #}
+    {% include "device/partial-sidebar.html" %}
+    {# base-with-sidebar, back from including partial-sidebar #}
 
-            {% block content %}
-            <p>A fine body here.</p>
-            {% endblock content %}
-        </div>
+    <div class="main">
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li {% if message.tags %}class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        {# base-with-sidebar, including topnav #}
+        {% include "device/partial-topnav.html" %}
+        {# base-with-sidebar, back from topnav #}
+
+        <main class="content px-3 py-4">
+            <div class="container-fluid">
+                <div class="mb-3">
+                    <h1>
+                        {% block h1 %}
+                        {% endblock h1 %}
+                    </h1>
+
+                    {# base-with-sidebar, expanding content #}
+                    {% block content %}
+                    <p>Fine content here, expanded in base-with-sidebar.</p>
+                    {% endblock content %}
+                    {# base-with-sidebar, back from expanding content #}
+                </div>
+            </div>
+        </main>
+
+        {# base-with-sidebar, including partial-footer #}
+        {% include "device/partial-footer.html" %}
+        {# base-with-sidebar, back from including partial-footer #}
     </div>
-</main>
+    {# base-with-sidebar, leaving main #}
 {% endblock main %}

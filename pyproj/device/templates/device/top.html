@@ -6,22 +6,14 @@
     SuperHouse Device Register
 {% endblock title %}
 
-{% block extra_topbar %}
-    <p>
-        Device search
-        <form method="get" action="{% url 'device:device_search' %}">
-            <input type="text" name="q" />
-        </form>
-    </p>
-{% endblock extra_topbar %}
-
 {% block h1 %}
-    SuperHouse Device Register
+    Device Register
 {% endblock h1 %}
 
 {% block content %}
     {% if user.is_staff %}
         <h2>Clients</h2>
+
         {% if clients %}
             <table border="1">
                 <tr>
@@ -73,7 +65,8 @@
         </p>
     {% endif %}
 
-    <p>Let's track some devices.</p>
+    <h3>Devices</h3>
+
     {% if devices %}
         <table border="1">
             <tr>
@@ -82,8 +75,16 @@
             {% for device in devices %}
                 <tr>
                     <td>
-                        {{ device.design.sku }} {{ device.design.name }} {{ device.design.hw_version }}
                         <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
+                    </td>
+                    <td>
+                        {{ device.design.sku }} {{ device.design.hw_version }}
+                    </td>
+                    <td>
+                        &nbsp;
+                        {% ifchanged device.design %}
+                            {{ device.design.name }}
+                        {% endifchanged %}
                     </td>
                 </tr>
             {% endfor %}
@@ -98,13 +99,7 @@
         <h2>Actions</h2>
         <ul>
             <li>
-                General action 1: <a href="{% url 'device:general_action' %}">link</a>
-            </li>
-            <li>
                 Device grid: <a href="{% url 'device:device_grid' %}">link</a>
-            </li>
-            <li>
-                Admin: <a href="{% url 'admin:index' %}">link</a>
             </li>
         </ul>
     {% endif %}

@@ -9,6 +9,7 @@
 {% endblock h1 %}
 
 {% block content %}
+    {# perm_report, in content #}
     {% if not user.is_authenticated %}
         <p>You're not logged in.</p>
     {% else %}
@@ -32,4 +33,5 @@
             <p>No actions because you're not staff.</p>
         {% endif %}
     {% endif %}
+    {# perm_report, leaving content #}
 {% endblock content %}
