@@ -129,6 +129,9 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
 LOGIN_REQUIRED_IGNORE_VIEW_NAMES = [
     'login',
     'logout',
+    ## Good source: https://developer.mozilla.org/en-US/docs/Learn/Server-side/Django/Authentication
+    'password_change',
+    'password_change_done',
     'password_reset',
     'password_reset_done',
     'password_reset_confirm',
