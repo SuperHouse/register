@@ -1,46 +1,47 @@
 <nav class="navbar navbar-expand px-4 py-3">
-    <form method="get" action="{% url 'device:device_search' %}" class="d-none d-sm-inline-block">
-        <div class="input-group input-group-navbar">
-            <input type="text" name="q" class="form-control border-0 rounded-0" placeholder="Device search...">
-            <button class="btn border-0 rounded-0" type="submit">Search</button>
-        </div>
-    </form>
-
-    <div class="navbar-collapse collapse">
-        <ul class="navbar-nav ms-auto">
-            <li class="nav-item dropdown">
-                <a href="#" class="nav-icon pe-md-0" data-bs-toggle="dropdown">
-                    {% if demo_name != 'b5demo' %}
-                        {% if client_logo %}
-                            <img src="{{ client_logo }}" class="avatar img-fluid" alt=""><br>
-                            <span>
-                                {{ client_name }}
-                            </span>
+    {% if user.is_authenticated %}
+        <form method="get" action="{% url 'device:device_search' %}" class="d-none d-sm-inline-block">
+            <div class="input-group input-group-navbar">
+                <input type="text" name="q" class="form-control border-0 rounded-0" placeholder="Device search...">
+                <button class="btn border-0 rounded-0" type="submit">Search</button>
+            </div>
+        </form>    
+        <div class="navbar-collapse collapse">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item dropdown">
+                    <a href="#" class="nav-icon pe-md-0" data-bs-toggle="dropdown">
+                        {% if demo_name != 'b5demo' %}
+                            {% if client_logo %}
+                                <img src="{{ client_logo }}" class="avatar img-fluid" alt=""><br>
+                                <span>
+                                    {{ client_name }}
+                                </span>
+                            {% else %}
+                                <i class="lni lni-user"></i>
+                            {% endif %}
                         {% else %}
                             <i class="lni lni-user"></i>
                         {% endif %}
-                    {% else %}
-                        <i class="lni lni-user"></i>
+                    </a>
+                    {% if demo_name == 'b5demo' %}
+                        <div class="dropdown-menu dropdown-menu-end rounded">
+                            <a href="#" class="dropdown-item">
+                                <i class="lni lni-timer"></i>
+                                <span>Analytics</span>
+                            </a>
+                            <a href="#" class="dropdown-item">
+                                <i class="lni lni-cog"></i>
+                                <span>Settings</span>
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" class="dropdown-item">
+                                <i class="lni lni-question-circle"></i>
+                                <span>Help</span> <!-- FIXME -->
+                            </a>
+                        </div>
                     {% endif %}
-                </a>
-                {% if demo_name == 'b5demo' %}
-                    <div class="dropdown-menu dropdown-menu-end rounded">
-                        <a href="#" class="dropdown-item">
-                            <i class="lni lni-timer"></i>
-                            <span>Analytics</span>
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="lni lni-cog"></i>
-                            <span>Settings</span>
-                        </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item">
-                            <i class="lni lni-question-circle"></i>
-                            <span>Help</span> <!-- FIXME -->
-                        </a>
-                    </div>
-                {% endif %}
-            </li>
-        </ul>
-    </div>
+                </li>
+            </ul>
+        </div>
+    {% endif %}
 </nav>
