@@ -112,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-AUTH_USER_MODEL = 'authuser.User'
+AUTH_USER_MODEL = 'authuser.User'  # In code, you can get the user model with; from django.contrib.auth import get_user_model; User = get_user_model()
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/device/'
 LOGOUT_REDIRECT_URL = '/device/'
