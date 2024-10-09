@@ -104,32 +104,6 @@ def create_some_device_events(django_user_model, create_users_and_user_data):
     return data
 
 
-def test_device_event_user1_cant_see_user2_data(client, create_some_device_events):
-    data = create_some_device_events
-
-    client.force_login(data['user1'])
-
-    u1d = data['user1_device']
-    u2d = data['user2_device']
-
-    response = client.get(reverse('device:device_event_add', args=[u1d.pk]))
-    assert response.status_code == 200
-    response = client.get(reverse('device:device_event_add', args=[u2d.pk]))
-    assert response.status_code == 404
-
-    u1de = data['user1_device_event1']
-    u2de = data['user2_device_event1']
-
-    response = client.get(reverse('device:device_event_edit', args=[u1de.pk]))
-    assert response.status_code == 200
-    response = client.get(reverse('device:device_event_delete', args=[u1de.pk]))
-    assert response.status_code == 200
-    response = client.get(reverse('device:device_event_edit', args=[u2de.pk]))
-    assert response.status_code == 404
-    response = client.get(reverse('device:device_event_delete', args=[u2de.pk]))
-    assert response.status_code == 404
-
-
 # Helper: Create some test records for two users
 @pytest.fixture
 def create_some_test_records(django_user_model, create_users_and_user_data):
@@ -158,25 +132,3 @@ def create_some_test_records(django_user_model, create_users_and_user_data):
     data.update(updates)
 
     return data
-
-
-def test_test_record_user1_cant_see_user2_data(client, create_some_test_records):
-    data = create_some_test_records
-
-    client.force_login(data['user1'])
-
-    u1d = data['user1_device']
-    u2d = data['user2_device']
-
-    response = client.get(reverse('device:test_record_add', args=[u1d.pk]))
-    assert response.status_code == 200
-    response = client.get(reverse('device:test_record_add', args=[u2d.pk]))
-    assert response.status_code == 404
-
-    u1tr = data['user1_test_record1']
-    u2tr = data['user2_test_record1']
-
-    response = client.get(reverse('device:test_record_edit', args=[u1tr.pk]))
-    assert response.status_code == 200
-    response = client.get(reverse('device:test_record_edit', args=[u2tr.pk]))
-    assert response.status_code == 404

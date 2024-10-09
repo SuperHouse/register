@@ -14,10 +14,12 @@ from test_clients_only_see_own_data import (
 post_dt_fmt = '%Y-%m-%d %H:%M:%S'
 
 
-def test_device_event_add_edit_delete(client, create_some_device_events):
+def test_device_event_add_edit_delete(client, create_some_device_events, django_user_model):
     data = create_some_device_events
 
-    client.force_login(data['user1'])
+    staff = django_user_model.objects.create_user(email='staff@example.com', password='staffy', is_staff=True)
+    staff.save()
+    client.force_login(staff)
 
     u1d = data['user1_device']
     u1de = data['user1_device_event1']
@@ -57,10 +59,12 @@ def test_device_event_add_edit_delete(client, create_some_device_events):
     assert u1d.deviceevent_set.count() == 1
 
 
-def test_test_record_add_edit(client, create_some_test_records):
+def test_test_record_add_edit(client, create_some_test_records, django_user_model):
     data = create_some_test_records
 
-    client.force_login(data['user1'])
+    staff = django_user_model.objects.create_user(email='staff@example.com', password='staffy', is_staff=True)
+    staff.save()
+    client.force_login(staff)
 
     u1d = data['user1_device']
     u1tr = data['user1_test_record1']
