@@ -14,6 +14,7 @@ pytest
 ./manage.py check
 sudo /usr/bin/systemctl stop gunicorn-test.service
 https://portaltest.superhouse.tv/device/
+curl --request GET --url https://portaltest.superhouse.tv/api/v1/test-endpoint-noauth/ --header 'Content-Type: application/json' -w ' %{http_code}\n'
 git status
 git diff
 deactivate
@@ -32,6 +33,7 @@ pytest
 ./manage.py check
 sudo /usr/bin/systemctl stop gunicorn.service
 https://portal.superhouse.tv/device/
+curl --request GET --url https://portal.superhouse.tv/api/v1/test-endpoint-noauth/ --header 'Content-Type: application/json' -w ' %{http_code}\n'
 git status
 git diff
 deactivate
