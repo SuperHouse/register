@@ -89,7 +89,7 @@ def test_staff_can_use_staff_views(
     assert response.status_code == 200
     response = client.get(reverse('device:device_event_delete', args=[u2de.pk]))
     assert response.status_code == 200
-    response = client.get(reverse('device:test_record_add', args=[u2tr.pk]))
+    response = client.get(reverse('device:test_record_add', args=[u2d.pk]))
     assert response.status_code == 200
     response = client.get(reverse('device:test_record_edit', args=[u2tr.pk]))
     assert response.status_code == 200
