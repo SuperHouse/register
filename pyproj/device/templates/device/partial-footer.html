@@ -24,7 +24,7 @@
                             <a class="text-body-secondary" href="#">Terms & Conditions</a>
                         </li>
                     {% endif %}
-                    {% if user.is_staff %}
+                    {% if user.is_staff and enable_demo_mode %}
                         <li class="list-inline-item">
                             <a class="text-body-secondary" href="{% url 'device:inc_demo' %}">Demo</a>{% if demo %}: {{ demo_name }}{% endif %}
                         </li>

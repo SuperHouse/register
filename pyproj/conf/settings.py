@@ -218,6 +218,7 @@ THUMBNAIL_ALIASES = {
 }
 
 DEPLOY_TYPE = os.environ.get("DEPLOY_TYPE")
+DEMO_MODE = os.environ.get("DEMO_MODE") in (True, 'True')
 BACKGROUND_SETTINGS = {
     'dev': {
         'CSS_BODY_BACKGROUND_COLOUR': '#e5edf5',

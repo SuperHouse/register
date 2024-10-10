@@ -12,12 +12,18 @@ def background_processor(request):
 
 
 def demo_processor(request):
-    # FIXME: Do something different if not in demo mode?
+    enable_demo_mode = settings.DEMO_MODE
     context = {
-        # FIXME: Handle demo session var being unset?
-        'demo': request.session.get('demo'),
-        'demo_name': request.session.get('demo_name', 'normal'),
+        'enable_demo_mode': enable_demo_mode,
     }
+    if enable_demo_mode:
+        context.update(
+            {
+                # FIXME: Handle demo session var being unset?
+                'demo': request.session.get('demo'),
+                'demo_name': request.session.get('demo_name', 'normal'),
+            }
+        )
 
     return context
 
