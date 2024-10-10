@@ -176,25 +176,26 @@ def device_action(request, device_number):
 
 def device_search(request):
     q = request.GET.get('q') or ''
+    msg = ''
 
     if q:
+        # FIXME: Try doing this with a .get().
         try:
-            # FIXME: Try doing this with a .get().
             device_set = Device.objects.filter(pk=q)
-            if device_set:
-                # Ok we found something...
-                if not request.user.is_staff:
-                    clients = Client.objects.filter(users=request.user)
-                    device_set = device_set.filter(design__client__in=clients)
-                if device_set:
-                    device = device_set.first()
-                    return redirect("device:device_detail", device_number=device.pk)
-        except Device.DoesNotExist:
-            pass
+        except ValueError:
+            msg = 'Please enter a numeric serial number.'
 
-    if q:
-        # If there was a search query, but we found something, we would have redirected.
-        messages.error(request, "There's no board with that serial number.")
+        if not msg:
+            if not request.user.is_staff:
+                clients = Client.objects.filter(users=request.user)
+                device_set = device_set.filter(design__client__in=clients)
+            if device_set:
+                device = device_set.first()
+                return redirect("device:device_detail", device_number=device.pk)
+            msg = "There's no board with that serial number."
+
+    if msg:
+        messages.error(request, msg)
 
     context = {
         'q': q,

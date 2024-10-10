@@ -9,15 +9,5 @@
 {% endblock h1 %}
 
 {% block content %}
-    <h2>Device search</h2>
-
-    <form method="get" action="{% url 'device:device_search' %}">
-        <input type="text" name="q" value="{{ q }}" />
-    </form>
-
-    <h2>Actions</h2>
-    <p>
-        Top: <a href="{% url 'device:top' %}">link</a>
-    </p>
-
+    <p>Please enter a device's numeric serial number in the search field above.</p>
 {% endblock content %}

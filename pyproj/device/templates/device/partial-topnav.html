@@ -2,7 +2,7 @@
     {% if user.is_authenticated %}
         <form method="get" action="{% url 'device:device_search' %}" class="d-none d-sm-inline-block">
             <div class="input-group input-group-navbar">
-                <input type="text" name="q" class="form-control border-0 rounded-0" placeholder="Device search...">
+                <input type="text" name="q" class="form-control border-0 rounded-0" value="{{ q }}" placeholder="Device search...">
                 <button class="btn border-0 rounded-0" type="submit">Search</button>
             </div>
         </form>    
