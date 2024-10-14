@@ -1,0 +1,23 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    SuperHouse Device Register: Messages test
+{% endblock title %}
+
+{% block h1 %}
+    Messages test
+{% endblock h1 %}
+
+{% block content %}
+    <p>What kind of message to send?</p>
+
+    <ul>
+        <li><a href="?mtype=debug">Debug</a></li>
+        <li><a href="?mtype=info">Info</a></li>
+        <li><a href="?mtype=success">Success</a></li>
+        <li><a href="?mtype=warning">Warning</a></li>
+        <li><a href="?mtype=error">Error</a></li>
+        <li><a href="?mtype=all">All</a></li>
+    </ul>
+
+{% endblock content %}

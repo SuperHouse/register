@@ -356,3 +356,30 @@ def test_record_edit(request, test_record_number):
     }
 
     return render(request, "device/test_record_edit.html", ctx)
+
+
+def test_messages(request):
+    mtype = request.GET.get('mtype') or ''
+
+    if mtype == 'debug':
+        messages.debug(request, 'This is a debug message.')
+    elif mtype == 'info':
+        messages.info(request, 'This is an info message.')
+    elif mtype == 'success':
+        messages.success(request, 'This is a success message.')
+    elif mtype == 'warning':
+        messages.warning(request, 'This is a warning message.')
+    elif mtype == 'error':
+        messages.error(request, 'This is an error message.')
+    elif mtype == 'all':
+        messages.debug(request, 'This is a debug message.')
+        messages.info(request, 'This is an info message.')
+        messages.success(request, 'This is a success message.')
+        messages.warning(request, 'This is a warning message.')
+        messages.error(request, 'This is an error message.')
+
+    context = {
+        'mtype': mtype,
+    }
+
+    return render(request, 'device/messages.html', context)

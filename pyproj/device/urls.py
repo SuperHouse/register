@@ -11,6 +11,7 @@ urlpatterns = [
     path('perm-report/', views.perm_report, name='perm_report'),
     path('action/', views.general_action, name='general_action'),
     path('incdemo/', views.inc_demo, name='inc_demo'),
+    path('messages/', views.test_messages, name='messages'),
     # Permanent URLs
     path('grid/', views.device_grid, name='device_grid'),
     path('search/', views.device_search, name='device_search'),
