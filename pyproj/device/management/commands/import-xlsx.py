@@ -201,7 +201,7 @@ class Command(BaseCommand):
 
             if shipping:
                 match = re.search(r'(\d{1,2}-[A-Z][a-z]{2}-202\d) (.*)', shipping)
-                assert match
+                assert match, f"Oops, failed to match shipping.  row={row}"
                 # self.stdout.write(f'{row=}')
                 # self.stdout.write(f'{shipping=}')
                 # d = match.groupdict()
