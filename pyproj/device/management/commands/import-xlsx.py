@@ -134,9 +134,13 @@ class Command(BaseCommand):
         known_device_keys = tuple(
             'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/PO/Shipped'.split('/')
         )
-        device_keys = tuple(cell.value for cell in ws_device['1'] if cell.value is not None)
+        ignore_device_keys = tuple(
+            'ExtAddr/Truck/Location/Compound'.split('/')
+        )
+        self.stdout.write(self.style.WARNING(f'Ignoring these columns: {ignore_device_keys}'))
+        device_keys = tuple(cell.value for cell in ws_device['1'] if cell.value is not None and cell.value not in ignore_device_keys)
         # self.stdout.write(f'{device_keys=}')
-        assert device_keys == known_device_keys
+        assert device_keys == known_device_keys, f"Unexpected column(s): {device_keys=} {known_device_keys=}"
 
         col_map = {key: letter for letter, key in zip(string.ascii_uppercase, known_device_keys)}
         # self.stdout.write(f'{col_map=}')
