@@ -77,12 +77,13 @@ class Command(BaseCommand):
         client_names = tuple(cell.value for cell in ws_design[col_map['Customer']][1:])
         client_info = zip(client_serials, client_names)
         client_map = {}
-        for client_id, name in client_info:
+        for row_nr, (client_id, name) in enumerate(client_info):
+            row_nr += 1
             if name is None:
                 continue
-            # self.stdout.write(f'{client_id=} {name=}')
+            # self.stdout.write(f'{row_nr=} {client_id=} {name=}')
             if client_id in client_map:
-                assert client_map[client_id] == name
+                assert client_map[client_id] == name, f"For serial {row_nr}, id {client_id} with name {name} doesn't match id {client_id} with name {client_map[client_id]} in database"
             else:
                 client_map[client_id] = name
 
