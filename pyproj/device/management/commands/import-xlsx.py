@@ -214,7 +214,7 @@ class Command(BaseCommand):
                         break
 
             if shipping:
-                match = re.search(r'(\d{1,2}-[A-Z][a-z]{2}-202\d) (.*)', shipping)
+                match = re.search(r'(\d{1,2}-[A-Z][a-z]{2}-20[23]\d):?( (.*))?', shipping)
                 assert match, f"Oops, failed to match shipping.  {shipping=} {row=}"
                 # self.stdout.write(f'{row=}')
                 # self.stdout.write(f'{shipping=}')
@@ -225,7 +225,7 @@ class Command(BaseCommand):
                     'device_id': device_id,
                     'event_dt': date_from_str(match.group(1)),
                     'event_type': 'SHIPPING',
-                    'description': match.group(2),
+                    'description': match.group(3),
                 }
                 de_list.append(de_data)
 
