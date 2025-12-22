@@ -8,7 +8,16 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from device.models import DeviceEvent, TestImage, TestRecord, Device, Design, Client, witching_hour, tz
+from device.models import (
+    Client,
+    Design,
+    Device,
+    DeviceEvent,
+    TestImage,
+    TestRecord,
+    tz,
+    witching_hour,
+)
 
 timezone.activate(tz)
 
@@ -221,7 +230,7 @@ class Command(BaseCommand):
                 de_list.append(de_data)
 
             if tested:
-                assert type(tested) == datetime.datetime
+                assert type(tested) is datetime.datetime
                 test_dt = datetime.datetime.combine(tested.date(), witching_hour, tzinfo=tz)
                 tr_data = {
                     'device_id': device_id,
