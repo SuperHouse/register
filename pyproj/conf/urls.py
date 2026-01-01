@@ -32,7 +32,8 @@ api = NinjaAPI(docs_decorator=staff_member_required)
 api.add_router("/", device_router)
 
 urlpatterns = [
-    path('', device_views.top, name='home'),
+    path('', device_views.dashboard, name='home'),
+    path('dashboard/', device_views.dashboard, name='dashboard'),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

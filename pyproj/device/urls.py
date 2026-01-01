@@ -6,8 +6,8 @@ from . import views
 app_name = 'device'
 
 urlpatterns = [
-    path('', RedirectView.as_view(url='/', permanent=False), name='top'),  # Redirect to home for backward compatibility
-    path('dashboard/', views.dashboard, name='dashboard'),
+    path('', views.top, name='top'),  # Devices page at /device/
+    path('dashboard/', RedirectView.as_view(url='/dashboard/', permanent=False), name='dashboard'),  # Redirect to root dashboard
     path('bootstrap-demo/', views.bootstrap_demo, name='bootstrap_demo'),
     # Test code uses this, not for actual people to use, except for demos
     path('perm-report/', views.perm_report, name='perm_report'),
