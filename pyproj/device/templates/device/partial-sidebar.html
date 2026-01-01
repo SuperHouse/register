@@ -1,17 +1,18 @@
+{% load static %}
 <aside class="sidebar sidebar-fixed sidebar-lg-show" id="sidebar">
     <div class="sidebar-brand d-none d-md-flex">
-        <a class="sidebar-brand-full" href="{% url 'home' %}">
+        <a class="sidebar-brand-full" href="https://www.testomatic.io/" target="_blank" rel="noopener noreferrer">
             {% if demo_name == "b5demo" %}
                 CodzSword
             {% else %}
-                SuperHouse
+                <img src="{% static 'img/testomatic-logo-transparent.png' %}" alt="Testomatic" style="max-height: 120px; width: auto; padding: 10px 0;">
             {% endif %}
         </a>
-        <a class="sidebar-brand-narrow" href="{% url 'home' %}">
+        <a class="sidebar-brand-narrow" href="https://www.testomatic.io/" target="_blank" rel="noopener noreferrer">
             {% if demo_name == "b5demo" %}
                 CS
             {% else %}
-                SH
+                <img src="{% static 'img/testomatic-logo-transparent.png' %}" alt="Testomatic" style="max-height: 120px; width: auto; padding: 10px 0;">
             {% endif %}
         </a>
     </div>

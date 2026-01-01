@@ -53,6 +53,17 @@ tr.highlight th {
     color: var(--cui-primary, #321fdb);
 }
 
+/* Sidebar brand logo styling */
+.sidebar-brand {
+    background-color: inherit; /* Inherit sidebar background color */
+    margin-bottom: 1rem; /* Add gap between logo and menu items */
+}
+
+.sidebar-brand a {
+    display: block;
+    background-color: inherit; /* Match sidebar background */
+}
+
 /* Avatar styling */
 .avatar {
     width: 40px;
