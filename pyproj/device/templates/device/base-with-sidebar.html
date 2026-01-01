@@ -1,42 +1,46 @@
 {% extends 'device/base.html' %}
 
 {% block main %}
-    {# base-with-sidebar, in main #}
-    {# base-with-sidebar, including partial-sidebar #}
+    {# CoreUI Sidebar #}
     {% include "device/partial-sidebar.html" %}
-    {# base-with-sidebar, back from including partial-sidebar #}
 
-    <div class="main">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert{% if message.tags %} {{ message.tags }}{% endif %}" role="alert">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-
-        {# base-with-sidebar, including topnav #}
+    <div class="body flex-grow-1 d-flex flex-column min-vh-100 overflow-hidden">
+        {# CoreUI Header #}
         {% include "device/partial-topnav.html" %}
-        {# base-with-sidebar, back from topnav #}
 
-        <main class="content px-3 py-4">
-            <div class="container-fluid">
-                <div class="mb-3">
-                    <h1>
-                        {% block h1 %}
-                        {% endblock h1 %}
-                    </h1>
+        <div class="body flex-grow-1 overflow-y-auto">
+            {# Messages #}
+            {% if messages %}
+                <div class="px-3 pt-3">
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-coreui-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-                    {# base-with-sidebar, expanding content #}
-                    {% block content %}
-                    <p>Fine content here, expanded in base-with-sidebar.</p>
-                    {% endblock content %}
-                    {# base-with-sidebar, back from expanding content #}
+            {# Main Content #}
+            <div class="px-3 pb-4">
+                <div class="container-fluid">
+                    <div class="mb-3">
+                        <h1 class="h3 mb-3">
+                            {% block h1 %}
+                            {% endblock h1 %}
+                        </h1>
+
+                        {# base-with-sidebar, expanding content #}
+                        {% block content %}
+                        <p>Fine content here, expanded in base-with-sidebar.</p>
+                        {% endblock content %}
+                        {# base-with-sidebar, back from expanding content #}
+                    </div>
                 </div>
             </div>
-        </main>
+        </div>
 
-        {# base-with-sidebar, including partial-footer #}
+        {# Footer #}
         {% include "device/partial-footer.html" %}
-        {# base-with-sidebar, back from including partial-footer #}
     </div>
-    {# base-with-sidebar, leaving main #}
 {% endblock main %}

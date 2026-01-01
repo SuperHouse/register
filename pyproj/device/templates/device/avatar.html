@@ -1,0 +1,14 @@
+{% if avatar_url %}
+    {# Use Gravatar if available #}
+    <img src="{{ avatar_url }}" 
+         class="avatar img-fluid rounded-circle" 
+         alt="{% if user.full_name %}{{ user.full_name }}{% else %}{{ user.get_short_name }}{% endif %}" 
+         style="width: {{ size }}px; height: {{ size }}px; object-fit: cover;">
+{% else %}
+    {# Use initials with colored background #}
+    <div class="avatar-initials rounded-circle d-inline-flex align-items-center justify-content-center text-white fw-bold" 
+         style="width: {{ size }}px; height: {{ size }}px; min-width: {{ size }}px; background-color: {{ avatar_color }}; font-size: {{ font_size }}px; line-height: {{ size }}px;">
+        {{ initials }}
+    </div>
+{% endif %}
+

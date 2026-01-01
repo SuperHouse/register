@@ -114,8 +114,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTH_USER_MODEL = 'authuser.User'  # In code, you can get the user model with; from django.contrib.auth import get_user_model; User = get_user_model()
 LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/device/'
-LOGOUT_REDIRECT_URL = '/device/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/'
 
 LOGIN_REQUIRED_IGNORE_PATHS = [
     '/office/login/',
@@ -219,6 +219,7 @@ THUMBNAIL_ALIASES = {
 
 DEPLOY_TYPE = os.environ.get("DEPLOY_TYPE")
 DEMO_MODE = os.environ.get("DEMO_MODE") in (True, 'True')
+ENABLE_GRAVATAR = os.environ.get("ENABLE_GRAVATAR", "False") in (True, 'True', 'true', '1')
 BACKGROUND_SETTINGS = {
     'dev': {
         'CSS_BODY_BACKGROUND_COLOUR': '#e5edf5',

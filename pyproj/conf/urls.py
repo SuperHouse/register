@@ -24,6 +24,7 @@ from django.views.generic.base import RedirectView
 from django.views.static import serve
 from ninja import NinjaAPI
 
+from device import views as device_views
 from device.api import router as device_router
 
 api = NinjaAPI(docs_decorator=staff_member_required)
@@ -31,6 +32,7 @@ api = NinjaAPI(docs_decorator=staff_member_required)
 api.add_router("/", device_router)
 
 urlpatterns = [
+    path('', device_views.top, name='home'),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

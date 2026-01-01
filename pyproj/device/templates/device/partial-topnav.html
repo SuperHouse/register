@@ -1,47 +1,44 @@
-<nav class="navbar navbar-expand px-4 py-3">
-    {% if user.is_authenticated %}
-        <form method="get" action="{% url 'device:device_search' %}" class="d-none d-sm-inline-block">
-            <div class="input-group input-group-navbar">
-                <input type="text" name="q" class="form-control border-0 rounded-0" value="{{ q }}" placeholder="Device search...">
-                <button class="btn border-0 rounded-0" type="submit">Search</button>
-            </div>
-        </form>    
-        <div class="navbar-collapse collapse">
-            <ul class="navbar-nav ms-auto">
+<header class="header header-sticky mb-4">
+    <div class="container-fluid">
+        {% if user.is_authenticated %}
+            <form method="get" action="{% url 'device:device_search' %}" class="d-none d-md-flex">
+                <div class="input-group">
+                    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Device search...">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="icon cil-magnifying-glass"></i>
+                    </button>
+                </div>
+            </form>
+            <ul class="header-nav ms-auto">
                 <li class="nav-item dropdown">
-                    <a href="#" class="nav-icon pe-md-0" data-bs-toggle="dropdown">
-                        {% if demo_name != 'b5demo' %}
-                            {% if client_logo %}
-                                <img src="{{ client_logo }}" class="avatar img-fluid" alt=""><br>
-                                <span>
-                                    {{ client_name }}
-                                </span>
-                            {% else %}
-                                <i class="lni lni-user"></i>
-                            {% endif %}
+                    <a class="nav-link py-0" href="{% url 'user_settings' %}" title="User Settings">
+                        <span class="d-none d-md-inline me-2">{% if user.full_name %}{{ user.full_name }}{% else %}{{ user.get_short_name }}{% endif %}</span>
+                        {% if demo_name != 'b5demo' and client_logo %}
+                            <img src="{{ client_logo }}" class="avatar img-fluid rounded-circle" alt="{{ client_name }}" style="width: 40px; height: 40px;">
                         {% else %}
-                            <i class="lni lni-user"></i>
+                            {% load avatar_tags %}
+                            {% user_avatar user size=40 show_name=False %}
                         {% endif %}
                     </a>
                     {% if demo_name == 'b5demo' %}
-                        <div class="dropdown-menu dropdown-menu-end rounded">
-                            <a href="#" class="dropdown-item">
-                                <i class="lni lni-timer"></i>
-                                <span>Analytics</span>
+                        <div class="dropdown-menu dropdown-menu-end pt-0">
+                            <a class="dropdown-item" href="#">
+                                <i class="icon cil-chart-line me-2"></i>
+                                Analytics
                             </a>
-                            <a href="#" class="dropdown-item">
-                                <i class="lni lni-cog"></i>
-                                <span>Settings</span>
+                            <a class="dropdown-item" href="#">
+                                <i class="icon cil-settings me-2"></i>
+                                Settings
                             </a>
                             <div class="dropdown-divider"></div>
-                            <a href="#" class="dropdown-item">
-                                <i class="lni lni-question-circle"></i>
-                                <span>Help</span> <!-- FIXME -->
+                            <a class="dropdown-item" href="#">
+                                <i class="icon cil-info me-2"></i>
+                                Help
                             </a>
                         </div>
                     {% endif %}
                 </li>
             </ul>
-        </div>
-    {% endif %}
-</nav>
+        {% endif %}
+    </div>
+</header>

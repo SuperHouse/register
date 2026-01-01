@@ -1,32 +1,31 @@
 <footer class="footer">
     <div class="container-fluid">
-        <div class="row text-body-secondary">
-            <div class="col-6 text-start ">
-                <a class="text-body-secondary" href="#">
+        <div class="row text-muted">
+            <div class="col-6 text-start">
+                <a class="text-muted text-decoration-none" href="{% url 'home' %}">
                     {% if demo_name == "b5demo" %}
                         <strong>CodzSword</strong>
                     {% else %}
-                        <strong>Superlab</strong>
+                        <strong>SuperHouse</strong>
                     {% endif %}
-
                 </a>
             </div>
-            <div class="col-6 text-end text-body-secondary d-none d-md-block">
+            <div class="col-6 text-end d-none d-md-block">
                 <ul class="list-inline mb-0">
                     {% if demo_name == "b5demo" %}
                         <li class="list-inline-item">
-                            <a class="text-body-secondary" href="#">Contact</a>
+                            <a class="text-muted text-decoration-none" href="#">Contact</a>
                         </li>
                         <li class="list-inline-item">
-                            <a class="text-body-secondary" href="#">About Us</a>
+                            <a class="text-muted text-decoration-none" href="#">About Us</a>
                         </li>
                         <li class="list-inline-item">
-                            <a class="text-body-secondary" href="#">Terms & Conditions</a>
+                            <a class="text-muted text-decoration-none" href="#">Terms & Conditions</a>
                         </li>
                     {% endif %}
                     {% if user.is_staff and enable_demo_mode %}
                         <li class="list-inline-item">
-                            <a class="text-body-secondary" href="{% url 'device:inc_demo' %}">Demo</a>{% if demo %}: {{ demo_name }}{% endif %}
+                            <a class="text-muted text-decoration-none" href="{% url 'device:inc_demo' %}">Demo</a>{% if demo %}: {{ demo_name }}{% endif %}
                         </li>
                     {% endif %}
                 </ul>

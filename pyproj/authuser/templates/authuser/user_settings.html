@@ -1,0 +1,113 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    User Settings - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    User Settings
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Profile Picture</h5>
+                    <div class="d-flex align-items-center mb-3">
+                        {% load avatar_tags %}
+                        {% user_avatar user size=64 show_name=False %}
+                        <div class="ms-3">
+                            <p class="mb-0"><strong>Your Avatar</strong></p>
+                            {% if user.avatar_type == 'gravatar' %}
+                                <small class="text-muted">Using Gravatar based on your email address. <a href="https://gravatar.com" target="_blank">Manage your Gravatar</a></small>
+                            {% else %}
+                                <small class="text-muted">Initials avatar generated from your name.</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Account Information</h5>
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {{ form.non_field_errors }}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.email.id_for_label }}" class="form-label">
+                                {{ form.email.label }}
+                            </label>
+                            {{ form.email }}
+                            {% if form.email.help_text %}
+                                <div class="form-text">{{ form.email.help_text }}</div>
+                            {% endif %}
+                            {% if form.email.errors %}
+                                <div class="text-danger small">{{ form.email.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.full_name.id_for_label }}" class="form-label">
+                                {{ form.full_name.label }}
+                            </label>
+                            {{ form.full_name }}
+                            {% if form.full_name.help_text %}
+                                <div class="form-text">{{ form.full_name.help_text }}</div>
+                            {% endif %}
+                            {% if form.full_name.errors %}
+                                <div class="text-danger small">{{ form.full_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.preferred_name.id_for_label }}" class="form-label">
+                                {{ form.preferred_name.label }}
+                            </label>
+                            {{ form.preferred_name }}
+                            {% if form.preferred_name.help_text %}
+                                <div class="form-text">{{ form.preferred_name.help_text }}</div>
+                            {% endif %}
+                            {% if form.preferred_name.errors %}
+                                <div class="text-danger small">{{ form.preferred_name.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">{{ form.avatar_type.label }}</label>
+                            {% if form.avatar_type.help_text %}
+                                <div class="form-text mb-2">{{ form.avatar_type.help_text }}</div>
+                            {% endif %}
+                            <div>
+                                {% for choice in form.avatar_type %}
+                                    <div class="form-check mb-2">
+                                        {{ choice.tag }}
+                                        <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                            {{ choice.choice_label }}
+                                        </label>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            {% if form.avatar_type.errors %}
+                                <div class="text-danger small">{{ form.avatar_type.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'home' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+

@@ -1,10 +1,14 @@
-from django.shortcuts import render
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect, render
 from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetConfirmView,
     PasswordResetDoneView,
     PasswordResetView,
 )
+
+from .forms import UserSettingsForm
 
 
 # /accounts/password_reset/	authuser.views.SuperHousePasswordResetView	password_reset
@@ -28,3 +32,21 @@ class SuperHousePasswordResetConfirmView(PasswordResetConfirmView):
 # /accounts/reset/done/	django.contrib.auth.views.SuperHousePasswordResetCompleteView	password_reset_complete
 class SuperHousePasswordResetCompleteView(PasswordResetCompleteView):
     template_name = "registration/superhouse_password_reset_complete.html"
+
+
+@login_required
+def user_settings(request):
+    if request.method == 'POST':
+        form = UserSettingsForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Your settings have been updated successfully.')
+            return redirect('user_settings')
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = UserSettingsForm(instance=request.user)
+    
+    return render(request, 'authuser/user_settings.html', {
+        'form': form,
+    })

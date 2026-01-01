@@ -1,185 +1,157 @@
-<aside id="sidebar">
-    <div class="d-flex">
-        <button class="toggle-btn" type="button">
-            <i class="lni lni-grid-alt"></i>
-        </button>
-        <div class="sidebar-logo">
+<aside class="sidebar sidebar-fixed sidebar-lg-show" id="sidebar">
+    <div class="sidebar-brand d-none d-md-flex">
+        <a class="sidebar-brand-full" href="{% url 'home' %}">
             {% if demo_name == "b5demo" %}
-                <a href="#">CodzSword</a>
+                CodzSword
             {% else %}
-                <a href="#">SuperHouse</a>
+                SuperHouse
             {% endif %}
-        </div>
+        </a>
+        <a class="sidebar-brand-narrow" href="{% url 'home' %}">
+            {% if demo_name == "b5demo" %}
+                CS
+            {% else %}
+                SH
+            {% endif %}
+        </a>
     </div>
     {% if user.is_authenticated %}
-        <ul class="sidebar-nav">
+        <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
             {% if demo_name == "b5demo" %}
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-user"></i>
-                        <span>Profile</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-user"></i>
+                        Profile
                     </a>
                 </li>
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-agenda"></i>
-                        <span>Task</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-task"></i>
+                        Task
                     </a>
                 </li>
-                <li class="sidebar-item">
-                    <a href="#"
-                    class="sidebar-link collapsed has-dropdown"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#auth"
-                    aria-expanded="false"
-                    aria-controls="auth">
-                        <i class="lni lni-protection"></i>
-                        <span>Auth</span>
+                <li class="nav-group">
+                    <a class="nav-link nav-group-toggle" href="#">
+                        <i class="nav-icon cil-shield-alt"></i>
+                        Auth
                     </a>
-                    <ul id="auth"
-                        class="sidebar-dropdown list-unstyled collapse"
-                        data-bs-parent="#sidebar">
-                        <li class="sidebar-item">
-                            <a href="#" class="sidebar-link">Login</a>
+                    <ul class="nav-group-items">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">Login</a>
                         </li>
-                        <li class="sidebar-item">
-                            <a href="#" class="sidebar-link">Register</a>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#">Register</a>
                         </li>
                     </ul>
                 </li>
-                <li class="sidebar-item">
-                    <a href="#"
-                    class="sidebar-link collapsed has-dropdown"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#multi"
-                    aria-expanded="false"
-                    aria-controls="multi">
-                        <i class="lni lni-layout"></i>
-                        <span>Multi Level</span>
-                    </a>
-                    <ul id="multi"
-                        class="sidebar-dropdown list-unstyled collapse"
-                        data-bs-parent="#sidebar">
-                        <li class="sidebar-item">
-                            <a href="#"
-                            class="sidebar-link collapsed"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#multi-two"
-                            aria-expanded="false"
-                            aria-controls="multi-two">Two Links</a>
-                            <ul id="multi-two" class="sidebar-dropdown list-unstyled collapse">
-                                <li class="sidebar-item">
-                                    <a href="#" class="sidebar-link">Link 1</a>
-                                </li>
-                                <li class="sidebar-item">
-                                    <a href="#" class="sidebar-link">Link 2</a>
-                                </li>
-                            </ul>
-                        </li>
-                    </ul>
-                </li>
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-popup"></i>
-                        <span>Notification</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-bell"></i>
+                        Notification
                     </a>
                 </li>
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-cog"></i>
-                        <span>Setting</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-settings"></i>
+                        Setting
                     </a>
                 </li>
             {% endif %}
             {% if demo_name != 'b5demo' %}
-                <li class="sidebar-item">
-                    <a href="{% url 'device:top' %}" class="sidebar-link">
-                        <i class="lni lni-calculator-alt"></i>
-                        <span>Devices</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'device:dashboard' %}">
+                        <i class="nav-icon cil-speedometer"></i>
+                        Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'home' %}">
+                        <i class="nav-icon cil-devices"></i>
+                        Devices
                     </a>
                 </li>
             {% endif %}
             {% if demo_name == 'sldemo' %}
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-calendar"></i>
-                        <span>Calendar</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-calendar"></i>
+                        Calendar
                     </a>
                 </li>
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-cart-full"></i>
-                        <span>Orders</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-cart"></i>
+                        Orders
                     </a>
                 </li>
                 {% if user.is_staff %}
-                    <li class="sidebar-item">
-                        <a href="#" class="sidebar-link">
-                            <i class="lni lni-grow"></i>
-                            <span>Inventree</span>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="nav-icon cil-chart-line"></i>
+                            Inventree
                         </a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="#" class="sidebar-link">
-                            <i class="lni lni-hammer"></i>
-                            <span>Production</span>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="nav-icon cil-industry"></i>
+                            Production
                         </a>
                     </li>
                 {% endif %}
-                <li class="sidebar-item">
-                    <a href="#" class="sidebar-link">
-                        <i class="lni lni-delivery"></i>
-                        <span>Deliveries</span>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="nav-icon cil-truck"></i>
+                        Deliveries
                     </a>
                 </li>
                 {% if user.is_staff %}
-                    <li class="sidebar-item">
-                        <a href="#" class="sidebar-link">
-                            <i class="lni lni-customer"></i>
-                            <span>Customers</span>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="nav-icon cil-people"></i>
+                            Customers
                         </a>
                     </li>
-                    <li class="sidebar-item">
-                        <a href="#" class="sidebar-link">
-                            <i class="lni lni-coin"></i>
-                            <span>Billing</span>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            <i class="nav-icon cil-dollar"></i>
+                            Billing
                         </a>
                     </li>
                 {% endif %}
             {% endif %}
             {% if demo_name != 'b5demo' %}
                 {% if user.is_staff %}
-                    <li class="sidebar-item">
-                        <a href="{% url 'admin:index' %}" class="sidebar-link">
-                            <i class="lni lni-cog"></i>
-                            <span>Admin</span>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin:index' %}">
+                            <i class="nav-icon cil-settings"></i>
+                            Admin
                         </a>
                     </li>
                 {% endif %}
             {% endif %}
         </ul>
-        <div class="sidebar-footer">
+        <div class="sidebar-footer border-top">
             {% if demo_name == 'b5demo' %}
-                <a href="#" class="sidebar-link">
-                    <i class="lni lni-exit"></i>
-                    <span>Logout</span>
+                <a class="nav-link" href="#">
+                    <i class="nav-icon cil-account-logout"></i>
+                    Logout
                 </a>
             {% else %}
-                <form id="logout-form" method="post" action="{% url 'logout' %}">
+                <form id="logout-form" method="post" action="{% url 'logout' %}" class="nav-link">
                     {% csrf_token %}
-                    <button class="toggle-btn" type="submit">
-                        <i class="lni lni-exit"></i>
+                    <button type="submit" class="btn btn-link nav-link p-0 text-start w-100 border-0">
+                        <i class="nav-icon cil-account-logout"></i>
+                        Logout
                     </button>
-                    <span>Logout</span>
                 </form>
             {% endif %}
         </div>
     {% else %}
-        <ul class="sidebar-nav">
-            <li class="sidebar-item">
-                <a href="#" class="sidebar-link">
-                    <i class="lni lni-user"></i>
-                    <span>Profile</span>
+        <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
+            <li class="nav-item">
+                <a class="nav-link" href="#">
+                    <i class="nav-icon cil-user"></i>
+                    Profile
                 </a>
             </li>
         </ul>

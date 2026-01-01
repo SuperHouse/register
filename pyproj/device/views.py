@@ -10,6 +10,26 @@ from .forms import DeviceEventForm, TestRecordForm
 from .models import Client, Design, Device, DeviceEvent, TestRecord
 
 
+def dashboard(request):
+    """Dashboard view showing summary statistics."""
+    clients = Client.objects.all()
+    designs = Design.objects.all()
+    devices = Device.objects.all()
+
+    if not request.user.is_staff:
+        clients = clients.filter(users=request.user)
+        designs = designs.filter(client__in=clients)
+        devices = devices.filter(design__client__in=clients)
+
+    context = {
+        'client_count': clients.count(),
+        'design_count': designs.count(),
+        'device_count': devices.count(),
+    }
+
+    return render(request, 'device/dashboard.html', context)
+
+
 def top(request):
     clients = Client.objects.all()
     designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
@@ -57,7 +77,7 @@ def inc_demo(request):
     if from_url:
         return HttpResponseRedirect(from_url)
     else:
-        return redirect('device:top')
+        return redirect('home')
 
 
 @login_not_required

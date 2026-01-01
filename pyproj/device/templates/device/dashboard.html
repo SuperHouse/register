@@ -1,0 +1,47 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Dashboard - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Dashboard
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Clients</h5>
+                    <p class="card-text">
+                        <span class="display-4 fw-bold">{{ client_count }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Designs</h5>
+                    <p class="card-text">
+                        <span class="display-4 fw-bold">{{ design_count }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-md-6 col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Boards</h5>
+                    <p class="card-text">
+                        <span class="display-4 fw-bold">{{ device_count }}</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+

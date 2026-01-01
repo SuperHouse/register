@@ -1,11 +1,13 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
 from . import views
 
 app_name = 'device'
 
 urlpatterns = [
-    path('', views.top, name='top'),
+    path('', RedirectView.as_view(url='/', permanent=False), name='top'),  # Redirect to home for backward compatibility
+    path('dashboard/', views.dashboard, name='dashboard'),
     path('bootstrap-demo/', views.bootstrap_demo, name='bootstrap_demo'),
     # Test code uses this, not for actual people to use, except for demos
     path('perm-report/', views.perm_report, name='perm_report'),

@@ -16,4 +16,7 @@ for i, pattern in enumerate(auth_patterns.url_patterns):
         route = auth_patterns.url_patterns[i].pattern._route
         auth_patterns.url_patterns[i] = path(route, overrides[pattern.name].as_view(), name=pattern.name)
 
-urlpatterns = [auth_patterns]
+urlpatterns = [
+    auth_patterns,
+    path('settings/', views.user_settings, name='user_settings'),
+]

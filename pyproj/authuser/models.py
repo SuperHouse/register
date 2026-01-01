@@ -45,9 +45,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     ensure compatibility with the built in management commands.
     """
 
+    INITIALS = 'initials'
+    GRAVATAR = 'gravatar'
+    AVATAR_TYPE_CHOICES = [
+        (INITIALS, 'Initials'),
+        (GRAVATAR, 'Gravatar'),
+    ]
+
     email = models.EmailField(blank=True, default="", unique=True)
     full_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Robert Menzies')
     preferred_name = models.CharField(max_length=200, blank=True, default="", help_text='eg: Bob')
+    avatar_type = models.CharField(
+        max_length=20,
+        choices=AVATAR_TYPE_CHOICES,
+        default=INITIALS,
+        help_text='Choose how your profile picture is displayed'
+    )
 
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
