@@ -89,9 +89,7 @@ class Command(BaseCommand):
 
         # self.stdout.write(f'{client_map}')
 
-        # Delete all data except for clients (which we'll update)
-        Device.objects.all().delete()
-        Design.objects.all().delete()
+        # No longer deleting any records - we'll update existing ones and add new ones
 
         # Import / update clients
         for id, name in client_map.items():
@@ -106,6 +104,7 @@ class Command(BaseCommand):
 
         # Import designs
         design_count = 0
+        design_updated_count = 0
         for row in ws_design.iter_rows(min_row=2, max_col=len(col_map.keys()), max_row=999):
             row = dict(zip(design_keys, (cell.value for cell in row)))
             # self.stdout.write(f'{row=}')
@@ -124,9 +123,26 @@ class Command(BaseCommand):
                 design_data['price'] = row['Price']
             if row['Price2']:
                 design_data['price2'] = row['Price2']
-            design = Design(**design_data)
-            design.save()
-            design_count += 1
+            
+            # Check if design exists, update if it does, create if it doesn't
+            try:
+                design = Design.objects.get(pk=id)
+                # Update existing design
+                design.client_id = design_data['client_id']
+                design.sku = design_data['sku']
+                design.name = design_data['name']
+                design.hw_version = design_data['hw_version']
+                if 'price' in design_data:
+                    design.price = design_data['price']
+                if 'price2' in design_data:
+                    design.price2 = design_data['price2']
+                design.save()
+                design_updated_count += 1
+            except Design.DoesNotExist:
+                # Create new design
+                design = Design(**design_data)
+                design.save()
+                design_count += 1
 
         # Now read from the first sheet, Devices
         ws_device = wb['Devices']
@@ -150,6 +166,7 @@ class Command(BaseCommand):
         de_list = []
         tr_list = []
         device_count = 0
+        device_updated_count = 0
         for row in ws_device.iter_rows(min_row=2, max_col=len(col_map.keys()), max_row=9999):
             row = dict(zip(device_keys, (cell.value for cell in row)))
             if row['DeviceTypeSerial'] is None:
@@ -231,15 +248,6 @@ class Command(BaseCommand):
                 }
                 tr_list.append(tr_data)
 
-            if sw_version:
-                de_data = {
-                    'device_id': device_id,
-                    'event_dt': timezone.now(),
-                    'event_type': 'SW_VERSION',
-                    'description': sw_version,
-                }
-                de_list.append(de_data)
-
             device_data = {
                 'id': device_id,
                 'design_id': design_id,
@@ -249,18 +257,62 @@ class Command(BaseCommand):
                 'notes': notes,
             }
 
-            device = Device(**device_data)
-            device.save()
-            device_count += 1
+            # Check if device exists, update if it does, create if it doesn't
+            try:
+                device = Device.objects.get(pk=device_id)
+                # Update existing device
+                device.design_id = device_data['design_id']
+                device.creation_dt = device_data['creation_dt']
+                device.invoice = device_data['invoice']
+                device.po = device_data['po']
+                device.notes = device_data['notes']
+                device.save()
+                device_updated_count += 1
+            except Device.DoesNotExist:
+                # Create new device
+                device = Device(**device_data)
+                device.save()
+                device_count += 1
 
+        # Import device events (avoid duplicates)
+        de_created_count = 0
+        de_skipped_count = 0
         for de_data in de_list:
-            de = DeviceEvent(**de_data)
-            de.save()
+            # Check if event already exists (same device, event_type, description, and event_dt)
+            existing = DeviceEvent.objects.filter(
+                device_id=de_data['device_id'],
+                event_type=de_data['event_type'],
+                description=de_data['description'],
+                event_dt=de_data['event_dt']
+            ).first()
+            if not existing:
+                de = DeviceEvent(**de_data)
+                de.save()
+                de_created_count += 1
+            else:
+                de_skipped_count += 1
 
+        # Import test records (avoid duplicates)
+        tr_created_count = 0
+        tr_skipped_count = 0
         for tr_data in tr_list:
-            tr = TestRecord(**tr_data)
-            tr.save()
+            # Check if test record already exists (same device and test_dt)
+            existing = TestRecord.objects.filter(
+                device_id=tr_data['device_id'],
+                test_dt=tr_data['test_dt']
+            ).first()
+            if not existing:
+                tr = TestRecord(**tr_data)
+                tr.save()
+                tr_created_count += 1
+            else:
+                tr_skipped_count += 1
 
-        self.stdout.write(f'Imported {design_count} designs, and {device_count} devices.')
+        self.stdout.write(
+            f'Imported {design_count} new designs, updated {design_updated_count} existing designs, '
+            f'imported {device_count} new devices, updated {device_updated_count} existing devices, '
+            f'created {de_created_count} device events (skipped {de_skipped_count} duplicates), '
+            f'and created {tr_created_count} test records (skipped {tr_skipped_count} duplicates).'
+        )
 
         self.stdout.write(self.style.SUCCESS('Done.'))
