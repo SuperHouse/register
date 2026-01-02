@@ -8,6 +8,11 @@
     Dashboard
 {% endblock h1 %}
 
+{% block extra_head %}
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock extra_head %}
+
 {% block content %}
     <div class="row">
         <div class="col-12 col-md-6 col-lg-4 mb-4">
@@ -43,5 +48,67 @@
             </div>
         </div>
     </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Boards Assembled Per Month</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="devicesChart" height="100"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('devicesChart');
+            if (ctx) {
+                const labels = {{ chart_labels|safe }};
+                const data = {{ chart_data|safe }};
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Boards',
+                            data: data,
+                            borderColor: 'rgb(50, 31, 219)',
+                            backgroundColor: 'rgba(50, 31, 219, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+{% endblock extra_js %}
 

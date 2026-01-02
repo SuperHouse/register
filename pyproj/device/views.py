@@ -1,9 +1,12 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.db.models.functions import TruncMonth
+import json
 
 from login_required import login_not_required
 
@@ -22,10 +25,32 @@ def dashboard(request):
         designs = designs.filter(client__in=clients)
         devices = devices.filter(design__client__in=clients)
 
+    # Calculate devices created per month
+    devices_by_month = (
+        devices
+        .annotate(month=TruncMonth('creation_dt'))
+        .values('month')
+        .annotate(count=Count('id'))
+        .order_by('month')
+    )
+    
+    # Prepare data for chart
+    chart_labels = []
+    chart_data = []
+    
+    for item in devices_by_month:
+        # Format month as "MMM YYYY" for better readability (e.g., "Jan 2024")
+        if item['month']:
+            month_str = item['month'].strftime('%b %Y')
+            chart_labels.append(month_str)
+            chart_data.append(item['count'])
+    
     context = {
         'client_count': clients.count(),
         'design_count': designs.count(),
         'device_count': devices.count(),
+        'chart_labels': json.dumps(chart_labels),
+        'chart_data': json.dumps(chart_data),
     }
 
     return render(request, 'device/dashboard.html', context)
