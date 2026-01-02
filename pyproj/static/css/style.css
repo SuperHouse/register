@@ -99,7 +99,32 @@ tr.highlight th {
     transition: margin-left 0.25s ease-in-out;
 }
 
-/* Expanded sidebar state */
+/* On mobile, sidebar should be hidden by default and overlay when shown */
+@media (max-width: 991.98px) {
+    #sidebar.sidebar-fixed {
+        transform: translateX(-100%) !important;
+        transition: transform 0.25s ease-in-out;
+        z-index: 1030 !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+    }
+    
+    #sidebar.sidebar-fixed.sidebar-lg-show {
+        transform: translateX(0) !important;
+        transition: transform 0.25s ease-in-out;
+        z-index: 1030 !important;
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+    }
+    
+    .sidebar-fixed ~ .body {
+        margin-left: 0;
+    }
+}
+
+/* Expanded sidebar state on desktop */
 @media (min-width: 992px) {
     .sidebar-lg-show.sidebar-fixed ~ .body {
         margin-left: 256px; /* CoreUI sidebar default width */
@@ -112,24 +137,148 @@ tr.highlight th {
     }
 }
 
-@media (min-width: 768px) and (max-width: 991.98px) {
-    .sidebar-md-show.sidebar-fixed ~ .body {
-        margin-left: 256px;
+/* Header toggler (hamburger menu) styling */
+.header-toggler {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    margin: 0.5rem;
+    background: transparent;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.25rem;
+    cursor: pointer;
+    z-index: 1031;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    color: #495057;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.header-toggler:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #000;
+}
+
+.header-toggler-icon {
+    display: block;
+    width: 1.5rem;
+    height: 1.25rem;
+    position: relative;
+}
+
+/* Create three horizontal lines for hamburger icon */
+.header-toggler-icon::before,
+.header-toggler-icon::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: currentColor;
+    transition: all 0.3s;
+}
+
+.header-toggler-icon {
+    background-color: currentColor;
+    height: 2px;
+    width: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    position: relative;
+}
+
+.header-toggler-icon::before {
+    top: -5px;
+}
+
+.header-toggler-icon::after {
+    bottom: -5px;
+}
+
+/* Ensure header toggler is visible on mobile devices only */
+@media (max-width: 991.98px) {
+    .header-toggler.d-lg-none {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
-    
-    .sidebar-narrow.sidebar-fixed ~ .body,
-    .sidebar-fixed:not(.sidebar-md-show) ~ .body {
-        margin-left: 56px;
+}
+
+/* Hide header toggler on large screens */
+@media (min-width: 992px) {
+    .header-toggler.d-lg-none {
+        display: none !important;
     }
+}
+
+/* Header layout */
+.header {
+    display: flex;
+    align-items: flex-start;
+}
+
+.header .container-fluid {
+    display: flex;
+    align-items: flex-start;
+    flex: 1;
+    padding: 0.5rem 1rem;
+}
+
+.header .container-fluid > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.5rem;
 }
 
 /* Responsive adjustments */
 @media (max-width: 767.98px) {
-    .header form {
-        display: none;
-    }
-    
     .sidebar-fixed ~ .body {
         margin-left: 0;
+    }
+    
+    .header .container-fluid {
+        padding: 0.5rem;
+    }
+    
+    .header form {
+        width: 100%;
+        margin-top: 0.5rem;
+        order: 3;
+    }
+    
+    .header-nav {
+        flex-shrink: 0;
+        order: 2;
+    }
+    
+    .header-toggler {
+        flex-shrink: 0;
+        order: 1;
+    }
+}
+
+@media (min-width: 768px) {
+    .header .container-fluid > div {
+        flex-wrap: nowrap;
+    }
+    
+    .header form {
+        flex: 1;
+        max-width: 400px;
+        order: 1;
+        margin-top: 0;
+    }
+    
+    .header-nav {
+        order: 2;
+        margin-left: auto;
+    }
+    
+    .header-toggler {
+        order: 0;
     }
 }
