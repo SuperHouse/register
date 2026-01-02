@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.paginator import Paginator
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -70,20 +71,38 @@ def organisation_edit(request, client_id):
 
 
 def top(request):
-    designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
     devices = Device.objects.prefetch_related("design").order_by('pk').all()
 
     if not request.user.is_staff:
         clients = Client.objects.filter(users=request.user)
-        designs = designs.filter(client__in=clients)
         devices = devices.filter(design__client__in=clients)
 
+    # Paginate with 50 items per page
+    paginator = Paginator(devices, 50)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'designs': designs,
-        'devices': devices,
+        'page_obj': page_obj,
+        'devices': page_obj,  # Keep 'devices' for template compatibility
     }
 
     return render(request, 'device/top.html', context)
+
+
+def design_list(request):
+    """List all designs."""
+    designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
+
+    if not request.user.is_staff:
+        clients = Client.objects.filter(users=request.user)
+        designs = designs.filter(client__in=clients)
+
+    context = {
+        'designs': designs,
+    }
+
+    return render(request, 'device/design_list.html', context)
 
 
 def bootstrap_demo(request):

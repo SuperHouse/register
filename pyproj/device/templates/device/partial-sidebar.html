@@ -68,10 +68,16 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'device:top' %}">
                         <i class="nav-icon cil-devices"></i>
-                        Devices
+                        Boards
                     </a>
                 </li>
                 {% if user.is_staff %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'design_list' %}">
+                            <i class="nav-icon cil-list"></i>
+                            Designs
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'organisation_list' %}">
                             <i class="nav-icon cil-people"></i>

@@ -1,0 +1,53 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% load thumbnail %}
+
+{% block title %}
+    Designs - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Designs
+{% endblock h1 %}
+
+{% block content %}
+    <div class="col">
+        <div class="col-12 col-md-10">
+            <div class="card border-0">
+                <div class="card-body py-10">
+                    {% if designs %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr class="highlight">
+                                    {% if user.is_staff %}
+                                        <th>Organisation</th>
+                                    {% endif %}
+                                    <th>SKU</th>
+                                    <th>Name</th>
+                                    <th>Version</th>
+                                </tr>
+                            </thead>
+                            {% for design in designs %}
+                                <tr>
+                                    {% if user.is_staff %}
+                                        <td>&nbsp;
+                                        {% ifchanged design.client %}{{ design.client.company_name }}{% endifchanged %}
+                                        </td>
+                                    {% endif %}
+                                    <td>{{ design.sku }}</td>
+                                    <td>{{ design.name }}</td>
+                                    <td>{{ design.hw_version }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>
+                            <i>There are no designs.</i>
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
