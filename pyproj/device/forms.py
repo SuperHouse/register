@@ -5,7 +5,7 @@ from django import forms
 from django.forms.widgets import HiddenInput
 from django.utils import timezone
 
-from .models import Design, Device, DeviceEvent, DeviceImage, TestRecord
+from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestRecord
 
 
 class DateTimeLocalInput(forms.DateTimeInput):
@@ -24,6 +24,28 @@ class DateTimeLocalInput(forms.DateTimeInput):
             value = timezone.localtime(value)
         # Format as YYYY-MM-DDTHH:MM (datetime-local format, no seconds)
         return value.strftime('%Y-%m-%dT%H:%M')
+
+
+class ClientForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = ['company_name', 'logo', 'users', 'api_key']
+        widgets = {
+            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'logo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'users': forms.SelectMultiple(attrs={'class': 'form-control', 'size': '10'}),
+            'api_key': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+        labels = {
+            'company_name': 'Company Name',
+            'logo': 'Logo',
+            'users': 'Users',
+            'api_key': 'API Key',
+        }
+        help_texts = {
+            'api_key': 'API key for authentication',
+            'users': 'Hold Ctrl (Cmd on Mac) to select multiple users',
+        }
 
 
 class DeviceEventForm(forms.ModelForm):

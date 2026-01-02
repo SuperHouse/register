@@ -34,6 +34,8 @@ api.add_router("/", device_router)
 urlpatterns = [
     path('', device_views.dashboard, name='home'),
     path('dashboard/', device_views.dashboard, name='dashboard'),
+    path('organisation/', device_views.organisation_list, name='organisation_list'),
+    path('organisation/<int:client_id>/edit/', device_views.organisation_edit, name='organisation_edit'),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

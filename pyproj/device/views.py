@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from login_required import login_not_required
 
-from .forms import DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .forms import ClientForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestRecord
 
 
@@ -28,6 +28,45 @@ def dashboard(request):
     }
 
     return render(request, 'device/dashboard.html', context)
+
+
+@staff_member_required
+def organisation_list(request):
+    """List all clients/organisations with links to edit them."""
+    clients = Client.objects.all().order_by('company_name')
+    
+    context = {
+        'clients': clients,
+    }
+    
+    return render(request, 'device/organisation_list.html', context)
+
+
+@staff_member_required
+def organisation_edit(request, client_id):
+    """Edit a client/organisation."""
+    client = get_object_or_404(Client, pk=client_id)
+    
+    if request.method == "POST":
+        form = ClientForm(request.POST, request.FILES, instance=client)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Organisation updated successfully.')
+            return redirect("organisation_list")
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors. Please review, and amend as required.",
+            )
+    else:
+        form = ClientForm(instance=client)
+    
+    context = {
+        'form': form,
+        'client': client,
+    }
+    
+    return render(request, 'device/organisation_edit.html', context)
 
 
 def top(request):
