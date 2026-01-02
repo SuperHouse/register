@@ -1,6 +1,7 @@
 {% extends "device/base-with-sidebar.html" %}
 
 {% load thumbnail %}
+{% load shipping_tags %}
 
 {% block title %}
     SuperHouse Device Register: Device detail
@@ -62,7 +63,11 @@
         <tr>
             <th>Shipping:</th>
             <td>
-                {{ device.latest_shipping|default_if_none:"<i>Not set</i>" }}
+                {% if device.latest_shipping %}
+                    {{ device.latest_shipping|tnt_tracking_link }}
+                {% else %}
+                    <i>Not set</i>
+                {% endif %}
             </td>
         </tr>
         <tr>
@@ -91,7 +96,13 @@
                     {% if user.is_staff %}<td>{{ event.internal|yesno:"🔒,🌏" }}</td>{% endif %}
                     <td>{{ event.get_event_dt_as_string }}</td>
                     <td>{{ event.get_type_display }}</td>
-                    <td>{{ event.description|default_if_none:"" }}</td>
+                    <td>
+                        {% if event.event_type == 'SHIPPING' %}
+                            {{ event.description|tnt_tracking_link|default_if_none:"" }}
+                        {% else %}
+                            {{ event.description|default_if_none:"" }}
+                        {% endif %}
+                    </td>
                     {% if user.is_staff %}
                         <td>
                             <a role="button"
