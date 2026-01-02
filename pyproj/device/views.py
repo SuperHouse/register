@@ -70,17 +70,15 @@ def organisation_edit(request, client_id):
 
 
 def top(request):
-    clients = Client.objects.all()
     designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
     devices = Device.objects.prefetch_related("design").order_by('pk').all()
 
     if not request.user.is_staff:
-        clients = clients.filter(users=request.user)
+        clients = Client.objects.filter(users=request.user)
         designs = designs.filter(client__in=clients)
         devices = devices.filter(design__client__in=clients)
 
     context = {
-        'clients': clients,
         'designs': designs,
         'devices': devices,
     }

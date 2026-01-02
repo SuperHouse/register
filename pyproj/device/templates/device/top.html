@@ -12,30 +12,6 @@
 
 {% block content %}
     <div class="col">
-        {% if user.is_staff %}
-            <div class="col-12 col-md-10">
-                <div class="card border-0">
-                    <div class="card-body py-10">
-                        <h3 class="fw-bold fs-4 mb-3">Clients</h3>
-                        {% if clients %}
-                            <table class="table table-striped">
-                                {% for client in clients %}
-                                    <tr>
-                                        <td valign="middle">
-                                            {% if client.logo %}<img src="{{ client.logo|thumbnail_url:'vsmall' }}" alt="{{ client.name }} logo">{% endif %}
-                                            {{ client.company_name }}<br>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </table>
-                        {% else %}
-                            <i>There are no clients.</i>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-
         <div class="col-12 col-md-10">
             <div class="card border-0">
                 <div class="card-body py-10">

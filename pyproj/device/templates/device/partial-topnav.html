@@ -3,7 +3,7 @@
         {% if user.is_authenticated %}
             <form method="get" action="{% url 'device:device_search' %}" class="d-none d-md-flex">
                 <div class="input-group">
-                    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Device search...">
+                    <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="Serial number search...">
                     <button class="btn btn-outline-secondary" type="submit">
                         <i class="icon cil-magnifying-glass"></i>
                     </button>
@@ -13,12 +13,8 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link py-0" href="{% url 'user_settings' %}" title="User Settings">
                         <span class="d-none d-md-inline me-2">{% if user.full_name %}{{ user.full_name }}{% else %}{{ user.get_short_name }}{% endif %}</span>
-                        {% if demo_name != 'b5demo' and client_logo %}
-                            <img src="{{ client_logo }}" class="avatar img-fluid rounded-circle" alt="{{ client_name }}" style="width: 40px; height: 40px;">
-                        {% else %}
-                            {% load avatar_tags %}
-                            {% user_avatar user size=40 show_name=False %}
-                        {% endif %}
+                        {% load avatar_tags %}
+                        {% user_avatar user size=40 show_name=False %}
                     </a>
                     {% if demo_name == 'b5demo' %}
                         <div class="dropdown-menu dropdown-menu-end pt-0">
