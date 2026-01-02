@@ -24,4 +24,7 @@ urlpatterns = [
     path('de/<int:device_event_number>/delete/', views.device_event_delete, name='device_event_delete'),
     path('<int:device_number>/tr-add/', views.test_record_add, name='test_record_add'),
     path('tr/<int:test_record_number>/', views.test_record_edit, name='test_record_edit'),
+    path('<int:device_number>/image-add/', views.device_image_add, name='device_image_add'),
+    path('di/<int:device_image_number>/', views.device_image_edit, name='device_image_edit'),
+    path('di/<int:device_image_number>/delete/', views.device_image_delete, name='device_image_delete'),
 ]

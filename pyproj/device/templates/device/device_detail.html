@@ -171,6 +171,50 @@
            href="{% url 'device:test_record_add' device.pk %}">Add</a>
     {% endif %}
 
+    <h3>Device Images</h3>
+
+    {% if device_images %}
+        <div class="row">
+            {% for device_image in device_images %}
+                <div class="col-12 col-md-6 col-lg-4 mb-3">
+                    <div class="card">
+                        <a href="{{ device_image.image.url }}" data-toggle="lightbox" data-gallery="device-images-{{ device.pk }}">
+                            <img src="{{ device_image.image.url }}" class="card-img-top" alt="Device image" style="max-height: 200px; object-fit: cover;">
+                        </a>
+                        <div class="card-body">
+                            <p class="card-text small text-muted mb-1">{{ device_image.get_image_dt_as_string }}</p>
+                            {% if device_image.notes %}
+                                <p class="card-text">{{ device_image.notes }}</p>
+                            {% endif %}
+                            {% if user.is_staff %}
+                                <div class="mt-2 text-center">
+                                    <a href="{% url 'device:device_image_edit' device_image.pk %}"
+                                       class="btn btn-sm btn-primary me-1"
+                                       title="Edit image notes">
+                                        <i class="cil-pencil"></i> Edit
+                                    </a>
+                                    <a href="{% url 'device:device_image_delete' device_image.pk %}"
+                                       class="btn btn-sm btn-danger"
+                                       title="Delete image">
+                                        <i class="cil-trash"></i> Delete
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p><i>No images uploaded for this device.</i></p>
+    {% endif %}
+
+    {% if user.is_staff %}
+        <a role="button"
+           class="btn btn-primary"
+           href="{% url 'device:device_image_add' device.pk %}">Upload Image</a>
+    {% endif %}
+
     {% if user.is_staff %}
         <h2>Actions</h2>
 

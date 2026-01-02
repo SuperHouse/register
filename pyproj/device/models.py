@@ -137,6 +137,27 @@ class TestImage(models.Model):
         return f'{self.test_record} - {self.image}'
 
 
+def device_image_upload_path(instance, filename):
+    """Generate upload path for device images: device_images/{device_id}/filename"""
+    return f'device_images/{instance.device.id}/{filename}'
+
+
+class DeviceImage(models.Model):
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    image_dt = models.DateTimeField(verbose_name='When', default=timezone.now)
+    image = models.ImageField(upload_to=device_image_upload_path)
+    notes = models.TextField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["device__id", "-image_dt"]
+
+    def __str__(self):
+        return f'{self.device}@{self.image_dt}: {self.image.name}'
+
+    def get_image_dt_as_string(self):
+        return get_dt_as_string(self.image_dt)
+
+
 class DeviceEvent(models.Model):
     NOTE = 'NOTE'
     SW_VERSION = 'SW_VERSION'

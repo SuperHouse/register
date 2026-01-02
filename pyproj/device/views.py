@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from login_required import login_not_required
 
-from .forms import DeviceEventForm, TestRecordForm
-from .models import Client, Design, Device, DeviceEvent, TestRecord
+from .forms import DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestRecord
 
 
 def dashboard(request):
@@ -169,9 +169,12 @@ def device_detail(request, device_number):
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
         events = device.deviceevent_set.exclude(internal=True)
 
+    device_images = device.deviceimage_set.all()
+
     context = {
         'device': device,
         'events': events,
+        'device_images': device_images,
     }
 
     return render(request, 'device/device_detail.html', context)
@@ -376,6 +379,94 @@ def test_record_edit(request, test_record_number):
     }
 
     return render(request, "device/test_record_edit.html", ctx)
+
+
+@staff_member_required
+def device_image_add(request, device_number):
+    device = get_object_or_404(Device, pk=device_number)
+
+    if request.method == "POST":
+        form = DeviceImageForm(request.POST, request.FILES, initial={'device': device})
+        if form.is_valid():
+            form.instance.device = device
+            device_image = form.save()
+
+            messages.success(request, 'Image uploaded successfully.')
+
+            return redirect("device:device_detail", device_number=device_image.device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a blank form
+        form = DeviceImageForm(initial={'device': device})
+
+    ctx = {
+        'form': form,
+        'device': device,
+        'operation': 'Upload',
+    }
+
+    return render(request, "device/device_image_upload.html", ctx)
+
+
+@staff_member_required
+def device_image_edit(request, device_image_number):
+    device_image = get_object_or_404(DeviceImage, pk=device_image_number)
+    device = device_image.device
+
+    if request.method == "POST":
+        form = DeviceImageEditForm(request.POST, instance=device_image)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Image notes updated.')
+
+            return redirect("device:device_detail", device_number=device.pk)
+        else:
+            messages.warning(
+                request,
+                "Some field values have errors.  Please review, and amend as required.",
+            )
+            # Drop through to re-render the form with the error messages
+
+    else:
+        # if a GET (or any other method) we'll create a form with the current instance
+        form = DeviceImageEditForm(instance=device_image)
+
+    ctx = {
+        'form': form,
+        'device_image': device_image,
+        'device': device,
+        'operation': 'Edit',
+    }
+
+    return render(request, "device/device_image_edit.html", ctx)
+
+
+@staff_member_required
+def device_image_delete(request, device_image_number):
+    device_image = get_object_or_404(DeviceImage, pk=device_image_number)
+    device = device_image.device
+
+    if request.method == "POST":
+        device_image.delete()
+        messages.success(
+            request,
+            "Device image deleted.",
+        )
+
+        return redirect("device:device_detail", device_number=device.pk)
+
+    ctx = {
+        'device_image': device_image,
+        'device': device,
+    }
+
+    return render(request, "device/device_image_delete.html", ctx)
 
 
 def test_messages(request):

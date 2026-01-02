@@ -3,7 +3,7 @@ from easy_thumbnails.files import get_thumbnailer
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Client, Design, Device, DeviceEvent, TestImage, TestRecord
+from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 
 
 class DesignAdmin(admin.ModelAdmin):
@@ -57,6 +57,7 @@ admin.site.register(Client)
 admin.site.register(Design, DesignAdmin)
 admin.site.register(Device, DeviceAdmin)
 admin.site.register(DeviceEvent)
+admin.site.register(DeviceImage)
 admin.site.register(TestImage, TestImageAdmin)
 admin.site.register(TestRecord, TestRecordAdmin)
 
