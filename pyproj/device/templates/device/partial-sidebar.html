@@ -67,7 +67,7 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'device:top' %}">
-                        <i class="nav-icon cil-devices"></i>
+                        <i class="nav-icon cil-memory"></i>
                         Boards
                     </a>
                 </li>
@@ -80,7 +80,7 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'organisation_list' %}">
-                            <i class="nav-icon cil-people"></i>
+                            <i class="nav-icon cil-building"></i>
                             Organisations
                         </a>
                     </li>
@@ -145,21 +145,19 @@
                 {% endif %}
             {% endif %}
         </ul>
+        <form id="logout-form" method="post" action="{% url 'logout' %}" class="nav-link">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-link nav-link p-0 text-center w-100 border-0">
+                <i class="nav-icon cil-account-logout"></i>
+                Logout
+            </button>
+        </form>
         <div class="sidebar-footer border-top">
-            {% if demo_name == 'b5demo' %}
-                <a class="nav-link" href="#">
-                    <i class="nav-icon cil-account-logout"></i>
-                    Logout
-                </a>
-            {% else %}
-                <form id="logout-form" method="post" action="{% url 'logout' %}" class="nav-link">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-link nav-link p-0 text-start w-100 border-0">
-                        <i class="nav-icon cil-account-logout"></i>
-                        Logout
-                    </button>
-                </form>
-            {% endif %}
+            <div class="text-center py-3">
+                <a href="https://www.testomatic.io/" target="_blank" rel="noopener noreferrer">
+                   <img src="{% static 'img/testomatic-logo-wide-transparent.png' %}" alt="Testomatic.io" style="max-width: 100%; height: auto; padding: 0 10px;">
+               </a>
+           </div>
         </div>
     {% else %}
         <ul class="sidebar-nav" data-coreui="navigation" data-simplebar>
