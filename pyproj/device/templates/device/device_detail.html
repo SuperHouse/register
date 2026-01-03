@@ -8,7 +8,7 @@
 {% endblock title %}
 
 {% block h1 %}
-    Device detail
+    Details
 {% endblock h1 %}
 
 {% block content %}
@@ -18,7 +18,7 @@
         {% if user.is_staff %}
             {% comment %} Only show client if we're staff (if we're a customer, we know who we are {% endcomment %}
             <tr>
-                <th>Client:</th>
+                <th>Organisation:</th>
                 <td>{{ device.design.client.company_name }}</td>
             </tr>
         {% endif %}
@@ -31,15 +31,11 @@
             <td>{{ device.design.sku }}</td>
         </tr>
         <tr>
-            <th>Serial:</th>
-            <td>{{ device.id }}</td>
-        </tr>
-        <tr>
             <th>H/W Version:</th>
             <td>{{ device.design.hw_version }}</td>
         </tr>
         <tr>
-            <th>Latest S/W Version:</th>
+            <th>S/W Version:</th>
             <td>
                 {{ device.latest_sw_version|default_if_none:"<i>Not set</i>" }}
             </td>
@@ -76,7 +72,7 @@
         </tr>
     </table>
 
-    <h3>Device events</h3>
+    <h3>Events</h3>
 
     <table class="table table-bordered">
         {% with events=device.deviceevent_set.all %}
@@ -182,7 +178,7 @@
            href="{% url 'device:test_record_add' device.pk %}">Add</a>
     {% endif %}
 
-    <h3>Device Images</h3>
+    <h3>Images</h3>
 
     {% if device_images %}
         <div class="row">
