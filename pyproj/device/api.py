@@ -1,4 +1,6 @@
 import ipaddress
+import re
+from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
@@ -6,12 +8,14 @@ from django.utils import timezone
 from ninja import File, Form, Router, UploadedFile
 from ninja.security import APIKeyHeader
 
-from device.models import Client, Design, Device, DeviceEvent, TestImage, TestRecord
+from device.models import Client, Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 
 from .schemas import (
     ClientSchema,
     DesignSchema,
     DeviceCreateSchema,
+    DeviceImageFormSchema,
+    DeviceImageResponseSchema,
     DeviceProgramSchema,
     ExistingDeviceResponseSchema,
     Message,
@@ -151,3 +155,77 @@ def add_test_image(request, testrecord_pk: str, file: File[UploadedFile]):
     ti.save()
 
     return {'thumbnail': ti.image.url}
+
+
+@router.post('device/{device_pk}/add-device-image/', response={200: DeviceImageResponseSchema, 403: Message, 404: Message})
+def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema], file: File[UploadedFile]):
+    """
+    Upload a device image. The API key must belong to the client associated with the device.
+    The image datetime can be extracted from the filename if it matches the pattern:
+    id-YYYY-MM-DD_h-m-s (e.g., "123-2024-01-15_14-30-45")
+    """
+    # Get the API key from the authenticated request
+    api_key = request.auth
+    if not api_key:
+        return 403, {'message': 'Authentication required'}
+    
+    # Get the client associated with this API key
+    try:
+        client = Client.objects.get(api_key=api_key)
+    except Client.DoesNotExist:
+        return 403, {'message': 'Invalid API key'}
+    
+    # Get the device
+    device = get_object_or_404(Device, pk=device_pk)
+    
+    # Verify that the device's design's client matches the API key's client
+    if device.design.client != client:
+        return 403, {'message': 'API key does not have access to this device'}
+    
+    # Extract datetime from filename if it matches the pattern
+    # Pattern: id-YYYY-MM-DD_h_m_s (e.g., "123-2024-01-15_14-30-45")
+    filename_dt = None
+    if file.name:
+        filename = file.name
+        # Extract just the filename without path (in case it has one)
+        if '/' in filename or '\\' in filename:
+            filename = filename.replace('\\', '/').split('/')[-1]
+        # Remove file extension
+        name_without_ext = filename.rsplit('.', 1)[0] if '.' in filename else filename
+        
+        # Pattern: id-YYYY-MM-DD_h_m_s
+        pattern = r'^.+?-(\d{4})-(\d{2})-(\d{2})_(\d{1,2})-(\d{1,2})-(\d{1,2})$'
+        match = re.match(pattern, name_without_ext)
+        
+        if match:
+            try:
+                year = int(match.group(1))
+                month = int(match.group(2))
+                day = int(match.group(3))
+                hour = int(match.group(4))
+                minute = int(match.group(5))
+                second = int(match.group(6))
+                
+                # Validate the date/time values
+                if (1 <= month <= 12 and 1 <= day <= 31 and 
+                    0 <= hour <= 23 and 0 <= minute <= 59 and 0 <= second <= 59):
+                    # Create datetime object
+                    parsed_dt = datetime(year, month, day, hour, minute, second)
+                    # Make it timezone-aware using the current timezone
+                    if timezone.is_naive(parsed_dt):
+                        parsed_dt = timezone.make_aware(parsed_dt)
+                    filename_dt = parsed_dt
+            except (ValueError, TypeError):
+                # If parsing fails, filename_dt remains None
+                pass
+    
+    # Create the DeviceImage
+    device_image = DeviceImage(
+        device=device,
+        image=file,
+        notes=data.notes,
+        image_dt=filename_dt if filename_dt else timezone.now()
+    )
+    device_image.save()
+    
+    return {'image_url': device_image.image.url, 'pk': device_image.pk}

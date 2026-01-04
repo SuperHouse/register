@@ -60,5 +60,14 @@ class TestImageResponseSchema(Schema):
     thumbnail: str
 
 
+class DeviceImageFormSchema(Schema):
+    notes: str | None = None
+
+
+class DeviceImageResponseSchema(Schema):
+    image_url: str
+    pk: int
+
+
 # UserSchema = create_schema(settings.AUTH_USER_MODEL, exclude=['password'])
 # UserSchemaUpdate = create_schema(settings.AUTH_USER_MODEL, exclude=['password'], write_only=True)
