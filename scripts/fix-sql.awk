@@ -7,7 +7,7 @@
 # (env) [pyproj]$ ./manage.py dbshell < ../devices_superlab_au.sql 
 # (env) [pyproj]$ 
 #
-# This script also creates a superuser with email address 'mjd@afork.com', and massages usernames.
+# This script also creates a superuser with email address 'user@example.com', and massages usernames.
 
 # Define the array of substitutions
 BEGIN {
@@ -80,10 +80,10 @@ SKIP == 0 {
         print("UPDATE authuser_user SET preferred_name = 'Jon' WHERE preferred_name = 'Jonathan';");
         print("INSERT INTO `authuser_user` (`id`, `preferred_name`, `full_name`, `email`, `password`, `is_active`, `is_staff`, `is_superuser`, `date_joined`) VALUES")
         if (SQLITE) {
-            print("(100, 'Mitch', 'Mitch Davis', 'mjd@afork.com', 'pbkdf2_sha256$720000$2ve6S2XB6rBLFEbJsd09vm$4ZnXsPDjUhq2JNtr7jiox0abT3yRCr5hFszzZw/WjbE=', 1, 1, 1, DATE('now'));")
+            print("(100, 'Jon', 'Jonathan Oxer', 'user@example.com', 'pbkdf2_sha56$7200WjbE=', 1, 1, 1, DATE('now'));")
         }
         if (MYSQL) {
-        print("(100, 'Mitch', 'Mitch Davis', 'mjd@afork.com', 'pbkdf2_sha256$720000$2ve6S2XB6rBLFEbJsd09vm$4ZnXsPDjUhq2JNtr7jiox0abT3yRCr5hFszzZw/WjbE=', 1, 1, 1, CURDATE());")
+        print("(100, 'Jon', 'Jonathan Oxer', 'user@example.com', 'pbkdf2_sha56$7WjbE=', 1, 1, 1, CURDATE());")
         }
     }
 
