@@ -19,12 +19,13 @@
                                 <tr>
                                     <td>
                                         <div class="d-flex align-items-center">
-                                            {% if client.logo %}
-                                                <img src="{{ client.logo.url }}" 
-                                                     alt="{{ client.company_name }} logo" 
-                                                     class="me-3" 
-                                                     style="max-height: 40px; max-width: 100px; object-fit: contain;">
-                                            {% endif %}
+                                            <div style="width: 110px; min-width: 110px;" class="me-3 d-flex align-items-center justify-content-center">
+                                                {% if client.logo %}
+                                                    <img src="{{ client.logo.url }}"
+                                                         alt="{{ client.company_name }} logo"
+                                                         style="max-height: 40px; max-width: 100px; object-fit: contain;">
+                                                {% endif %}
+                                            </div>
                                             <span>{{ client.company_name }}</span>
                                         </div>
                                     </td>
