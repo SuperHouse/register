@@ -28,7 +28,7 @@
                                 </tr>
                             </thead>
                             {% for design in designs %}
-                                <tr>
+                                <tr style="cursor: pointer;" onclick="window.location='{% url 'design_detail' design.pk %}'">
                                     {% if user.is_staff %}
                                         <td>&nbsp;
                                         {% ifchanged design.client %}{{ design.client.company_name }}{% endifchanged %}

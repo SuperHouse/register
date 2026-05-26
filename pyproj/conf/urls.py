@@ -35,6 +35,7 @@ urlpatterns = [
     path('', device_views.dashboard, name='home'),
     path('dashboard/', device_views.dashboard, name='dashboard'),
     path('design/', device_views.design_list, name='design_list'),
+    path('design/<int:design_id>/', device_views.design_detail, name='design_detail'),
     path('organisation/', device_views.organisation_list, name='organisation_list'),
     path('organisation/<int:client_id>/edit/', device_views.organisation_edit, name='organisation_edit'),
     path('office/', admin.site.urls),

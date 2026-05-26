@@ -130,6 +130,25 @@ def design_list(request):
     return render(request, 'device/design_list.html', context)
 
 
+def design_detail(request, design_id):
+    """Detail view for a single design."""
+    if request.user.is_staff:
+        design = get_object_or_404(Design, pk=design_id)
+    else:
+        clients = Client.objects.filter(users=request.user)
+        design = get_object_or_404(Design, pk=design_id, client__in=clients)
+
+    devices = Device.objects.filter(design=design).order_by('pk')
+
+    context = {
+        'design': design,
+        'devices': devices,
+        'device_count': devices.count(),
+    }
+
+    return render(request, 'device/design_detail.html', context)
+
+
 def bootstrap_demo(request):
     context = {}
 

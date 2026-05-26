@@ -23,8 +23,8 @@
             </tr>
         {% endif %}
         <tr>
-            <th>Device:</th>
-            <td>{{ device.design.name }}</td>
+            <th>Design:</th>
+            <td><a href="{% url 'design_detail' device.design.pk %}">{{ device.design.name }}</a></td>
         </tr>
         <tr>
             <th>SKU:</th>
