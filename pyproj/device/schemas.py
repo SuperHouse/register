@@ -69,5 +69,13 @@ class DeviceImageResponseSchema(Schema):
     pk: int
 
 
+class DashboardStatsSchema(Schema):
+    client_count: int
+    design_count: int
+    device_count: int
+    chart_labels: list[str]
+    chart_data: list[int]
+
+
 # UserSchema = create_schema(settings.AUTH_USER_MODEL, exclude=['password'])
 # UserSchemaUpdate = create_schema(settings.AUTH_USER_MODEL, exclude=['password'], write_only=True)

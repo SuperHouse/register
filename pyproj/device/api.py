@@ -1,10 +1,13 @@
 import ipaddress
+import json
 import re
 from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Count
+from django.db.models.functions import TruncMonth
 from ninja import File, Form, Router, UploadedFile
 from ninja.security import APIKeyHeader
 
@@ -12,6 +15,7 @@ from device.models import Client, Design, Device, DeviceEvent, DeviceImage, Test
 
 from .schemas import (
     ClientSchema,
+    DashboardStatsSchema,
     DesignSchema,
     DeviceCreateSchema,
     DeviceImageFormSchema,
@@ -61,6 +65,43 @@ class AuthByApiKey(APIKeyHeader):
 
 
 header_key_auth = AuthByApiKey()
+
+
+def session_or_api_key_auth(request):
+    """Auth that accepts either Django session auth or API key auth."""
+    # Try session auth first
+    if request.user and request.user.is_authenticated:
+        return {'auth_type': 'session', 'user': request.user}
+
+    # Try API key auth
+    api_key = request.headers.get('X-API-Key')
+    if api_key:
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        if x_forwarded_for:
+            request_from = x_forwarded_for.split(',')[0]
+        else:
+            request_from = request.META.get('REMOTE_ADDR')
+
+        try:
+            ip_addr = ipaddress.ip_address(request_from)
+
+            allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
+            local_network = ipaddress.ip_network('127.0.0.0/24')
+
+            allow = False
+            if ip_addr in local_network:
+                allow = True
+            if allowed_ipv4_network and ip_addr in allowed_ipv4_network:
+                allow = True
+
+            if allow and Client.objects.filter(api_key=api_key).exists():
+                return {'auth_type': 'api_key', 'key': api_key}
+        except ValueError:
+            pass
+
+    return None
+
+
 router = Router(auth=header_key_auth)
 
 
@@ -229,3 +270,59 @@ def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema],
     device_image.save()
     
     return {'image_url': device_image.image.url, 'pk': device_image.pk}
+
+
+@router.get('dashboard-stats/', auth=session_or_api_key_auth, response=DashboardStatsSchema)
+def get_dashboard_stats(request):
+    """Get dashboard statistics. Available to authenticated users and API keys."""
+    auth_info = request.auth
+    if not auth_info:
+        # This shouldn't happen due to auth, but be explicit
+        return 401, {'message': 'Unauthorized'}
+
+    # Determine access level based on auth type
+    if auth_info['auth_type'] == 'session':
+        user = auth_info['user']
+        clients = Client.objects.all()
+        designs = Design.objects.all()
+        devices = Device.objects.all()
+
+        if not user.is_staff:
+            clients = clients.filter(users=user)
+            designs = designs.filter(client__in=clients)
+            devices = devices.filter(design__client__in=clients)
+
+    else:  # api_key auth
+        api_key = auth_info['key']
+        client = Client.objects.get(api_key=api_key)
+        clients = Client.objects.filter(pk=client.pk)
+        designs = Design.objects.filter(client=client)
+        devices = Device.objects.filter(design__client=client)
+
+    # Calculate devices created per month
+    devices_by_month = (
+        devices
+        .annotate(month=TruncMonth('creation_dt'))
+        .values('month')
+        .annotate(count=Count('id'))
+        .order_by('month')
+    )
+
+    # Prepare data for chart
+    chart_labels = []
+    chart_data = []
+
+    for item in devices_by_month:
+        if item['month']:
+            month_str = item['month'].strftime('%b %Y')
+            chart_labels.append(month_str)
+            chart_data.append(item['count'])
+
+    return {
+        'client_count': clients.count(),
+        'design_count': designs.count(),
+        'device_count': devices.count(),
+        'chart_labels': chart_labels,
+        'chart_data': chart_data,
+    }
+

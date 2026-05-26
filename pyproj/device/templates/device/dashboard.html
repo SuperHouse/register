@@ -21,7 +21,7 @@
                     <div class="card-body text-center">
                         <h5 class="card-title">Organisations</h5>
                         <p class="card-text">
-                            <span class="display-4 fw-bold">{{ client_count }}</span>
+                            <span class="display-4 fw-bold" id="client-count">{{ client_count }}</span>
                         </p>
                     </div>
                 </div>
@@ -34,7 +34,7 @@
                     <div class="card-body text-center">
                         <h5 class="card-title">Designs</h5>
                         <p class="card-text">
-                            <span class="display-4 fw-bold">{{ design_count }}</span>
+                            <span class="display-4 fw-bold" id="design-count">{{ design_count }}</span>
                         </p>
                     </div>
                 </div>
@@ -47,14 +47,14 @@
                     <div class="card-body text-center">
                         <h5 class="card-title">Boards</h5>
                         <p class="card-text">
-                            <span class="display-4 fw-bold">{{ device_count }}</span>
+                            <span class="display-4 fw-bold" id="device-count">{{ device_count }}</span>
                         </p>
                     </div>
                 </div>
             </a>
         </div>
     </div>
-    
+
     <div class="row mt-4">
         <div class="col-12">
             <div class="card">
@@ -71,49 +71,108 @@
 
 {% block extra_js %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        let chart = null;
+        let lastChartData = null;
+
+        function initChart(labels, data) {
             const ctx = document.getElementById('devicesChart');
-            if (ctx) {
-                const labels = {{ chart_labels|safe }};
-                const data = {{ chart_data|safe }};
-                
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Boards',
-                            data: data,
-                            borderColor: 'rgb(50, 31, 219)',
-                            backgroundColor: 'rgba(50, 31, 219, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'top'
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false
-                            }
+            if (!ctx) return;
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Boards',
+                        data: data,
+                        borderColor: 'rgb(50, 31, 219)',
+                        backgroundColor: 'rgba(50, 31, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
                         },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    stepSize: 1
-                                }
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
                             }
                         }
                     }
-                });
+                }
+            });
+        }
+
+        function chartDataChanged(newLabels, newData) {
+            if (!lastChartData) return true;
+            if (lastChartData.labels.length !== newLabels.length) return true;
+            if (lastChartData.data.length !== newData.length) return true;
+
+            for (let i = 0; i < newLabels.length; i++) {
+                if (lastChartData.labels[i] !== newLabels[i] || lastChartData.data[i] !== newData[i]) {
+                    return true;
+                }
             }
+            return false;
+        }
+
+        async function updateDashboardStats() {
+            try {
+                const response = await fetch('/api/v1/dashboard-stats/');
+                if (!response.ok) {
+                    console.error('Failed to fetch dashboard stats:', response.status);
+                    return;
+                }
+
+                const data = await response.json();
+
+                // Update counter displays
+                document.getElementById('client-count').textContent = data.client_count;
+                document.getElementById('design-count').textContent = data.design_count;
+                document.getElementById('device-count').textContent = data.device_count;
+
+                // Update chart only if data changed
+                if (chartDataChanged(data.chart_labels, data.chart_data)) {
+                    lastChartData = {
+                        labels: data.chart_labels,
+                        data: data.chart_data
+                    };
+                    initChart(data.chart_labels, data.chart_data);
+                }
+            } catch (error) {
+                console.error('Error updating dashboard stats:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize chart with initial data
+            const initialLabels = {{ chart_labels|safe }};
+            const initialData = {{ chart_data|safe }};
+            lastChartData = {
+                labels: initialLabels,
+                data: initialData
+            };
+            initChart(initialLabels, initialData);
+
+            // Poll for updates every 30 seconds
+            setInterval(updateDashboardStats, 30000);
         });
     </script>
 {% endblock extra_js %}
