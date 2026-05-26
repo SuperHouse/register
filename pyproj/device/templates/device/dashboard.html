@@ -16,36 +16,42 @@
 {% block content %}
     <div class="row">
         <div class="col-12 col-md-6 col-lg-4 mb-4">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Organisations</h5>
-                    <p class="card-text">
-                        <span class="display-4 fw-bold">{{ client_count }}</span>
-                    </p>
+            <a href="{% url 'organisation_list' %}" class="text-decoration-none">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Organisations</h5>
+                        <p class="card-text">
+                            <span class="display-4 fw-bold">{{ client_count }}</span>
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
-        
+
         <div class="col-12 col-md-6 col-lg-4 mb-4">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Designs</h5>
-                    <p class="card-text">
-                        <span class="display-4 fw-bold">{{ design_count }}</span>
-                    </p>
+            <a href="{% url 'design_list' %}" class="text-decoration-none">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Designs</h5>
+                        <p class="card-text">
+                            <span class="display-4 fw-bold">{{ design_count }}</span>
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
-        
+
         <div class="col-12 col-md-6 col-lg-4 mb-4">
-            <div class="card">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Boards</h5>
-                    <p class="card-text">
-                        <span class="display-4 fw-bold">{{ device_count }}</span>
-                    </p>
+            <a href="{% url 'device:top' %}" class="text-decoration-none">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">Boards</h5>
+                        <p class="card-text">
+                            <span class="display-4 fw-bold">{{ device_count }}</span>
+                        </p>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
     </div>
     
