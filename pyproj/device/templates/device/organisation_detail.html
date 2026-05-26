@@ -1,0 +1,83 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    {{ client.company_name }} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Organisation: {{ client.company_name }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="col">
+        <div class="col-12 col-md-10">
+            <div class="card border-0 mb-4">
+                <div class="card-body py-10">
+                    <table class="table table-bordered">
+                        <tr>
+                            <th>Name:</th>
+                            <td>{{ client.company_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>Logo:</th>
+                            <td>
+                                {% if client.logo %}
+                                    <img src="{{ client.logo.url }}"
+                                         alt="{{ client.company_name }} logo"
+                                         style="max-height: 60px; object-fit: contain;">
+                                {% else %}
+                                    <i>No logo</i>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Users:</th>
+                            <td>
+                                {% for user in client.users.all %}
+                                    {{ user.full_name|default:user.email }}{% if not forloop.last %}, {% endif %}
+                                {% empty %}
+                                    <i>No users</i>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>API Key:</th>
+                            <td>{{ client.api_key|default:"<i>Not set</i>" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            {% if designs %}
+                <h5>Designs</h5>
+                <div class="card border-0 mb-4">
+                    <div class="card-body py-10">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>SKU</th>
+                                    <th>Name</th>
+                                    <th>Version</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for design in designs %}
+                                    <tr style="cursor: pointer;" onclick="window.location='{% url 'design_detail' design.pk %}'">
+                                        <td>{{ design.sku }}</td>
+                                        <td>{{ design.name }}</td>
+                                        <td>{{ design.hw_version }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="d-flex gap-2 mt-3">
+                <a href="{% url 'organisation_edit' client.pk %}" class="btn btn-primary">Edit</a>
+                <a href="{% url 'organisation_list' %}" class="btn btn-secondary">Back to Organisations</a>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

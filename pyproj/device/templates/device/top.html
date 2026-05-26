@@ -25,13 +25,9 @@
                                 </tr>
                             </thead>
                             {% for device in devices %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a>
-                                    </td>
-                                    <td>
-                                        {{ device.design.sku }} {{ device.design.hw_version }}
-                                    </td>
+                                <tr style="cursor: pointer;" onclick="window.location='{% url 'device:device_detail' device.pk %}'">
+                                    <td>{{ device.pk }}</td>
+                                    <td>{{ device.design.sku }} {{ device.design.hw_version }}</td>
                                     <td>
                                         &nbsp;
                                         {% ifchanged device.design %}

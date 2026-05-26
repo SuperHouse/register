@@ -16,7 +16,7 @@
                     <table class="table table-hover">
                         <tbody>
                             {% for client in clients %}
-                                <tr>
+                                <tr style="cursor: pointer;" onclick="window.location='{% url 'organisation_detail' client.pk %}'">
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div style="width: 110px; min-width: 110px;" class="me-3 d-flex align-items-center justify-content-center">
@@ -28,12 +28,6 @@
                                             </div>
                                             <span>{{ client.company_name }}</span>
                                         </div>
-                                    </td>
-                                    <td>
-                                        <a href="{% url 'organisation_edit' client.pk %}" 
-                                           class="btn btn-sm btn-primary">
-                                            Edit
-                                        </a>
                                     </td>
                                 </tr>
                             {% endfor %}

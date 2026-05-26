@@ -58,14 +58,28 @@ def dashboard(request):
 
 @staff_member_required
 def organisation_list(request):
-    """List all clients/organisations with links to edit them."""
+    """List all clients/organisations."""
     clients = Client.objects.all().order_by('company_name')
-    
+
     context = {
         'clients': clients,
     }
-    
+
     return render(request, 'device/organisation_list.html', context)
+
+
+@staff_member_required
+def organisation_detail(request, client_id):
+    """Detail view for a single organisation."""
+    client = get_object_or_404(Client, pk=client_id)
+    designs = Design.objects.filter(client=client).order_by('sku')
+
+    context = {
+        'client': client,
+        'designs': designs,
+    }
+
+    return render(request, 'device/organisation_detail.html', context)
 
 
 @staff_member_required
@@ -78,7 +92,7 @@ def organisation_edit(request, client_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Organisation updated successfully.')
-            return redirect("organisation_list")
+            return redirect("organisation_detail", client_id=client.pk)
         else:
             messages.warning(
                 request,
