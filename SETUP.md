@@ -4,8 +4,24 @@ This guide will help you set up the Testomatic Dashboard.
 
 ## Linux Production Setup
 
-I think there's something called UWSGI managing the processes, but I can't see 
-how it's set up.
+uWSGI Emperor manages the processes using ini files in `/etc/uwsgi-emperor/vassals/`.
+There are two apps: `register` (production) and `register-test`.
+
+To restart an app, touch its ini file — Emperor detects the change and reloads it:
+
+```bash
+# Restart production
+sudo touch /etc/uwsgi-emperor/vassals/register.ini
+
+# Restart test
+sudo touch /etc/uwsgi-emperor/vassals/register-test.ini
+```
+
+The Emperor process itself is managed by systemd:
+
+```bash
+sudo systemctl restart uwsgi-emperor
+```
 
 ## Linux Local Setup (dev)
 
