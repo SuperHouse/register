@@ -11,6 +11,16 @@
 {% block extra_head %}
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @keyframes stat-update-glow {
+            0%   { background-color: transparent; }
+            25%  { background-color: rgba(40, 167, 69, 0.35); }
+            100% { background-color: transparent; }
+        }
+        .stat-updated {
+            animation: stat-update-glow 1s ease-out;
+        }
+    </style>
 {% endblock extra_head %}
 
 {% block content %}
@@ -133,6 +143,18 @@
             return false;
         }
 
+        function flashUpdate(elementId, newValue) {
+            const el = document.getElementById(elementId);
+            if (el.textContent != newValue) {
+                el.textContent = newValue;
+                const card = el.closest('.card');
+                card.classList.remove('stat-updated');
+                void card.offsetWidth; // force reflow to restart animation
+                card.classList.add('stat-updated');
+                card.addEventListener('animationend', () => card.classList.remove('stat-updated'), { once: true });
+            }
+        }
+
         async function updateDashboardStats() {
             try {
                 const response = await fetch('/api/v1/dashboard-stats/');
@@ -143,10 +165,10 @@
 
                 const data = await response.json();
 
-                // Update counter displays
-                document.getElementById('client-count').textContent = data.client_count;
-                document.getElementById('design-count').textContent = data.design_count;
-                document.getElementById('device-count').textContent = data.device_count;
+                // Update counter displays, flashing green if a value changed
+                flashUpdate('client-count', data.client_count);
+                flashUpdate('design-count', data.design_count);
+                flashUpdate('device-count', data.device_count);
 
                 // Update chart only if data changed
                 if (chartDataChanged(data.chart_labels, data.chart_data)) {
