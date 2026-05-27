@@ -87,20 +87,21 @@ Django project configuration.
 
 Base URL: `/api/v1/` — implemented with [Django Ninja](https://django-ninja.dev/).
 
-**Authentication:** `X-API-Key: <key>` header. Keys are stored on `Client` objects. Requests are also restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
+**Authentication:** `X-API-Key: <key>` header OR Django session cookies. Keys are stored on `Client` objects. API key requests are restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
 
 Key endpoints:
 
-| Method | URL | Description |
-|---|---|---|
-| GET | `/api/v1/clients/` | List all clients |
-| GET | `/api/v1/designs/` | List designs (filter with `?client_pk=`) |
-| POST | `/api/v1/device/add/` | Create or update a device |
-| GET | `/api/v1/device/{pk}/` | Get device details |
-| POST | `/api/v1/device/{pk}/program/` | Record firmware version |
-| POST | `/api/v1/device/{pk}/add-tr/` | Add test record |
-| POST | `/api/v1/device/{tr_pk}/add-image/` | Upload test image (multipart) |
-| POST | `/api/v1/device/{pk}/add-device-image/` | Upload device image (multipart, client must own device) |
+| Method | URL | Description | Auth |
+|---|---|---|---|
+| GET | `/api/v1/clients/` | List all clients | API key |
+| GET | `/api/v1/designs/` | List designs (filter with `?client_pk=`) | API key |
+| POST | `/api/v1/device/add/` | Create or update a device | API key |
+| GET | `/api/v1/device/{pk}/` | Get device details | API key |
+| POST | `/api/v1/device/{pk}/program/` | Record firmware version | API key |
+| POST | `/api/v1/device/{pk}/add-tr/` | Add test record | API key |
+| POST | `/api/v1/device/{tr_pk}/add-image/` | Upload test image (multipart) | API key |
+| POST | `/api/v1/device/{pk}/add-device-image/` | Upload device image (multipart, client must own device) | API key |
+| GET | `/api/v1/dashboard-stats/` | Dashboard statistics (client/design/device counts + chart data) | Session or API key |
 
 Full documentation in [API.md](API.md).
 
@@ -109,7 +110,8 @@ Full documentation in [API.md](API.md).
 - **Staff users** see all data across all clients.
 - **Non-staff users** only see `Client`, `Design`, and `Device` objects associated with their user account via the `Client.users` M2M relationship.
 - Internal `DeviceEvent` records (`internal=True`) are hidden from non-staff users.
-- All views require login (enforced by `login_required` middleware); the `/api/` prefix is exempt.
+- All views require login (enforced by `login_required` middleware).
+- **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling).
 
 ## Configuration / Environment
 
@@ -124,13 +126,19 @@ Environment variables are loaded from `pyproj/.env` (see `.env.template`):
 | `ENABLE_GRAVATAR` | `True` to allow Gravatar avatars |
 | `EMAIL_HOST` / `EMAIL_PORT` / etc. | SMTP settings for password reset emails |
 
+## Dashboard
+
+The dashboard (`/`) displays summary statistics (client/design/device counts) and a line chart of boards assembled per month. The display updates periodically via polling `/api/v1/dashboard-stats/` every 30 seconds. The chart only redraws if the underlying board data has changed.
+
+Access control: Users see only data for their associated clients (if non-staff). Staff see all data.
+
 ## Key Dependencies
 
-- **Django 4.2** — web framework
+- **Django >=5.2,<6** — web framework
 - **Django Ninja** — REST API (OpenAPI/Swagger auto-docs at `/api/v1/docs`)
 - **easy_thumbnails** — image thumbnail generation
 - **django-hijack** — staff can impersonate users (`/hijack/`)
 - **dj-database-url** — database config from URL string
-- **dbbackup** — database backup utility
+- **django-dbbackup** — database backup utility
 - **openpyxl** — Excel import
 - **login_required** — middleware to require login globally
