@@ -73,10 +73,12 @@ def organisation_detail(request, client_id):
     """Detail view for a single organisation."""
     client = get_object_or_404(Client, pk=client_id)
     designs = Design.objects.filter(client=client).order_by('sku')
+    board_count = Device.objects.filter(design__client=client).count()
 
     context = {
         'client': client,
         'designs': designs,
+        'board_count': board_count,
     }
 
     return render(request, 'device/organisation_detail.html', context)
