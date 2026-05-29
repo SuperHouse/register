@@ -20,10 +20,40 @@
         .stat-updated {
             animation: stat-update-glow 1s ease-out;
         }
+        body.display-mode aside#sidebar {
+            display: none !important;
+        }
+        body.display-mode header.header {
+            display: none !important;
+        }
+        body.display-mode footer.footer {
+            display: none !important;
+        }
+        body.display-mode h1.h3 {
+            display: none !important;
+        }
+        body.display-mode #display-mode-btn {
+            display: none !important;
+        }
+        /* CoreUI sidebar-fixed reserves space via --cui-sidebar-occupy-start; zero it out */
+        body.display-mode {
+            --cui-sidebar-occupy-start: 0 !important;
+        }
+        body.display-mode .body.flex-grow-1 {
+            margin-left: 0 !important;
+        }
     </style>
 {% endblock extra_head %}
 
 {% block content %}
+    <div class="d-flex justify-content-end mb-2">
+        <button id="display-mode-btn" class="btn btn-sm btn-outline-secondary"
+                title="Enter display mode (hides navigation)"
+                onclick="document.body.classList.add('display-mode')">
+            <i class="cil-fullscreen icon"></i> Display
+        </button>
+    </div>
+
     <div class="row">
         <div class="col-12 col-md-6 col-lg-4 mb-4">
             <a href="{% url 'organisation_list' %}" class="text-decoration-none">
