@@ -1,3 +1,42 @@
+function initServerFilter(resultsId) {
+    const input = document.getElementById('list-search');
+    const clearBtn = document.getElementById('list-search-clear');
+    const resultsDiv = document.getElementById(resultsId);
+    if (!input || !resultsDiv) return;
+
+    let debounceTimer;
+
+    async function fetchResults(q) {
+        const url = q ? '?q=' + encodeURIComponent(q) : '?';
+        try {
+            const response = await fetch(url);
+            const html = await response.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const newResults = doc.getElementById(resultsId);
+            if (newResults) {
+                resultsDiv.innerHTML = newResults.innerHTML;
+            }
+            history.pushState(null, '', url);
+        } catch (e) {
+            console.error('Filter fetch failed:', e);
+        }
+    }
+
+    input.addEventListener('input', function() {
+        const q = input.value.trim();
+        clearBtn.style.display = q ? '' : 'none';
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() { fetchResults(q); }, 300);
+    });
+
+    clearBtn.addEventListener('click', function() {
+        input.value = '';
+        clearBtn.style.display = 'none';
+        fetchResults('');
+        input.focus();
+    });
+}
+
 // Set fixed margin for body content to account for sidebar
 document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.querySelector('#sidebar');

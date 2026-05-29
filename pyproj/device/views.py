@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -61,8 +61,17 @@ def organisation_list(request):
     """List all clients/organisations."""
     clients = Client.objects.all().order_by('company_name')
 
+    q = request.GET.get('q', '').strip()
+    if q:
+        clients = clients.filter(company_name__icontains=q)
+
+    paginator = Paginator(clients, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     context = {
-        'clients': clients,
+        'clients': page_obj,
+        'page_obj': page_obj,
+        'q': q,
     }
 
     return render(request, 'device/organisation_list.html', context)
@@ -118,14 +127,23 @@ def top(request):
         clients = Client.objects.filter(users=request.user)
         devices = devices.filter(design__client__in=clients)
 
-    # Paginate with 50 items per page
+    q = request.GET.get('q', '').strip()
+    if q:
+        devices = devices.filter(
+            Q(pk__icontains=q) |
+            Q(design__sku__icontains=q) |
+            Q(design__name__icontains=q) |
+            Q(design__hw_version__icontains=q)
+        )
+
     paginator = Paginator(devices, 50)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     context = {
         'page_obj': page_obj,
-        'devices': page_obj,  # Keep 'devices' for template compatibility
+        'devices': page_obj,
+        'q': q,
     }
 
     return render(request, 'device/top.html', context)
@@ -139,8 +157,22 @@ def design_list(request):
         clients = Client.objects.filter(users=request.user)
         designs = designs.filter(client__in=clients)
 
+    q = request.GET.get('q', '').strip()
+    if q:
+        designs = designs.filter(
+            Q(client__company_name__icontains=q) |
+            Q(sku__icontains=q) |
+            Q(name__icontains=q) |
+            Q(hw_version__icontains=q)
+        )
+
+    paginator = Paginator(designs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
     context = {
-        'designs': designs,
+        'designs': page_obj,
+        'page_obj': page_obj,
+        'q': q,
     }
 
     return render(request, 'device/design_list.html', context)

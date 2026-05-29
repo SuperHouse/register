@@ -11,81 +11,92 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div class="col">
-        <div class="col-12 col-md-10">
-            <div class="card border-0">
-                <div class="card-body py-10">
-                    {% if devices %}
-                        <table class="table table-striped">
-                            <thead>
-                                <tr class="highlight">
-                                    <th>Device ID</th>
-                                    <th>Design</th>
-                                    <th>Name</th>
-                                </tr>
-                            </thead>
-                            {% for device in devices %}
-                                <tr style="cursor: pointer;" onclick="window.location='{% url 'device:device_detail' device.pk %}'">
-                                    <td>{{ device.pk }}</td>
-                                    <td>{{ device.design.sku }} {{ device.design.hw_version }}</td>
-                                    <td>
-                                        &nbsp;
-                                        {% ifchanged device.design %}
-                                            {{ device.design.name }}
-                                        {% endifchanged %}
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        </table>
-                        
-                        {% if page_obj.has_other_pages %}
-                            <nav aria-label="Page navigation">
-                                <ul class="pagination justify-content-center mt-3">
-                                    {% if page_obj.has_previous %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page=1">&laquo; First</a>
+    <div class="mb-3">
+        <div class="input-group" style="max-width: 400px;">
+            <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
+            <input type="text" id="list-search" class="form-control" placeholder="Filter boards..."
+                   value="{{ q }}">
+            <button class="btn btn-outline-secondary" type="button" id="list-search-clear"
+                    {% if not q %}style="display:none;"{% endif %} title="Clear filter">
+                <i class="cil-x icon"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="boards-results">
+        <div class="col">
+            <div class="col-12 col-md-10">
+                <div class="card border-0">
+                    <div class="card-body py-10">
+                        {% if devices %}
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr class="highlight">
+                                        <th>Device ID</th>
+                                        <th>Design</th>
+                                        <th>Name</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for device in devices %}
+                                        <tr style="cursor: pointer;" onclick="window.location='{% url 'device:device_detail' device.pk %}'">
+                                            <td>{{ device.pk }}</td>
+                                            <td>{{ device.design.sku }} {{ device.design.hw_version }}</td>
+                                            <td>{{ device.design.name }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+
+                            {% if page_obj.has_other_pages %}
+                                <nav aria-label="Page navigation">
+                                    <ul class="pagination justify-content-center mt-3">
+                                        {% if page_obj.has_previous %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page=1">&laquo; First</a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">&laquo; First</span>
+                                            </li>
+                                            <li class="page-item disabled">
+                                                <span class="page-link">Previous</span>
+                                            </li>
+                                        {% endif %}
+
+                                        <li class="page-item active">
+                                            <span class="page-link">
+                                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                            </span>
                                         </li>
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
-                                        </li>
-                                    {% else %}
-                                        <li class="page-item disabled">
-                                            <span class="page-link">&laquo; First</span>
-                                        </li>
-                                        <li class="page-item disabled">
-                                            <span class="page-link">Previous</span>
-                                        </li>
-                                    {% endif %}
-                                    
-                                    <li class="page-item active">
-                                        <span class="page-link">
-                                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-                                        </span>
-                                    </li>
-                                    
-                                    {% if page_obj.has_next %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
-                                        </li>
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
-                                        </li>
-                                    {% else %}
-                                        <li class="page-item disabled">
-                                            <span class="page-link">Next</span>
-                                        </li>
-                                        <li class="page-item disabled">
-                                            <span class="page-link">Last &raquo;</span>
-                                        </li>
-                                    {% endif %}
-                                </ul>
-                            </nav>
+
+                                        {% if page_obj.has_next %}
+                                            <li class="page-item">
+                                                <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                            </li>
+                                            <li class="page-item">
+                                                <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">Next</span>
+                                            </li>
+                                            <li class="page-item disabled">
+                                                <span class="page-link">Last &raquo;</span>
+                                            </li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            {% endif %}
+                        {% else %}
+                            <p>
+                                <i>{% if q %}No boards match "{{ q }}".{% else %}There are no devices.{% endif %}</i>
+                            </p>
                         {% endif %}
-                    {% else %}
-                        <p>
-                            <i>There are no devices.</i>
-                        </p>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -100,3 +111,7 @@
         </ul>
     {% endif %}
 {% endblock content %}
+
+{% block extra_js %}
+    <script>initServerFilter('boards-results');</script>
+{% endblock extra_js %}
