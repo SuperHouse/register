@@ -41,6 +41,7 @@
         }
         body.display-mode .body.flex-grow-1 {
             margin-left: 0 !important;
+            transition: none !important;
         }
     </style>
 {% endblock extra_head %}
@@ -49,7 +50,7 @@
     <div class="d-flex justify-content-end mb-2">
         <button id="display-mode-btn" class="btn btn-sm btn-outline-secondary"
                 title="Enter display mode (hides navigation)"
-                onclick="document.body.classList.add('display-mode')">
+                onclick="enterDisplayMode()">
             <i class="cil-fullscreen icon"></i> Display
         </button>
     </div>
@@ -113,6 +114,10 @@
     <script>
         let chart = null;
         let lastChartData = null;
+
+        function enterDisplayMode() {
+            document.body.classList.add('display-mode');
+        }
 
         function initChart(labels, data) {
             const ctx = document.getElementById('devicesChart');
@@ -199,6 +204,14 @@
                 flashUpdate('client-count', data.client_count);
                 flashUpdate('design-count', data.design_count);
                 flashUpdate('device-count', data.device_count);
+
+                // Resize chart if the container has changed width (e.g. after entering display mode)
+                if (chart && chart.canvas) {
+                    const containerWidth = chart.canvas.parentElement.clientWidth;
+                    if (Math.abs(containerWidth - chart.width) > 1) {
+                        chart.resize();
+                    }
+                }
 
                 // Update chart only if data changed
                 if (chartDataChanged(data.chart_labels, data.chart_data)) {
