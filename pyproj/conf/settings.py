@@ -28,6 +28,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
+VERSION = '2026.05.29.1'
+
 SECRET_KEY = os.environ.get("SECRET_KEY")
 
 # Application definition
@@ -81,6 +83,7 @@ TEMPLATES = [
                 'device.context_processor.background_processor',  # Variables for customising the background
                 'device.context_processor.demo_processor',  # Variables for the demo level
                 'device.context_processor.get_client_logo_processor',  # Variables for the client logo
+                'device.context_processor.version_processor',  # App version number
             ],
         },
     },

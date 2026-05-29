@@ -28,6 +28,10 @@ def demo_processor(request):
     return context
 
 
+def version_processor(request):
+    return {'app_version': settings.VERSION}
+
+
 def get_client_logo_processor(request):
     context = {
         'client_logo': None,
