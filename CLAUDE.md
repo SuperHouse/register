@@ -20,14 +20,19 @@ register/
 
 ## Running the Project
 
+**Development:**
 ```bash
 cd pyproj
 source venv/bin/activate
 python manage.py runserver
 ```
 
-- Main UI: http://127.0.0.1:8000/device/
+**Production (Linux):** uWSGI Emperor manages apps via ini files in `/etc/uwsgi-emperor/vassals/`. Touch an ini file to restart the app (`sudo touch /etc/uwsgi-emperor/vassals/register.ini`). See [SETUP.md](SETUP.md) for full setup instructions.
+
 - Dashboard: http://127.0.0.1:8000/
+- Boards: http://127.0.0.1:8000/device/
+- Designs: http://127.0.0.1:8000/design/
+- Organisations: http://127.0.0.1:8000/organisation/
 - Admin: http://127.0.0.1:8000/office/
 - API docs: http://127.0.0.1:8000/api/v1/docs (requires staff login)
 
@@ -61,11 +66,12 @@ The hierarchy is: **Client → Design → Device → TestRecord / DeviceEvent / 
 All PCB business logic lives here.
 
 - **[models.py](pyproj/device/models.py)** — All models. `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
-- **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Client`(s).
+- **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Client`(s). List pages (Boards, Designs, Organisations) use server-side filtering (not client-side) so filtering works correctly with pagination. Designs and Organisations lists are paginated.
 - **[api.py](pyproj/device/api.py)** — Django Ninja REST API. Auth via `X-API-Key` header + IP allowlist.
 - **[schemas.py](pyproj/device/schemas.py)** — Pydantic schemas for the API.
 - **[admin.py](pyproj/device/admin.py)** — Django admin config at `/office/`.
-- **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`.
+- **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`. Note: design and organisation URLs are in `conf/urls.py`, not here.
+- **[context_processor.py](pyproj/device/context_processor.py)** — Context processors injected into all templates: `background_processor` (deploy-type background), `demo_processor` (demo mode vars), `version_processor` (injects `app_version` from `settings.VERSION`), `get_client_logo_processor` (client logo/name for non-staff users).
 - **[management/commands/import-xlsx.py](pyproj/device/management/commands/import-xlsx.py)** — Bulk import from Excel; expects sheets: Devices, Queue, DeviceTypes, Raw Serials, Patched Boards.
 
 ### `authuser`
@@ -128,9 +134,13 @@ Environment variables are loaded from `pyproj/.env` (see `.env.template`):
 
 ## Dashboard
 
-The dashboard (`/`) displays summary statistics (client/design/device counts) and a line chart of boards assembled per month. The display updates periodically via polling `/api/v1/dashboard-stats/` every 30 seconds. The chart only redraws if the underlying board data has changed.
+The dashboard (`/`) displays summary statistics (client/design/device counts) and a line chart of boards assembled per month. The display updates periodically via polling `/api/v1/dashboard-stats/` every 30 seconds. The chart only redraws if the underlying board data has changed; on each timed update the chart canvas size is also checked and redrawn if it has changed (handles window resizing). Stat cards briefly pulse green when their data changes. A "clean view" button temporarily hides navigation for use as a status screen display.
 
 Access control: Users see only data for their associated clients (if non-staff). Staff see all data.
+
+## Version Number
+
+`settings.VERSION` holds the current app version string (format `YYYY.MM.DD.N`). It is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar.
 
 ## Key Dependencies
 
