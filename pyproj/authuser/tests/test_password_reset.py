@@ -28,7 +28,7 @@ def test_password_reset(client, db, mailoutbox):  # , create_users_and_user_data
 
     # Now test the POST method.  This will send the email.
     data = {
-        'email': 'mjd@afork.com',
+        'email': 'user@example.com',
     }
     response = client.post(reverse('password_reset'), data, follow=True)
     assert response.status_code == 200

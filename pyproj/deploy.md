@@ -2,7 +2,6 @@ How to deploy new version
 =========================
 
 ```
-ssh mjd@portal.superhouse.tv
 cd ~/register-test/pyproj
 . env/bin/activate
 git pull
@@ -21,7 +20,6 @@ deactivate
 ```
 
 ```
-ssh mjd@portal.superhouse.tv
 cd ~/register/pyproj
 . env/bin/activate
 git pull
