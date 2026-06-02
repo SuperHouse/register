@@ -22,9 +22,9 @@ def get_dt_as_string(dt):
     if dt.tzinfo == datetime.timezone.utc:
         dt = dt.astimezone(tz)
     if dt.time() == witching_hour:
-        return dt.strftime('%-d %b %Y')
+        return dt.strftime('%-d-%b-%Y')
     else:
-        return dt.strftime('%-d %b %Y, %H:%M:%S')
+        return dt.strftime('%-d-%b-%Y %H:%M:%S')
 
 
 class Client(models.Model):
