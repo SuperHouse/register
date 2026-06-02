@@ -1,0 +1,63 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Edit Asset - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Edit Asset
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <table class="table table-bordered mb-0">
+                        <tr>
+                            <th>Design:</th>
+                            <td>{{ design }}</td>
+                        </tr>
+                        <tr>
+                            <th>Type:</th>
+                            <td>{{ asset.get_asset_type_display }}</td>
+                        </tr>
+                        <tr>
+                            <th>File:</th>
+                            <td><a href="{{ asset.file.url }}">{{ asset.filename }}</a></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">{{ form.description.label }}</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'design_detail' design.pk %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

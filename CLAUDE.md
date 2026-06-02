@@ -51,13 +51,18 @@ The hierarchy is: **Client → Design → Device → TestRecord / DeviceEvent / 
 |---|---|---|
 | `Client` | Organisation/customer | `company_name`, `logo`, `api_key`, M2M `users` |
 | `Design` | PCB board type | `sku`, `hw_version` (unique together), `client`, `price` |
+| `DesignAsset` | File attached to a design | `design`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
 | `Device` | Individual board | PK = serial number, `design`, `creation_dt`, `invoice`, `po`, `notes` |
 | `TestRecord` | Test result | `device`, `test_dt`, `result` (NEW/PASS/FAIL/HUH?), `notes` |
 | `TestImage` | Image on a test record | `test_record`, `image` |
 | `DeviceImage` | Image on a device | `device`, `image`, `image_dt`, `notes` |
 | `DeviceEvent` | Event on a device | `device`, `event_type` (NOTE/SW_VERSION/SHIPPING), `description`, `internal` |
 
-`DeviceEvent.internal = True` hides the event from non-staff users. `Device.pk` is the hardware serial number.
+`DeviceEvent.internal = True` and `DesignAsset.internal = True` hide records from non-staff users. `Device.pk` is the hardware serial number.
+
+### Design Assets
+
+`DesignAsset` stores arbitrary files (design files, BOMs, firmware binaries, images, documents, etc.) against a `Design` record. Files are stored on disk under `MEDIA_ROOT/design_assets/{design_id}/`; only the path and metadata live in the database. Asset types: `FUSION` (Fusion Electronics Project), `BOM` (Bill of Materials), `FIRMWARE` (Firmware Binary), `IMAGE`, `DOC` (Document), `OTHER`. Staff can upload, edit metadata (name/description), and delete assets from the design detail page. Non-staff users see non-internal assets only.
 
 ## Apps
 
@@ -118,6 +123,7 @@ Full documentation in [API.md](API.md).
 - Internal `DeviceEvent` records (`internal=True`) are hidden from non-staff users.
 - All views require login (enforced by `login_required` middleware).
 - **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling).
+- Internal `DesignAsset` records (`internal=True`) are hidden from non-staff users.
 
 ## Configuration / Environment
 

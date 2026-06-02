@@ -10,8 +10,8 @@ import json
 
 from login_required import login_not_required
 
-from .forms import ClientForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
-from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestRecord
+from .forms import ClientForm, DesignAssetEditForm, DesignAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .models import Client, Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestRecord
 
 
 def dashboard(request):
@@ -182,9 +182,11 @@ def design_detail(request, design_id):
     """Detail view for a single design."""
     if request.user.is_staff:
         design = get_object_or_404(Design, pk=design_id)
+        assets = design.designasset_set.all()
     else:
         clients = Client.objects.filter(users=request.user)
         design = get_object_or_404(Design, pk=design_id, client__in=clients)
+        assets = design.designasset_set.filter(internal=False)
 
     devices = Device.objects.filter(design=design).order_by('pk')
 
@@ -192,9 +194,70 @@ def design_detail(request, design_id):
         'design': design,
         'devices': devices,
         'device_count': devices.count(),
+        'assets': assets,
+        'asset_form': DesignAssetForm() if request.user.is_staff else None,
     }
 
     return render(request, 'device/design_detail.html', context)
+
+
+@staff_member_required
+def design_asset_add(request, design_id):
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        form = DesignAssetForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.instance.design = design
+            form.save()
+            messages.success(request, 'Asset uploaded successfully.')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+
+    return redirect('design_detail', design_id=design.pk)
+
+
+@staff_member_required
+def design_asset_edit(request, asset_id):
+    asset = get_object_or_404(DesignAsset, pk=asset_id)
+    design = asset.design
+
+    if request.method == 'POST':
+        form = DesignAssetEditForm(request.POST, instance=asset)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Asset updated.')
+            return redirect('design_detail', design_id=design.pk)
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = DesignAssetEditForm(instance=asset)
+
+    ctx = {
+        'form': form,
+        'asset': asset,
+        'design': design,
+    }
+
+    return render(request, 'device/design_asset_edit.html', ctx)
+
+
+@staff_member_required
+def design_asset_delete(request, asset_id):
+    asset = get_object_or_404(DesignAsset, pk=asset_id)
+    design = asset.design
+
+    if request.method == 'POST':
+        asset.delete()
+        messages.success(request, 'Asset deleted.')
+        return redirect('design_detail', design_id=design.pk)
+
+    ctx = {
+        'asset': asset,
+        'design': design,
+    }
+
+    return render(request, 'device/design_asset_delete.html', ctx)
 
 
 def bootstrap_demo(request):

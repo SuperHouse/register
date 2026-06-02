@@ -1,4 +1,5 @@
 import datetime
+import os
 import zoneinfo
 
 from django.conf import settings
@@ -156,6 +157,46 @@ class DeviceImage(models.Model):
 
     def get_image_dt_as_string(self):
         return get_dt_as_string(self.image_dt)
+
+
+def design_asset_upload_path(instance, filename):
+    return f'design_assets/{instance.design.id}/{filename}'
+
+
+class DesignAsset(models.Model):
+    FUSION = 'FUSION'
+    BOM = 'BOM'
+    FIRMWARE = 'FIRMWARE'
+    IMAGE = 'IMAGE'
+    DOC = 'DOC'
+    OTHER = 'OTHER'
+
+    ASSET_TYPE_CHOICES = [
+        (FUSION, 'Fusion Electronics Project'),
+        (BOM, 'Bill of Materials'),
+        (FIRMWARE, 'Firmware Binary'),
+        (IMAGE, 'Image'),
+        (DOC, 'Document'),
+        (OTHER, 'Other'),
+    ]
+
+    design = models.ForeignKey(Design, on_delete=models.CASCADE)
+    file = models.FileField(upload_to=design_asset_upload_path)
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES, default=OTHER)
+    uploaded_dt = models.DateTimeField(default=timezone.now)
+    internal = models.BooleanField(default=False, help_text='Do not show this asset to clients')
+
+    class Meta:
+        ordering = ['asset_type', 'name']
+
+    def __str__(self):
+        return f'{self.design}: {self.name} ({self.get_asset_type_display()})'
+
+    @property
+    def filename(self):
+        return os.path.basename(self.file.name)
 
 
 class DeviceEvent(models.Model):
