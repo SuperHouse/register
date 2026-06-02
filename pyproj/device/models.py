@@ -167,7 +167,12 @@ def design_asset_upload_path(instance, filename):
 
 class DesignAsset(models.Model):
     FUSION = 'FUSION'
+    PCB_DESIGN = 'PCB_DESIGN'
+    SCHEMATIC = 'SCHEMATIC'
     BOM = 'BOM'
+    PCB_TOP = 'PCB_TOP'
+    PCB_BOTTOM = 'PCB_BOTTOM'
+    PCB_3D = 'PCB_3D'
     FIRMWARE = 'FIRMWARE'
     IMAGE = 'IMAGE'
     DOC = 'DOC'
@@ -175,10 +180,15 @@ class DesignAsset(models.Model):
 
     ASSET_TYPE_CHOICES = [
         (FUSION, 'Fusion Electronics Project'),
+        (PCB_DESIGN, 'PCB Design File'),
+        (SCHEMATIC, 'Schematic Design File'),
         (BOM, 'Bill of Materials'),
+        (PCB_TOP, 'PCB Top Preview'),
+        (PCB_BOTTOM, 'PCB Bottom Preview'),
+        (PCB_3D, 'PCB 3D Preview'),
         (FIRMWARE, 'Firmware Binary'),
         (IMAGE, 'Image'),
-        (DOC, 'Document'),
+        (DOC, 'PDF Document'),
         (OTHER, 'Other'),
     ]
 
@@ -203,10 +213,15 @@ class DesignAsset(models.Model):
     def get_icon_class(self):
         """Returns a Bootstrap Icons class for non-FUSION asset types."""
         classes = {
+            self.PCB_DESIGN: 'bi-cpu',
+            self.SCHEMATIC: 'bi-diagram-3',
             self.BOM: 'bi-file-earmark-spreadsheet',
+            self.PCB_TOP: 'bi-file-earmark-image',
+            self.PCB_BOTTOM: 'bi-file-earmark-image',
+            self.PCB_3D: 'bi-box',
             self.FIRMWARE: 'bi-file-earmark-binary',
             self.IMAGE: 'bi-file-earmark-image',
-            self.DOC: 'bi-file-earmark-text',
+            self.DOC: 'bi-file-earmark-pdf',
             self.OTHER: 'bi-file-earmark',
         }
         return classes.get(self.asset_type, 'bi-file-earmark')

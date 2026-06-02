@@ -12,6 +12,14 @@
 {% block content %}
     <div class="col">
         <div class="col-12 col-md-10">
+            {% if pcb_top_asset %}
+                <div class="mb-4">
+                    <img src="{{ pcb_top_asset.file.url }}"
+                         alt="PCB Top Preview"
+                         class="img-fluid rounded"
+                         style="max-height: 400px;">
+                </div>
+            {% endif %}
             <div class="card border-0 mb-4">
                 <div class="card-body py-10">
                     <table class="table table-bordered">
@@ -195,9 +203,15 @@
             const dotIndex = filename.lastIndexOf('.');
             const nameWithoutExt = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
             document.getElementById('id_name').value = nameWithoutExt;
-            if (filename.toLowerCase().endsWith('.f3z')) {
-                document.getElementById('id_asset_type').value = 'FUSION';
-                document.getElementById('id_description').value = 'Fusion project';
+            const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
+            const extMap = {
+                '.f3z': ['FUSION',     'Fusion project'],
+                '.brd': ['PCB_DESIGN', 'PCB design file'],
+                '.sch': ['SCHEMATIC',  'Schematic design file'],
+            };
+            if (extMap[ext]) {
+                document.getElementById('id_asset_type').value    = extMap[ext][0];
+                document.getElementById('id_description').value   = extMap[ext][1];
             }
         });
 

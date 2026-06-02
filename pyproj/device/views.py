@@ -192,12 +192,15 @@ def design_detail(request, design_id):
 
     devices = Device.objects.filter(design=design).order_by('pk')
 
+    pcb_top_asset = assets.filter(asset_type=DesignAsset.PCB_TOP).first()
+
     context = {
         'design': design,
         'devices': devices,
         'device_count': devices.count(),
         'assets': assets,
         'asset_form': DesignAssetForm() if request.user.is_staff else None,
+        'pcb_top_asset': pcb_top_asset,
     }
 
     return render(request, 'device/design_detail.html', context)
