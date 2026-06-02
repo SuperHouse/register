@@ -64,6 +64,8 @@ The hierarchy is: **Client → Design → Device → TestRecord / DeviceEvent / 
 
 `DesignAsset` stores arbitrary files (design files, BOMs, firmware binaries, images, documents, etc.) against a `Design` record. Files are stored on disk under `MEDIA_ROOT/design_assets/{design_id}/`; only the path and metadata live in the database. Asset types: `FUSION` (Fusion Electronics Project), `BOM` (Bill of Materials), `FIRMWARE` (Firmware Binary), `IMAGE`, `DOC` (Document), `OTHER`. Staff can upload, edit metadata (name/description), and delete assets from the design detail page. Non-staff users see non-internal assets only.
 
+The design detail page asset list shows a file-type icon, the asset name as a download link, description, and upload date. Each asset type maps to a Bootstrap Icons glyph via `DesignAsset.get_icon_class()`; the `FUSION` type uses a custom SVG at `static/img/filetypes/fusion.svg` rendered as an `<img>` instead. When a file is selected in the upload form, JavaScript auto-populates the Name field from the filename (extension stripped) and auto-selects the Fusion type when the extension is `.f3z`.
+
 ## Apps
 
 ### `device` (main app)
@@ -158,3 +160,16 @@ Access control: Users see only data for their associated clients (if non-staff).
 - **django-dbbackup** — database backup utility
 - **openpyxl** — Excel import
 - **login_required** — middleware to require login globally
+
+## Frontend Libraries (CDN)
+
+Loaded in `device/templates/device/base.html` for all pages:
+
+| Library | Version | Purpose |
+|---|---|---|
+| CoreUI | 4.3.2 | CSS framework, layout, components |
+| CoreUI Icons | 3.0.1 | Icon font (`cil-*` classes) used throughout the UI |
+| Bootstrap Icons | 1.13.1 | File-type icons (`bi-*` classes) used in the asset list |
+| SimpleBar | latest | Custom scrollbar for the sidebar |
+
+Custom icons (SVG files) live in `static/img/filetypes/` and are referenced via `{% static %}` in templates.

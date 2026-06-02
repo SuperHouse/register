@@ -248,6 +248,7 @@ def design_asset_delete(request, asset_id):
     design = asset.design
 
     if request.method == 'POST':
+        asset.file.delete(save=False)
         asset.delete()
         messages.success(request, 'Asset deleted.')
         return redirect('design_detail', design_id=design.pk)

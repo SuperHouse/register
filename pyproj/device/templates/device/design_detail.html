@@ -1,4 +1,5 @@
 {% extends "device/base-with-sidebar.html" %}
+{% load static %}
 
 {% block title %}
     {{ design.sku }} {{ design.hw_version }} - SuperHouse Device Register
@@ -52,34 +53,6 @@
                 </div>
             </div>
 
-            {% if devices %}
-                <h5>Devices</h5>
-                <div class="card border-0">
-                    <div class="card-body py-10">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Serial</th>
-                                    <th>Created</th>
-                                    <th>Invoice</th>
-                                    <th>Purchase Order</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for device in devices %}
-                                    <tr>
-                                        <td><a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a></td>
-                                        <td>{{ device.creation_dt|date:"j-M-Y" }}</td>
-                                        <td>{{ device.invoice|default:"" }}</td>
-                                        <td>{{ device.po|default:"" }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
-
             <h5 class="mt-4">Assets</h5>
             {% if assets %}
                 <div class="card border-0 mb-3">
@@ -87,9 +60,9 @@
                         <table class="table table-striped">
                             <thead>
                                 <tr>
-                                    <th>Name</th>
+                                    <th></th>
+                                    <th>Asset</th>
                                     <th>Description</th>
-                                    <th>File</th>
                                     <th>Uploaded</th>
                                     {% if user.is_staff %}<th></th>{% endif %}
                                 </tr>
@@ -97,14 +70,20 @@
                             <tbody>
                                 {% for asset in assets %}
                                     <tr>
-                                        <td>{{ asset.name }}</td>
-                                        <td>{{ asset.description|default:"" }}</td>
+                                        <td class="text-nowrap">
+                                            {% if asset.asset_type == 'FUSION' %}
+                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                            {% else %}
+                                                <i class="bi {{ asset.get_icon_class }}"></i>
+                                            {% endif %}
+                                        </td>
                                         <td>
-                                            <a href="{{ asset.file.url }}">{{ asset.filename }}</a>
+                                            <a href="{{ asset.file.url }}">{{ asset.name }}</a>
                                             {% if user.is_staff and asset.internal %}
                                                 <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
                                             {% endif %}
                                         </td>
+                                        <td>{{ asset.description|default:"" }}</td>
                                         <td>{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
                                         {% if user.is_staff %}
                                             <td class="text-nowrap">
@@ -173,9 +152,53 @@
                 </div>
             {% endif %}
 
+            {% if devices %}
+                <h5 class="mt-4">Devices</h5>
+                <div class="card border-0">
+                    <div class="card-body py-10">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Serial</th>
+                                    <th>Created</th>
+                                    <th>Invoice</th>
+                                    <th>Purchase Order</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in devices %}
+                                    <tr>
+                                        <td><a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a></td>
+                                        <td>{{ device.creation_dt|date:"j-M-Y" }}</td>
+                                        <td>{{ device.invoice|default:"" }}</td>
+                                        <td>{{ device.po|default:"" }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="mt-3">
                 <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
             </div>
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script>
+        document.getElementById('id_file').addEventListener('change', function () {
+            if (!this.files[0]) return;
+            const filename = this.files[0].name;
+            const dotIndex = filename.lastIndexOf('.');
+            const nameWithoutExt = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+            document.getElementById('id_name').value = nameWithoutExt;
+            if (filename.toLowerCase().endsWith('.f3z')) {
+                document.getElementById('id_asset_type').value = 'FUSION';
+                document.getElementById('id_description').value = 'Fusion project';
+            }
+        });
+    </script>
+{% endblock extra_js %}

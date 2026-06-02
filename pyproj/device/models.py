@@ -198,6 +198,17 @@ class DesignAsset(models.Model):
     def filename(self):
         return os.path.basename(self.file.name)
 
+    def get_icon_class(self):
+        """Returns a Bootstrap Icons class for non-FUSION asset types."""
+        classes = {
+            self.BOM: 'bi-file-earmark-spreadsheet',
+            self.FIRMWARE: 'bi-file-earmark-binary',
+            self.IMAGE: 'bi-file-earmark-image',
+            self.DOC: 'bi-file-earmark-text',
+            self.OTHER: 'bi-file-earmark',
+        }
+        return classes.get(self.asset_type, 'bi-file-earmark')
+
 
 class DeviceEvent(models.Model):
     NOTE = 'NOTE'
