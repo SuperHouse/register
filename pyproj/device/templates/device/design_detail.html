@@ -57,13 +57,13 @@
             {% if assets %}
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
-                        <table class="table table-striped">
+                        <table class="table table-striped" id="asset-table">
                             <thead>
                                 <tr>
                                     <th></th>
-                                    <th>Asset</th>
-                                    <th>Description</th>
-                                    <th>Uploaded</th>
+                                    <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                    <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                    <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
                                     {% if user.is_staff %}<th></th>{% endif %}
                                 </tr>
                             </thead>
@@ -84,7 +84,7 @@
                                             {% endif %}
                                         </td>
                                         <td>{{ asset.description|default:"" }}</td>
-                                        <td>{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
+                                        <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
                                         {% if user.is_staff %}
                                             <td class="text-nowrap">
                                                 <a href="{% url 'design_asset_edit' asset.pk %}"
@@ -200,5 +200,54 @@
                 document.getElementById('id_description').value = 'Fusion project';
             }
         });
+
+        (function () {
+            const table = document.getElementById('asset-table');
+            if (!table) return;
+
+            let sortCol = 3;    // Uploaded
+            let sortAsc = true; // oldest first
+
+            function cellValue(row, col) {
+                const cell = row.querySelectorAll('td')[col];
+                if (!cell) return '';
+                return cell.dataset.sortValue ?? cell.textContent.trim().toLowerCase();
+            }
+
+            function applySort() {
+                const tbody = table.tBodies[0];
+                const rows = Array.from(tbody.rows);
+                rows.sort((a, b) => {
+                    const av = cellValue(a, sortCol);
+                    const bv = cellValue(b, sortCol);
+                    return av < bv ? (sortAsc ? -1 : 1) : av > bv ? (sortAsc ? 1 : -1) : 0;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+
+                table.querySelectorAll('th[data-col]').forEach(th => {
+                    const icon = th.querySelector('.sort-indicator');
+                    if (parseInt(th.dataset.col) === sortCol) {
+                        icon.className = `sort-indicator bi ms-1 ${sortAsc ? 'bi-arrow-up' : 'bi-arrow-down'}`;
+                    } else {
+                        icon.className = 'sort-indicator bi bi-arrow-up ms-1 invisible';
+                    }
+                });
+            }
+
+            table.querySelectorAll('th[data-col]').forEach(th => {
+                th.addEventListener('click', function () {
+                    const col = parseInt(this.dataset.col);
+                    if (col === sortCol) {
+                        sortAsc = !sortAsc;
+                    } else {
+                        sortCol = col;
+                        sortAsc = true;
+                    }
+                    applySort();
+                });
+            });
+
+            applySort();
+        }());
     </script>
 {% endblock extra_js %}
