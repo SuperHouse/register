@@ -64,7 +64,9 @@ The hierarchy is: **Client → Design → Device → TestRecord / DeviceEvent / 
 
 `DesignAsset` stores arbitrary files (design files, BOMs, firmware binaries, images, documents, etc.) against a `Design` record. Files are stored on disk under `MEDIA_ROOT/design_assets/{design_id}/`; only the path and metadata live in the database. Asset types: `FUSION` (Fusion Electronics Project), `BOM` (Bill of Materials), `FIRMWARE` (Firmware Binary), `IMAGE`, `DOC` (Document), `OTHER`. Staff can upload, edit metadata (name/description), and delete assets from the design detail page. Non-staff users see non-internal assets only.
 
-The design detail page asset list shows a file-type icon, the asset name as a download link, description, and upload date. Each asset type maps to a Bootstrap Icons glyph via `DesignAsset.get_icon_class()`; the `FUSION` type uses a custom SVG at `static/img/filetypes/fusion.svg` rendered as an `<img>` instead. When a file is selected in the upload form, JavaScript auto-populates the Name field from the filename (extension stripped) and auto-selects the Fusion type when the extension is `.f3z`.
+The design detail page asset list shows a file-type icon, the asset name as a download link, description, and upload date. Each asset type maps to a Bootstrap Icons glyph via `DesignAsset.get_icon_class()`; the `FUSION` type uses a custom SVG at `static/img/filetypes/fusion.svg` rendered as an `<img>` instead. When a file is selected in the upload form, JavaScript auto-populates the Name field from the filename (extension stripped) and auto-selects the Fusion type and fills the Description with "Fusion project" when the extension is `.f3z`.
+
+The asset list is client-side sortable: clicking any column header sorts by that column (ascending first); clicking again reverses the order. The active sort column shows a Bootstrap Icons up/down arrow; inactive columns show an invisible placeholder so header widths stay stable. Default sort is Uploaded ascending (oldest first). The Uploaded cell stores `data-sort-value` as a full ISO datetime (`Y-m-d H:i:s`) so items uploaded on the same day are ordered by time; hovering the date shows a tooltip with the full datetime in `j-M-Y H:i:s` format.
 
 ## Apps
 
@@ -148,7 +150,11 @@ Access control: Users see only data for their associated clients (if non-staff).
 
 ## Version Number
 
-`settings.VERSION` holds the current app version string (format `YYYY.MM.DD.N`). It is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar.
+`settings.VERSION` holds the current app version string (format `YYYY.MM.DD.N`). It is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar as a link to the project source repository on GitHub, satisfying the AGPL network-use disclosure requirement.
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3 or later** (AGPL-3.0-or-later). The full license text is in `LICENSE`. Key source files carry an SPDX identifier and copyright notice. Because this is a network service, any modified deployment must make its corresponding source available to users — the sidebar version link serves this purpose.
 
 ## Key Dependencies
 
