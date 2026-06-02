@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 """Django's command-line utility for administrative tasks."""
 import os
 import sys

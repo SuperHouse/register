@@ -35,3 +35,11 @@ assigned, which are an embodiment of a design.
 
 It's written as a Django + React application and can use either SQLite 
 or MariaDB / MySQL.
+
+## License
+
+Copyright (C) 2026 SuperHouse Automation Pty Ltd
+
+This program is free software: you can redistribute it and/or modify it under the terms of the [GNU Affero General Public License](LICENSE) as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+Because this software is licensed under the AGPL, if you run a modified version as a network service, you must make the corresponding source code available to users of that service. The source code for this project is available at [https://github.com/SuperHouse/register](https://github.com/SuperHouse/register).
