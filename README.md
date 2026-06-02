@@ -12,6 +12,7 @@ It includes:
 
  * A database for storage of information relating to individual boards
  * Image storage to associate images with test records or boards
+ * File asset storage to associate design files, BOMs, firmware binaries, and other documents with board designs
  * An internal web UI for managing records of boards and tests
  * An external web UI for customers to look up details of specific boards
  * An API for updating data stored in the system
@@ -26,7 +27,8 @@ purchased or commissioned the assembly of boards.
 are associated with one or more organisations.
 
 **Designs** represent a type of circuit board, and are associated with an 
-organisation.
+organisation. Design files, BOMs, firmware binaries, and other assets can 
+be attached directly to a design for easy reference.
 
 **Boards** represent individual circuit boards with a serial number 
 assigned, which are an embodiment of a design.

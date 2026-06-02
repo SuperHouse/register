@@ -3,13 +3,20 @@ from easy_thumbnails.files import get_thumbnailer
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Client, Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
+from .models import Client, Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
+
+
+class DesignAssetInline(admin.TabularInline):
+    model = DesignAsset
+    extra = 0
+    readonly_fields = ['uploaded_dt']
 
 
 class DesignAdmin(admin.ModelAdmin):
     fields = ['client', ('sku', 'hw_version'), 'name', 'description', 'price', 'price2']
     list_filter = ['client', 'sku']
     search_fields = ['sku', 'name', 'hw_version']
+    inlines = [DesignAssetInline]
 
 
 class TestRecordInline(admin.StackedInline):
