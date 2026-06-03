@@ -192,13 +192,30 @@ def design_detail(request, design_id):
 
     devices = Device.objects.filter(design=design).order_by('pk')
 
-    pcb_top_asset = assets.filter(asset_type=DesignAsset.PCB_TOP).first()
+    core_type_order = [
+        (DesignAsset.PCB_3D, 'PCB 3D View'),
+        (DesignAsset.PCB_TOP, 'PCB Top View'),
+        (DesignAsset.PCB_BOTTOM, 'PCB Bottom View'),
+        (DesignAsset.FUSION, 'Fusion Electronics Project'),
+        (DesignAsset.SCHEMATIC, 'Schematic Design File'),
+        (DesignAsset.PCB_DESIGN, 'PCB Design File'),
+        (DesignAsset.BOM, 'Bill of Materials'),
+        (DesignAsset.FIRMWARE, 'Firmware Binary'),
+    ]
+    existing_core = {a.asset_type: a for a in assets.filter(asset_type__in=DesignAsset.CORE_ASSET_TYPES)}
+    core_assets = [(type_key, label, existing_core.get(type_key)) for type_key, label in core_type_order]
+    has_core_assets = bool(existing_core)
+
+    attachments = assets.filter(asset_type=DesignAsset.ATTACHMENT)
+    pcb_top_asset = existing_core.get(DesignAsset.PCB_TOP)
 
     context = {
         'design': design,
         'devices': devices,
         'device_count': devices.count(),
-        'assets': assets,
+        'core_assets': core_assets,
+        'has_core_assets': has_core_assets,
+        'attachments': attachments,
         'asset_form': DesignAssetForm() if request.user.is_staff else None,
         'pcb_top_asset': pcb_top_asset,
     }
@@ -214,8 +231,16 @@ def design_asset_add(request, design_id):
         form = DesignAssetForm(request.POST, request.FILES)
         if form.is_valid():
             form.instance.design = design
+            asset_type = form.cleaned_data['asset_type']
+            replaced = False
+            if asset_type in DesignAsset.CORE_ASSET_TYPES:
+                existing = DesignAsset.objects.filter(design=design, asset_type=asset_type).first()
+                if existing:
+                    existing.file.delete(save=False)
+                    existing.delete()
+                    replaced = True
             form.save()
-            messages.success(request, 'Asset uploaded successfully.')
+            messages.success(request, 'File replaced successfully.' if replaced else 'File uploaded successfully.')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
 

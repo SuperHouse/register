@@ -174,29 +174,31 @@ class DesignAsset(models.Model):
     PCB_BOTTOM = 'PCB_BOTTOM'
     PCB_3D = 'PCB_3D'
     FIRMWARE = 'FIRMWARE'
-    IMAGE = 'IMAGE'
-    DOC = 'DOC'
-    OTHER = 'OTHER'
+    ATTACHMENT = 'ATTACHMENT'
+
+    CORE_ASSET_TYPES = frozenset({FUSION, PCB_DESIGN, SCHEMATIC, BOM, PCB_TOP, PCB_BOTTOM, PCB_3D, FIRMWARE})
 
     ASSET_TYPE_CHOICES = [
-        (FUSION, 'Fusion Electronics Project'),
-        (PCB_DESIGN, 'PCB Design File'),
-        (SCHEMATIC, 'Schematic Design File'),
-        (BOM, 'Bill of Materials'),
-        (PCB_TOP, 'PCB Top Preview'),
-        (PCB_BOTTOM, 'PCB Bottom Preview'),
-        (PCB_3D, 'PCB 3D Preview'),
-        (FIRMWARE, 'Firmware Binary'),
-        (IMAGE, 'Image'),
-        (DOC, 'PDF Document'),
-        (OTHER, 'Other'),
+        ('Design Files', [
+            (PCB_3D, 'PCB 3D View'),
+            (PCB_TOP, 'PCB Top View'),
+            (PCB_BOTTOM, 'PCB Bottom View'),
+            (FUSION, 'Fusion Electronics Project'),
+            (SCHEMATIC, 'Schematic Design File'),
+            (PCB_DESIGN, 'PCB Design File'),
+            (BOM, 'Bill of Materials'),
+            (FIRMWARE, 'Firmware Binary'),
+        ]),
+        ('Additional', [
+            (ATTACHMENT, 'Attachment'),
+        ]),
     ]
 
     design = models.ForeignKey(Design, on_delete=models.CASCADE)
     file = models.FileField(upload_to=design_asset_upload_path)
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
-    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES, default=OTHER)
+    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES, default=ATTACHMENT)
     uploaded_dt = models.DateTimeField(default=timezone.now)
     internal = models.BooleanField(default=False, help_text='Do not show this asset to clients')
 
@@ -207,11 +209,23 @@ class DesignAsset(models.Model):
         return f'{self.design}: {self.name} ({self.get_asset_type_display()})'
 
     @property
+    def is_core(self):
+        return self.asset_type in self.CORE_ASSET_TYPES
+
+    @property
     def filename(self):
         return os.path.basename(self.file.name)
 
+    def get_icon_color(self):
+        """Returns an inline color style value for this asset type, or empty string for default."""
+        colors = {
+            self.PCB_DESIGN: '#198754',
+            self.SCHEMATIC:  "#b50d13",
+        }
+        return colors.get(self.asset_type, '')
+
     def get_icon_class(self):
-        """Returns a Bootstrap Icons class for non-FUSION asset types."""
+        """Returns a Bootstrap Icons class for this asset type."""
         classes = {
             self.PCB_DESIGN: 'bi-cpu',
             self.SCHEMATIC: 'bi-diagram-3',
@@ -220,9 +234,7 @@ class DesignAsset(models.Model):
             self.PCB_BOTTOM: 'bi-file-earmark-image',
             self.PCB_3D: 'bi-box',
             self.FIRMWARE: 'bi-file-earmark-binary',
-            self.IMAGE: 'bi-file-earmark-image',
-            self.DOC: 'bi-file-earmark-pdf',
-            self.OTHER: 'bi-file-earmark',
+            self.ATTACHMENT: 'bi-paperclip',
         }
         return classes.get(self.asset_type, 'bi-file-earmark')
 

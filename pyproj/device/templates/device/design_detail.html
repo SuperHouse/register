@@ -15,7 +15,7 @@
             {% if pcb_top_asset %}
                 <div class="mb-4">
                     <img src="{{ pcb_top_asset.file.url }}"
-                         alt="PCB Top Preview"
+                         alt="PCB Top View"
                          class="img-fluid rounded"
                          style="max-height: 400px;">
                 </div>
@@ -61,65 +61,120 @@
                 </div>
             </div>
 
-            <h5 class="mt-4">Assets</h5>
-            {% if assets %}
+            {% if user.is_staff or has_core_assets %}
+                <h5 class="mt-4">Design Files</h5>
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
-                        <table class="table table-striped" id="asset-table">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    {% if user.is_staff %}<th></th>{% endif %}
-                                </tr>
-                            </thead>
+                        <table class="table table-striped core-file-table">
                             <tbody>
-                                {% for asset in assets %}
-                                    <tr>
-                                        <td class="text-nowrap">
-                                            {% if asset.asset_type == 'FUSION' %}
-                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
-                                            {% else %}
-                                                <i class="bi {{ asset.get_icon_class }}"></i>
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            <a href="{{ asset.file.url }}">{{ asset.name }}</a>
-                                            {% if user.is_staff and asset.internal %}
-                                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ asset.description|default:"" }}</td>
-                                        <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
-                                        {% if user.is_staff %}
-                                            <td class="text-nowrap">
-                                                <a href="{% url 'design_asset_edit' asset.pk %}"
-                                                   class="btn btn-sm btn-primary me-1"
-                                                   title="Edit asset">
-                                                    <i class="cil-pencil"></i>
-                                                </a>
-                                                <a href="{% url 'design_asset_delete' asset.pk %}"
-                                                   class="btn btn-sm btn-danger"
-                                                   title="Delete asset">
-                                                    <i class="cil-trash"></i>
-                                                </a>
+                                {% for type_key, label, asset in core_assets %}
+                                    {% if asset or user.is_staff %}
+                                        <tr{% if asset %} class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer"{% endif %}>
+                                            <td class="text-nowrap" style="width:1px">
+                                                {% if asset %}
+                                                    {% if type_key == 'FUSION' %}
+                                                        <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                                    {% else %}
+                                                        <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <i class="bi bi-file-earmark text-muted"></i>
+                                                {% endif %}
                                             </td>
-                                        {% endif %}
-                                    </tr>
+                                            <td class="text-nowrap">{{ label }}</td>
+                                            <td>
+                                                {% if asset %}
+                                                    {{ asset.filename }}
+                                                    {% if user.is_staff and asset.internal %}
+                                                        <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="text-muted fst-italic">Not uploaded</span>
+                                                {% endif %}
+                                            </td>
+                                            {% if user.is_staff %}
+                                                <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                    {% if asset %}
+                                                        <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                           class="btn btn-sm btn-primary me-1"
+                                                           title="Edit">
+                                                            <i class="cil-pencil"></i>
+                                                        </a>
+                                                        <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                           class="btn btn-sm btn-danger"
+                                                           title="Delete">
+                                                            <i class="cil-trash"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
+                        <style>.core-file-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }</style>
                     </div>
                 </div>
-            {% else %}
-                <p><i>No assets uploaded for this design.</i></p>
+            {% endif %}
+
+            {% if attachments or user.is_staff %}
+                <h5 class="mt-4">Attachments</h5>
+                {% if attachments %}
+                    <div class="card border-0 mb-3">
+                        <div class="card-body py-10">
+                            <table class="table table-striped" id="attachment-table">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                        <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                        <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                        {% if user.is_staff %}<th></th>{% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for asset in attachments %}
+                                        <tr>
+                                            <td class="text-nowrap">
+                                                <i class="bi {{ asset.get_icon_class }}"></i>
+                                            </td>
+                                            <td>
+                                                <a href="{{ asset.file.url }}">{{ asset.name }}</a>
+                                                {% if user.is_staff and asset.internal %}
+                                                    <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ asset.description|default:"" }}</td>
+                                            <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
+                                            {% if user.is_staff %}
+                                                <td class="text-nowrap">
+                                                    <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                       class="btn btn-sm btn-primary me-1"
+                                                       title="Edit attachment">
+                                                        <i class="cil-pencil"></i>
+                                                    </a>
+                                                    <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                       class="btn btn-sm btn-danger"
+                                                       title="Delete attachment">
+                                                        <i class="cil-trash"></i>
+                                                    </a>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                {% else %}
+                    <p><i>No attachments uploaded for this design.</i></p>
+                {% endif %}
             {% endif %}
 
             {% if user.is_staff %}
                 <div class="card border-0 mb-4">
-                    <div class="card-header">Upload Asset</div>
+                    <div class="card-header">Upload File</div>
                     <div class="card-body">
                         <form method="post"
                               action="{% url 'design_asset_add' design.pk %}"
@@ -216,7 +271,7 @@
         });
 
         (function () {
-            const table = document.getElementById('asset-table');
+            const table = document.getElementById('attachment-table');
             if (!table) return;
 
             let sortCol = 3;    // Uploaded
