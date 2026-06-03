@@ -69,32 +69,24 @@
                             <tbody>
                                 {% for type_key, label, asset in core_assets %}
                                     {% if asset or user.is_staff %}
-                                        <tr{% if asset %} class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer"{% endif %}>
-                                            <td class="text-nowrap" style="width:1px">
-                                                {% if asset %}
+                                        {% if asset %}
+                                            <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                                <td class="text-nowrap" style="width:1px">
                                                     {% if type_key == 'FUSION' %}
                                                         <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
                                                     {% else %}
                                                         <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
                                                     {% endif %}
-                                                {% else %}
-                                                    <i class="bi bi-file-earmark text-muted"></i>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-nowrap">{{ label }}</td>
-                                            <td>
-                                                {% if asset %}
+                                                </td>
+                                                <td class="text-nowrap">{{ label }}</td>
+                                                <td>
                                                     {{ asset.filename }}
                                                     {% if user.is_staff and asset.internal %}
                                                         <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
                                                     {% endif %}
-                                                {% else %}
-                                                    <span class="text-muted fst-italic">Not uploaded</span>
-                                                {% endif %}
-                                            </td>
-                                            {% if user.is_staff %}
-                                                <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                    {% if asset %}
+                                                </td>
+                                                {% if user.is_staff %}
+                                                    <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
                                                         <a href="{% url 'design_asset_edit' asset.pk %}"
                                                            class="btn btn-sm btn-primary me-1"
                                                            title="Edit">
@@ -105,15 +97,54 @@
                                                            title="Delete">
                                                             <i class="cil-trash"></i>
                                                         </a>
-                                                    {% endif %}
+                                                    </td>
+                                                {% endif %}
+                                            </tr>
+                                        {% else %}
+                                            <tr class="core-upload-trigger"
+                                                data-type="{{ type_key }}"
+                                                style="cursor:pointer"
+                                                title="Click to upload {{ label }}">
+                                                <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
+                                                <td class="text-nowrap">{{ label }}</td>
+                                                <td><span class="text-muted fst-italic">Not uploaded</span></td>
+                                                <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                                    <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
                                                 </td>
-                                            {% endif %}
-                                        </tr>
+                                            </tr>
+                                            <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
+                                                <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                                    <form method="post"
+                                                          action="{% url 'design_asset_add' design.pk %}"
+                                                          enctype="multipart/form-data"
+                                                          class="d-flex align-items-end gap-3 flex-wrap">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="asset_type" value="{{ type_key }}">
+                                                        <div>
+                                                            <label class="form-label small mb-1">File</label>
+                                                            <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label small mb-1">Name</label>
+                                                            <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
+                                                        </div>
+                                                        <div class="d-flex gap-2">
+                                                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                            <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
+                                                        </div>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        {% endif %}
                                     {% endif %}
                                 {% endfor %}
                             </tbody>
                         </table>
-                        <style>.core-file-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }</style>
+                        <style>
+                            .core-file-table tr.clickable-row:hover td,
+                            #attachment-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
+                            .core-file-table tr.core-upload-trigger:hover td { background-color: #e8efff !important; }
+                        </style>
                     </div>
                 </div>
             {% endif %}
@@ -135,12 +166,12 @@
                                 </thead>
                                 <tbody>
                                     {% for asset in attachments %}
-                                        <tr>
-                                            <td class="text-nowrap">
+                                        <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                            <td class="text-nowrap" style="width:1px">
                                                 <i class="bi {{ asset.get_icon_class }}"></i>
                                             </td>
                                             <td>
-                                                <a href="{{ asset.file.url }}">{{ asset.name }}</a>
+                                                {{ asset.name }}
                                                 {% if user.is_staff and asset.internal %}
                                                     <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
                                                 {% endif %}
@@ -148,7 +179,7 @@
                                             <td>{{ asset.description|default:"" }}</td>
                                             <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
                                             {% if user.is_staff %}
-                                                <td class="text-nowrap">
+                                                <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
                                                     <a href="{% url 'design_asset_edit' asset.pk %}"
                                                        class="btn btn-sm btn-primary me-1"
                                                        title="Edit attachment">
@@ -252,6 +283,39 @@
 
 {% block extra_js %}
     <script>
+        // Inline upload rows in the Design Files table
+        document.querySelectorAll('.core-upload-trigger').forEach(function (row) {
+            row.addEventListener('click', function () {
+                const type = this.dataset.type;
+                document.querySelectorAll('.inline-upload-row').forEach(function (r) {
+                    if (r.dataset.forType !== type) r.classList.add('d-none');
+                });
+                const formRow = document.querySelector('.inline-upload-row[data-for-type="' + type + '"]');
+                if (formRow) {
+                    formRow.classList.toggle('d-none');
+                    if (!formRow.classList.contains('d-none')) {
+                        formRow.querySelector('.inline-file-input').focus();
+                    }
+                }
+            });
+        });
+
+        document.querySelectorAll('.cancel-inline-upload').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                this.closest('.inline-upload-row').classList.add('d-none');
+            });
+        });
+
+        document.querySelectorAll('.inline-file-input').forEach(function (input) {
+            input.addEventListener('change', function () {
+                if (!this.files[0]) return;
+                const filename = this.files[0].name;
+                const dotIndex = filename.lastIndexOf('.');
+                const nameWithoutExt = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+                this.closest('form').querySelector('.inline-name-field').value = nameWithoutExt;
+            });
+        });
+
         document.getElementById('id_file').addEventListener('change', function () {
             if (!this.files[0]) return;
             const filename = this.files[0].name;
