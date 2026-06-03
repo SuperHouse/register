@@ -180,10 +180,10 @@ class DesignAsset(models.Model):
 
     ASSET_TYPE_CHOICES = [
         ('Design Files', [
+            (FUSION, 'Fusion Electronics Project'),
             (PCB_3D, 'PCB 3D View'),
             (PCB_TOP, 'PCB Top View'),
             (PCB_BOTTOM, 'PCB Bottom View'),
-            (FUSION, 'Fusion Electronics Project'),
             (SCHEMATIC, 'Schematic Design File'),
             (PCB_DESIGN, 'PCB Design File'),
             (BOM, 'Bill of Materials'),

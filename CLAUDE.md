@@ -74,6 +74,8 @@ The design detail page shows the `PCB_TOP` file as an image banner immediately b
 
 Below the Design Files table, the **Attachments** section lists attachment files with a file-type icon, name as a download link, description, and upload date. When a file is selected in the upload form, JavaScript auto-populates the Name field from the filename (extension stripped) and sets the Asset Type and Description based on the file extension: `.f3z` → Fusion / "Fusion project"; `.brd` → PCB Design File / "PCB design file"; `.sch` → Schematic Design File / "Schematic design file"; other extensions leave the type as Attachment.
 
+When a `.f3z` Fusion Electronics Project file is uploaded, `_extract_fusion_assets()` in [views.py](pyproj/device/views.py) automatically extracts and stores the following assets using the `fusionextractor` library: BOM (`.csv`), PCB Design File (`.brd`), Schematic (`.sch`), PCB Top View (3D render via `extract_board_image('pcb_3d_top')`), PCB Bottom View (3D render via `extract_board_image('pcb_3d_bottom')`), and PCB 3D View (thumbnail via `get_previews(include_large_images=False)`, source `'3d_model'`). Each extracted file gets a name suffix to ensure uniqueness (`-top`, `-bottom`, `-3d`). The `.f3d` nested archive inside `.f3z` files uses zstd compression for some entries — `zipfile-zstd` must be installed for the PCB 3D View thumbnail to be extracted.
+
 The Attachments list is client-side sortable: clicking any column header sorts by that column (ascending first); clicking again reverses the order. The active sort column shows a Bootstrap Icons up/down arrow; inactive columns show an invisible placeholder so header widths stay stable. Default sort is Uploaded ascending (oldest first). The Uploaded cell stores `data-sort-value` as a full ISO datetime (`Y-m-d H:i:s`) so items uploaded on the same day are ordered by time; hovering the date shows a tooltip with the full datetime in `j-M-Y H:i:s` format.
 
 ## Apps
@@ -174,6 +176,8 @@ This project is licensed under the **GNU Affero General Public License v3 or lat
 - **django-dbbackup** — database backup utility
 - **openpyxl** — Excel import
 - **login_required** — middleware to require login globally
+- **fusionextractor >=1.2.0** — extracts BOM, board, schematic, and PCB render images from Autodesk Fusion Electronics `.f3z` files
+- **zipfile-zstd** — zstd codec support for `zipfile`; required to read zstd-compressed entries inside `.f3z` nested archives (e.g. the PCB 3D View thumbnail)
 
 ## Frontend Libraries (CDN)
 

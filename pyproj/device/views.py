@@ -1,7 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import tempfile
+from pathlib import Path
+
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.files import File
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
@@ -9,6 +13,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
 import json
+
+from fusionextractor.exceptions import FusionExtractorError
+from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
@@ -193,10 +200,10 @@ def design_detail(request, design_id):
     devices = Device.objects.filter(design=design).order_by('pk')
 
     core_type_order = [
+        (DesignAsset.FUSION, 'Fusion Electronics Project'),
         (DesignAsset.PCB_3D, 'PCB 3D View'),
         (DesignAsset.PCB_TOP, 'PCB Top View'),
         (DesignAsset.PCB_BOTTOM, 'PCB Bottom View'),
-        (DesignAsset.FUSION, 'Fusion Electronics Project'),
         (DesignAsset.SCHEMATIC, 'Schematic Design File'),
         (DesignAsset.PCB_DESIGN, 'PCB Design File'),
         (DesignAsset.BOM, 'Bill of Materials'),
@@ -223,6 +230,43 @@ def design_detail(request, design_id):
     return render(request, 'device/design_detail.html', context)
 
 
+def _extract_fusion_assets(design, f3z_path, stem):
+    """Extract BOM, board, schematic, and PCB renders from a .f3z file and save as DesignAssets."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        with FusionProject(f3z_path) as proj:
+            bom_path = proj.extract_bom(tmpdir_path)
+            board_path = proj.extract_board(tmpdir_path)
+            sch_path = proj.extract_schematic(tmpdir_path)
+            pcb_top_path = proj.extract_board_image('pcb_3d_top', tmpdir_path)
+            pcb_bottom_path = proj.extract_board_image('pcb_3d_bottom', tmpdir_path)
+            pcb_3d_path = None
+            for preview in proj.get_previews(include_large_images=False):
+                if preview.source == '3d_model':
+                    pcb_3d_path = tmpdir_path / '3d_model__small.png'
+                    pcb_3d_path.write_bytes(preview.data)
+                    break
+
+        for asset_type, extracted_path, name_suffix, suffix in [
+            (DesignAsset.BOM, bom_path, '', '.csv'),
+            (DesignAsset.PCB_DESIGN, board_path, '', '.brd'),
+            (DesignAsset.SCHEMATIC, sch_path, '', '.sch'),
+            (DesignAsset.PCB_TOP, pcb_top_path, '-top', pcb_top_path.suffix),
+            (DesignAsset.PCB_BOTTOM, pcb_bottom_path, '-bottom', pcb_bottom_path.suffix),
+            (DesignAsset.PCB_3D, pcb_3d_path, '-3d', '.png'),
+        ]:
+            if extracted_path is None:
+                continue
+            existing = DesignAsset.objects.filter(design=design, asset_type=asset_type).first()
+            if existing:
+                existing.file.delete(save=False)
+                existing.delete()
+
+            asset = DesignAsset(design=design, name=stem, asset_type=asset_type)
+            with open(extracted_path, 'rb') as f:
+                asset.file.save(f"{stem}{name_suffix}{suffix}", File(f), save=True)
+
+
 @staff_member_required
 def design_asset_add(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
@@ -239,8 +283,16 @@ def design_asset_add(request, design_id):
                     existing.file.delete(save=False)
                     existing.delete()
                     replaced = True
-            form.save()
+            saved_asset = form.save()
             messages.success(request, 'File replaced successfully.' if replaced else 'File uploaded successfully.')
+
+            if asset_type == DesignAsset.FUSION and saved_asset.filename.lower().endswith('.f3z'):
+                stem = Path(saved_asset.filename).stem
+                try:
+                    _extract_fusion_assets(design, saved_asset.file.path, stem)
+                    messages.success(request, 'BOM, PCB design file, schematic, and PCB renders extracted from Fusion project.')
+                except FusionExtractorError as e:
+                    messages.warning(request, f'Fusion project uploaded, but asset extraction failed: {e}')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
 
