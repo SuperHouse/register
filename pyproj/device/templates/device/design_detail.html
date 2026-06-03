@@ -65,7 +65,7 @@
                 <h5 class="mt-4">Design Files</h5>
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
-                        <table class="table table-striped core-file-table">
+                        <table class="table core-file-table">
                             <tbody>
                                 {% for type_key, label, asset in core_assets %}
                                     {% if asset or user.is_staff %}
@@ -143,7 +143,8 @@
                         <style>
                             .core-file-table tr.clickable-row:hover td,
                             #attachment-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
-                            .core-file-table tr.core-upload-trigger:hover td { background-color: #e8efff !important; }
+                            .core-file-table tr.core-upload-trigger:hover td,
+                            #attachment-table tr#attachment-add-trigger:hover td { background-color: #e8efff !important; }
                         </style>
                     </div>
                 </div>
@@ -151,97 +152,91 @@
 
             {% if attachments or user.is_staff %}
                 <h5 class="mt-4">Attachments</h5>
-                {% if attachments %}
-                    <div class="card border-0 mb-3">
-                        <div class="card-body py-10">
-                            <table class="table table-striped" id="attachment-table">
-                                <thead>
-                                    <tr>
-                                        <th></th>
-                                        <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                        <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                        <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                        {% if user.is_staff %}<th></th>{% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for asset in attachments %}
-                                        <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
-                                            <td class="text-nowrap" style="width:1px">
-                                                <i class="bi {{ asset.get_icon_class }}"></i>
-                                            </td>
-                                            <td>
-                                                {{ asset.name }}
-                                                {% if user.is_staff and asset.internal %}
-                                                    <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ asset.description|default:"" }}</td>
-                                            <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
-                                            {% if user.is_staff %}
-                                                <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                    <a href="{% url 'design_asset_edit' asset.pk %}"
-                                                       class="btn btn-sm btn-primary me-1"
-                                                       title="Edit attachment">
-                                                        <i class="cil-pencil"></i>
-                                                    </a>
-                                                    <a href="{% url 'design_asset_delete' asset.pk %}"
-                                                       class="btn btn-sm btn-danger"
-                                                       title="Delete attachment">
-                                                        <i class="cil-trash"></i>
-                                                    </a>
-                                                </td>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        <table class="table table-striped" id="attachment-table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                    <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                    <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                    {% if user.is_staff %}<th></th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for asset in attachments %}
+                                    <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                        <td class="text-nowrap" style="width:1px">
+                                            <i class="bi {{ asset.get_icon_class }}"></i>
+                                        </td>
+                                        <td>
+                                            {{ asset.name }}
+                                            {% if user.is_staff and asset.internal %}
+                                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
                                             {% endif %}
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                {% else %}
-                    <p><i>No attachments uploaded for this design.</i></p>
-                {% endif %}
-            {% endif %}
-
-            {% if user.is_staff %}
-                <div class="card border-0 mb-4">
-                    <div class="card-header">Upload File</div>
-                    <div class="card-body">
-                        <form method="post"
-                              action="{% url 'design_asset_add' design.pk %}"
-                              enctype="multipart/form-data">
-                            {% csrf_token %}
-                            <div class="row g-3">
-                                <div class="col-12 col-md-6">
-                                    <label for="{{ asset_form.file.id_for_label }}" class="form-label">{{ asset_form.file.label }}</label>
-                                    {{ asset_form.file }}
-                                    {% if asset_form.file.errors %}<div class="text-danger small">{{ asset_form.file.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label for="{{ asset_form.name.id_for_label }}" class="form-label">{{ asset_form.name.label }}</label>
-                                    {{ asset_form.name }}
-                                    {% if asset_form.name.errors %}<div class="text-danger small">{{ asset_form.name.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-12 col-md-4">
-                                    <label for="{{ asset_form.asset_type.id_for_label }}" class="form-label">{{ asset_form.asset_type.label }}</label>
-                                    {{ asset_form.asset_type }}
-                                    {% if asset_form.asset_type.errors %}<div class="text-danger small">{{ asset_form.asset_type.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-12 col-md-8">
-                                    <label for="{{ asset_form.description.id_for_label }}" class="form-label">{{ asset_form.description.label }}</label>
-                                    {{ asset_form.description }}
-                                </div>
-                                <div class="col-12">
-                                    <div class="form-check">
-                                        {{ asset_form.internal }}
-                                        <label class="form-check-label" for="{{ asset_form.internal.id_for_label }}">Internal only (hide from clients)</label>
-                                    </div>
-                                </div>
-                                <div class="col-12">
-                                    <button type="submit" class="btn btn-primary">Upload</button>
-                                </div>
-                            </div>
-                        </form>
+                                        </td>
+                                        <td>{{ asset.description|default:"" }}</td>
+                                        <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
+                                        {% if user.is_staff %}
+                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                   class="btn btn-sm btn-primary me-1"
+                                                   title="Edit attachment">
+                                                    <i class="cil-pencil"></i>
+                                                </a>
+                                                <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                   class="btn btn-sm btn-danger"
+                                                   title="Delete attachment">
+                                                    <i class="cil-trash"></i>
+                                                </a>
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                                {% if user.is_staff %}
+                                    <tr id="attachment-add-trigger"
+                                        style="cursor:pointer"
+                                        title="Click to add an attachment">
+                                        <td style="width:1px"><i class="bi bi-plus-circle text-muted"></i></td>
+                                        <td><span class="text-muted fst-italic">Add attachment</span></td>
+                                        <td></td>
+                                        <td></td>
+                                        <td class="text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                            <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
+                                        </td>
+                                    </tr>
+                                    <tr id="attachment-add-row" class="d-none">
+                                        <td colspan="5" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                            <form method="post"
+                                                  action="{% url 'design_asset_add' design.pk %}"
+                                                  enctype="multipart/form-data">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="asset_type" value="ATTACHMENT">
+                                                <div class="row g-2">
+                                                    <div class="col-12 col-md-auto">
+                                                        <label class="form-label small mb-1">File</label>
+                                                        <input type="file" name="file" class="form-control form-control-sm attachment-file-input" required>
+                                                    </div>
+                                                    <div class="col-12 col-md-auto">
+                                                        <label class="form-label small mb-1">Name</label>
+                                                        <input type="text" name="name" class="form-control form-control-sm attachment-name-field" required>
+                                                    </div>
+                                                    <div class="col-12 col-md">
+                                                        <label class="form-label small mb-1">Description</label>
+                                                        <input type="text" name="description" class="form-control form-control-sm">
+                                                    </div>
+                                                    <div class="col-12 col-md-auto d-flex align-items-end gap-2">
+                                                        <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                        <button type="button" class="btn btn-sm btn-secondary" id="attachment-add-cancel">Cancel</button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             {% endif %}
@@ -316,23 +311,37 @@
             });
         });
 
-        document.getElementById('id_file').addEventListener('change', function () {
-            if (!this.files[0]) return;
-            const filename = this.files[0].name;
-            const dotIndex = filename.lastIndexOf('.');
-            const nameWithoutExt = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
-            document.getElementById('id_name').value = nameWithoutExt;
-            const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
-            const extMap = {
-                '.f3z': ['FUSION',     'Fusion project'],
-                '.brd': ['PCB_DESIGN', 'PCB design file'],
-                '.sch': ['SCHEMATIC',  'Schematic design file'],
-            };
-            if (extMap[ext]) {
-                document.getElementById('id_asset_type').value    = extMap[ext][0];
-                document.getElementById('id_description').value   = extMap[ext][1];
-            }
-        });
+        // Stripe visible rows only, skipping hidden inline-upload-row elements
+        (function restripeCoreTbl() {
+            let idx = 0;
+            document.querySelectorAll('.core-file-table tbody tr').forEach(function (row) {
+                if (row.classList.contains('inline-upload-row')) return;
+                row.style.setProperty('--bs-table-accent-bg', idx % 2 === 1 ? 'rgba(0,0,0,.05)' : 'transparent');
+                idx++;
+            });
+        }());
+
+        // Attachment add row toggle
+        const attachTrigger = document.getElementById('attachment-add-trigger');
+        const attachRow = document.getElementById('attachment-add-row');
+        if (attachTrigger && attachRow) {
+            attachTrigger.addEventListener('click', function () {
+                attachRow.classList.toggle('d-none');
+                if (!attachRow.classList.contains('d-none')) {
+                    attachRow.querySelector('.attachment-file-input').focus();
+                }
+            });
+            document.getElementById('attachment-add-cancel').addEventListener('click', function () {
+                attachRow.classList.add('d-none');
+            });
+            attachRow.querySelector('.attachment-file-input').addEventListener('change', function () {
+                if (!this.files[0]) return;
+                const filename = this.files[0].name;
+                const dotIndex = filename.lastIndexOf('.');
+                const nameWithoutExt = dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+                attachRow.querySelector('.attachment-name-field').value = nameWithoutExt;
+            });
+        }
 
         (function () {
             const table = document.getElementById('attachment-table');
@@ -349,13 +358,15 @@
 
             function applySort() {
                 const tbody = table.tBodies[0];
-                const rows = Array.from(tbody.rows);
+                const pinned = ['attachment-add-trigger', 'attachment-add-row'];
+                const rows = Array.from(tbody.rows).filter(r => !pinned.includes(r.id));
                 rows.sort((a, b) => {
                     const av = cellValue(a, sortCol);
                     const bv = cellValue(b, sortCol);
                     return av < bv ? (sortAsc ? -1 : 1) : av > bv ? (sortAsc ? 1 : -1) : 0;
                 });
                 rows.forEach(r => tbody.appendChild(r));
+                pinned.forEach(id => { const r = document.getElementById(id); if (r) tbody.appendChild(r); });
 
                 table.querySelectorAll('th[data-col]').forEach(th => {
                     const icon = th.querySelector('.sort-indicator');
