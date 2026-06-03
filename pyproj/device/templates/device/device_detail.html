@@ -8,13 +8,13 @@
 {% endblock title %}
 
 {% block h1 %}
-    Details
+    {{ device.design.client.company_name }} {{ device.design.name }} v{{ device.design.hw_version }} #{{ device.id }}
 {% endblock h1 %}
 
 {% block content %}
-    <h5>Serial: {{ device.id }}</h5>
 
     <table class="table table-bordered">
+        <!--
         {% if user.is_staff %}
             {% comment %} Only show client if we're staff (if we're a customer, we know who we are {% endcomment %}
             <tr>
@@ -22,6 +22,7 @@
                 <td>{{ device.design.client.company_name }}</td>
             </tr>
         {% endif %}
+        -->
         <tr>
             <th>Design:</th>
             <td><a href="{% url 'design_detail' device.design.pk %}">{{ device.design.name }}</a></td>

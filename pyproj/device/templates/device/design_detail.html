@@ -6,7 +6,7 @@
 {% endblock title %}
 
 {% block h1 %}
-    Design: {{ design.name }}
+    {{ design.client.company_name }} {{ design.name }} v{{ design.hw_version }}
 {% endblock h1 %}
 
 {% block content %}
@@ -23,16 +23,19 @@
             <div class="card border-0 mb-4">
                 <div class="card-body py-10">
                     <table class="table table-bordered">
+<!--
                         {% if user.is_staff %}
                             <tr>
                                 <th>Organisation:</th>
                                 <td>{{ design.client.company_name }}</td>
                             </tr>
                         {% endif %}
+-->
                         <tr>
                             <th>SKU:</th>
                             <td>{{ design.sku }}</td>
                         </tr>
+<!--
                         <tr>
                             <th>Name:</th>
                             <td>{{ design.name }}</td>
@@ -41,6 +44,7 @@
                             <th>H/W Version:</th>
                             <td>{{ design.hw_version }}</td>
                         </tr>
+-->
                         <tr>
                             <th>Description:</th>
                             <td>{{ design.description|default:"<i>Not set</i>" }}</td>
@@ -48,10 +52,6 @@
                         <tr>
                             <th>Price:</th>
                             <td>{{ design.price|default:"<i>Not set</i>" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Price 2:</th>
-                            <td>{{ design.price2|default:"<i>Not set</i>" }}</td>
                         </tr>
                         <tr>
                             <th>Devices:</th>
@@ -242,7 +242,7 @@
             {% endif %}
 
             {% if devices %}
-                <h5 class="mt-4">Devices</h5>
+                <h5 class="mt-4">Boards</h5>
                 <div class="card border-0">
                     <div class="card-body py-10">
                         <table class="table table-striped">
