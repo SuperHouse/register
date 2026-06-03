@@ -8,7 +8,7 @@
 {% endblock title %}
 
 {% block h1 %}
-    {{ device.design.client.company_name }} {{ device.design.name }} v{{ device.design.hw_version }} #{{ device.id }}
+    {{ device.design.client.company_name }} <b>{{ device.design.name }}</b> v{{ device.design.hw_version }} #{{ device.id }}
 {% endblock h1 %}
 
 {% block content %}
@@ -223,23 +223,167 @@
            href="{% url 'device:device_image_add' device.pk %}">Upload Image</a>
     {% endif %}
 
-    {% if user.is_staff %}
-        <h2>Actions</h2>
-
-        <ul>
-            <li>
-                <a role="button"
-                   class="btn btn-primary"
-                   href="{% url 'admin:device_device_change' device.pk %}">Admin</a> for this device.
-            </li>
-        </ul>
+    {% if attachments or user.is_staff %}
+        <h3>Attachments</h3>
+        <table class="table table-striped" id="device-attachment-table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                    <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                    <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                    {% if user.is_staff %}<th></th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in attachments %}
+                    <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                        <td class="text-nowrap" style="width:1px">
+                            <i class="bi {{ asset.get_icon_class }}"></i>
+                        </td>
+                        <td>
+                            {{ asset.name }}
+                            {% if user.is_staff and asset.internal %}
+                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ asset.description|default:"" }}</td>
+                        <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
+                        {% if user.is_staff %}
+                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                <a href="{% url 'device:device_asset_edit' asset.pk %}"
+                                   class="btn btn-sm btn-primary me-1"
+                                   title="Edit attachment">
+                                    <i class="cil-pencil"></i>
+                                </a>
+                                <a href="{% url 'device:device_asset_delete' asset.pk %}"
+                                   class="btn btn-sm btn-danger"
+                                   title="Delete attachment">
+                                    <i class="cil-trash"></i>
+                                </a>
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+                {% if user.is_staff %}
+                    <tr id="device-attachment-add-trigger"
+                        style="cursor:pointer"
+                        title="Click to add an attachment">
+                        <td style="width:1px"><i class="bi bi-plus-circle text-muted"></i></td>
+                        <td><span class="text-muted fst-italic">Add attachment</span></td>
+                        <td></td>
+                        <td></td>
+                        <td class="text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                            <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
+                        </td>
+                    </tr>
+                    <tr id="device-attachment-add-row" class="d-none">
+                        <td colspan="5" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                            <form method="post"
+                                  action="{% url 'device:device_asset_add' device.pk %}"
+                                  enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <input type="hidden" name="asset_type" value="ATTACHMENT">
+                                <div class="row g-2">
+                                    <div class="col-12 col-md-auto">
+                                        <label class="form-label small mb-1">File</label>
+                                        <input type="file" name="file" class="form-control form-control-sm device-attachment-file-input" required>
+                                    </div>
+                                    <div class="col-12 col-md-auto">
+                                        <label class="form-label small mb-1">Name</label>
+                                        <input type="text" name="name" class="form-control form-control-sm device-attachment-name-field" required>
+                                    </div>
+                                    <div class="col-12 col-md">
+                                        <label class="form-label small mb-1">Description</label>
+                                        <input type="text" name="description" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-12 col-md-auto d-flex align-items-end gap-2">
+                                        <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                        <button type="button" class="btn btn-sm btn-secondary" id="device-attachment-add-cancel">Cancel</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
     {% endif %}
 
-    <p>
-        <a role="button" class="btn btn-primary" href="{% url 'device:top' %}">Up</a>
-    </p>
 {% endblock content %}
 
 {% block extra_js %}
     <script src="https://cdn.jsdelivr.net/npm/bs5-lightbox@1.8.3/dist/index.bundle.min.js"></script>
+    <script>
+        (function () {
+            const trigger = document.getElementById('device-attachment-add-trigger');
+            const addRow = document.getElementById('device-attachment-add-row');
+            if (!trigger || !addRow) return;
+
+            trigger.addEventListener('click', function () {
+                addRow.classList.toggle('d-none');
+                if (!addRow.classList.contains('d-none')) {
+                    addRow.querySelector('.device-attachment-file-input').focus();
+                }
+            });
+
+            document.getElementById('device-attachment-add-cancel').addEventListener('click', function () {
+                addRow.classList.add('d-none');
+            });
+
+            addRow.querySelector('.device-attachment-file-input').addEventListener('change', function () {
+                if (!this.files[0]) return;
+                const filename = this.files[0].name;
+                const dotIndex = filename.lastIndexOf('.');
+                addRow.querySelector('.device-attachment-name-field').value =
+                    dotIndex > 0 ? filename.substring(0, dotIndex) : filename;
+            });
+        }());
+
+        (function () {
+            const table = document.getElementById('device-attachment-table');
+            if (!table) return;
+
+            let sortCol = 3;
+            let sortAsc = true;
+
+            function cellValue(row, col) {
+                const cell = row.querySelectorAll('td')[col];
+                if (!cell) return '';
+                return cell.dataset.sortValue ?? cell.textContent.trim().toLowerCase();
+            }
+
+            function applySort() {
+                const tbody = table.tBodies[0];
+                const pinned = ['device-attachment-add-trigger', 'device-attachment-add-row'];
+                const rows = Array.from(tbody.rows).filter(r => !pinned.includes(r.id));
+                rows.sort((a, b) => {
+                    const av = cellValue(a, sortCol);
+                    const bv = cellValue(b, sortCol);
+                    return av < bv ? (sortAsc ? -1 : 1) : av > bv ? (sortAsc ? 1 : -1) : 0;
+                });
+                rows.forEach(r => tbody.appendChild(r));
+                pinned.forEach(id => { const r = document.getElementById(id); if (r) tbody.appendChild(r); });
+
+                table.querySelectorAll('th[data-col]').forEach(th => {
+                    const icon = th.querySelector('.sort-indicator');
+                    if (parseInt(th.dataset.col) === sortCol) {
+                        icon.className = `sort-indicator bi ms-1 ${sortAsc ? 'bi-arrow-up' : 'bi-arrow-down'}`;
+                    } else {
+                        icon.className = 'sort-indicator bi bi-arrow-up ms-1 invisible';
+                    }
+                });
+            }
+
+            table.querySelectorAll('th[data-col]').forEach(th => {
+                th.addEventListener('click', function () {
+                    const col = parseInt(this.dataset.col);
+                    if (col === sortCol) { sortAsc = !sortAsc; } else { sortCol = col; sortAsc = true; }
+                    applySort();
+                });
+            });
+
+            applySort();
+        }());
+    </script>
 {% endblock extra_js %}

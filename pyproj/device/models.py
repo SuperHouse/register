@@ -165,6 +165,10 @@ def design_asset_upload_path(instance, filename):
     return f'design_assets/{instance.design.id}/{filename}'
 
 
+def device_asset_upload_path(instance, filename):
+    return f'device_assets/{instance.device.id}/{filename}'
+
+
 class DesignAsset(models.Model):
     FUSION = 'FUSION'
     PCB_DESIGN = 'PCB_DESIGN'
@@ -234,6 +238,44 @@ class DesignAsset(models.Model):
             self.PCB_BOTTOM: 'bi-file-earmark-image',
             self.PCB_3D: 'bi-box',
             self.FIRMWARE: 'bi-file-earmark-binary',
+            self.ATTACHMENT: 'bi-paperclip',
+        }
+        return classes.get(self.asset_type, 'bi-file-earmark')
+
+
+class DeviceAsset(models.Model):
+    ATTACHMENT = 'ATTACHMENT'
+
+    CORE_ASSET_TYPES = frozenset()
+
+    ASSET_TYPE_CHOICES = [
+        (ATTACHMENT, 'Attachment'),
+    ]
+
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    file = models.FileField(upload_to=device_asset_upload_path)
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES, default=ATTACHMENT)
+    uploaded_dt = models.DateTimeField(default=timezone.now)
+    internal = models.BooleanField(default=False, help_text='Do not show this asset to clients')
+
+    class Meta:
+        ordering = ['asset_type', 'name']
+
+    def __str__(self):
+        return f'{self.device}: {self.name} ({self.get_asset_type_display()})'
+
+    @property
+    def is_core(self):
+        return self.asset_type in self.CORE_ASSET_TYPES
+
+    @property
+    def filename(self):
+        return os.path.basename(self.file.name)
+
+    def get_icon_class(self):
+        classes = {
             self.ATTACHMENT: 'bi-paperclip',
         }
         return classes.get(self.asset_type, 'bi-file-earmark')

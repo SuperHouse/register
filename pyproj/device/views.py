@@ -19,8 +19,8 @@ from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
-from .forms import ClientForm, DesignAssetEditForm, DesignAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
-from .models import Client, Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestRecord
+from .forms import ClientForm, DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .models import Client, Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 
 
 def dashboard(request):
@@ -458,17 +458,21 @@ def device_detail(request, device_number):
     if request.user.is_staff:
         device = get_object_or_404(Device, pk=device_number)
         events = device.deviceevent_set.all()
+        assets = device.deviceasset_set.all()
     else:
         clients = Client.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
         events = device.deviceevent_set.exclude(internal=True)
+        assets = device.deviceasset_set.filter(internal=False)
 
     device_images = device.deviceimage_set.all()
+    attachments = assets.filter(asset_type=DeviceAsset.ATTACHMENT)
 
     context = {
         'device': device,
         'events': events,
         'device_images': device_images,
+        'attachments': attachments,
     }
 
     return render(request, 'device/device_detail.html', context)
@@ -519,6 +523,66 @@ def device_search(request):
     }
 
     return render(request, 'device/device_search.html', context)
+
+
+@staff_member_required
+def device_asset_add(request, device_number):
+    device = get_object_or_404(Device, pk=device_number)
+
+    if request.method == 'POST':
+        form = DeviceAssetForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.instance.device = device
+            form.save()
+            messages.success(request, 'File uploaded successfully.')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+
+    return redirect('device:device_detail', device_number=device.pk)
+
+
+@staff_member_required
+def device_asset_edit(request, asset_id):
+    asset = get_object_or_404(DeviceAsset, pk=asset_id)
+    device = asset.device
+
+    if request.method == 'POST':
+        form = DeviceAssetEditForm(request.POST, instance=asset)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Asset updated.')
+            return redirect('device:device_detail', device_number=device.pk)
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = DeviceAssetEditForm(instance=asset)
+
+    ctx = {
+        'form': form,
+        'asset': asset,
+        'device': device,
+    }
+
+    return render(request, 'device/device_asset_edit.html', ctx)
+
+
+@staff_member_required
+def device_asset_delete(request, asset_id):
+    asset = get_object_or_404(DeviceAsset, pk=asset_id)
+    device = asset.device
+
+    if request.method == 'POST':
+        asset.file.delete(save=False)
+        asset.delete()
+        messages.success(request, 'Asset deleted.')
+        return redirect('device:device_detail', device_number=device.pk)
+
+    ctx = {
+        'asset': asset,
+        'device': device,
+    }
+
+    return render(request, 'device/device_asset_delete.html', ctx)
 
 
 @staff_member_required

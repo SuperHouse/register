@@ -5,7 +5,7 @@ from django import forms
 from django.forms.widgets import HiddenInput
 from django.utils import timezone
 
-from .models import Client, Design, Device, DeviceEvent, DeviceImage, DesignAsset, TestRecord
+from .models import Client, Design, Device, DeviceAsset, DeviceEvent, DeviceImage, DesignAsset, TestRecord
 
 
 class DateTimeLocalInput(forms.DateTimeInput):
@@ -156,6 +156,29 @@ class DesignAssetForm(forms.ModelForm):
 class DesignAssetEditForm(forms.ModelForm):
     class Meta:
         model = DesignAsset
+        fields = ['name', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class DeviceAssetForm(forms.ModelForm):
+    class Meta:
+        model = DeviceAsset
+        fields = ['file', 'name', 'description', 'asset_type', 'internal']
+        widgets = {
+            'file': forms.FileInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'asset_type': forms.Select(attrs={'class': 'form-select'}),
+            'internal': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class DeviceAssetEditForm(forms.ModelForm):
+    class Meta:
+        model = DeviceAsset
         fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),

@@ -3,7 +3,7 @@ from easy_thumbnails.files import get_thumbnailer
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Client, Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
+from .models import Client, Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
 
 
 class DesignAssetInline(admin.TabularInline):
@@ -29,9 +29,15 @@ class DeviceEventInline(admin.StackedInline):
     extra = 0
 
 
+class DeviceAssetInline(admin.TabularInline):
+    model = DeviceAsset
+    extra = 0
+    readonly_fields = ['uploaded_dt']
+
+
 class DeviceAdmin(admin.ModelAdmin):
     autocomplete_fields = ['design']
-    inlines = [TestRecordInline, DeviceEventInline]
+    inlines = [TestRecordInline, DeviceEventInline, DeviceAssetInline]
     search_fields = ['id']
 
 
