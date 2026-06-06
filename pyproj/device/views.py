@@ -7,7 +7,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files import File
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -160,10 +160,18 @@ def top(request):
 
 def design_list(request):
     """List all designs."""
-    designs = Design.objects.prefetch_related("client").order_by('client', 'sku').all()
+    pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
 
     if not request.user.is_staff:
         clients = Client.objects.filter(users=request.user)
+        pcb_top_qs = pcb_top_qs.filter(internal=False)
+
+    designs = Design.objects.prefetch_related(
+        "client",
+        Prefetch('designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
+    ).order_by('client', 'sku').all()
+
+    if not request.user.is_staff:
         designs = designs.filter(client__in=clients)
 
     q = request.GET.get('q', '').strip()
