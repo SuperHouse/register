@@ -2,12 +2,12 @@ import pytest
 from django.db import IntegrityError
 
 from device.models import Design
-from crm.models import Client
+from crm.models import Org
 
 
 @pytest.mark.django_db
 def test_no_duplicate_designs():
-    client1 = Client(company_name='Client One')
+    client1 = Org(company_name='Client One')
     client1.save()
 
     # Let's create a 1.0 version of an SKU

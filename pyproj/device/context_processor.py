@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from crm.models import Client
+from crm.models import Org
 
 
 def background_processor(request):

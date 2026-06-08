@@ -3,7 +3,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 
-from crm.models import Client
+from crm.models import Org
 from device.forms import ClientForm
 from device.models import Design, Device
 
@@ -12,7 +12,7 @@ from device.models import Design, Device
 @staff_member_required
 def organisation_list(request):
     """List all clients/organisations."""
-    clients = Client.objects.all().order_by('company_name')
+    clients = Org.objects.all().order_by('company_name')
 
     q = request.GET.get('q', '').strip()
     if q:
@@ -33,7 +33,7 @@ def organisation_list(request):
 @staff_member_required
 def organisation_detail(request, client_id):
     """Detail view for a single organisation."""
-    client = get_object_or_404(Client, pk=client_id)
+    client = get_object_or_404(Org, pk=client_id)
     designs = Design.objects.filter(client=client).order_by('sku')
     board_count = Device.objects.filter(design__client=client).count()
 
@@ -49,7 +49,7 @@ def organisation_detail(request, client_id):
 @staff_member_required
 def organisation_edit(request, client_id):
     """Edit a client/organisation."""
-    client = get_object_or_404(Client, pk=client_id)
+    client = get_object_or_404(Org, pk=client_id)
 
     if request.method == "POST":
         form = ClientForm(request.POST, request.FILES, instance=client)

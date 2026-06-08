@@ -6,7 +6,7 @@ from django.forms.widgets import HiddenInput
 from django.utils import timezone
 
 from .models import Design, Device, DeviceAsset, DeviceEvent, DeviceImage, DesignAsset, TestRecord
-from crm.models import Client
+from crm.models import Org
 
 
 class DateTimeLocalInput(forms.DateTimeInput):
@@ -29,7 +29,7 @@ class DateTimeLocalInput(forms.DateTimeInput):
 
 class ClientForm(forms.ModelForm):
     class Meta:
-        model = Client
+        model = Org
         fields = ['company_name', 'logo', 'users', 'api_key']
         widgets = {
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),

@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
-from crm.models import Client
+from crm.models import Org
 
 
 class DesignAssetInline(admin.TabularInline):

@@ -1,4 +1,4 @@
-from crm.models import Client
+from crm.models import Org
 
 
 def get_client_logo_processor(request):
@@ -9,7 +9,7 @@ def get_client_logo_processor(request):
 
     if request.user.is_authenticated:
         context['client_name'] = request.user.preferred_name
-        c_set = Client.objects.filter(users=request.user)
+        c_set = Org.objects.filter(users=request.user)
         if c_set.exists():
             c = c_set.first()
             if c.logo:

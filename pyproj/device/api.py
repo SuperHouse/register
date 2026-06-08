@@ -12,7 +12,7 @@ from django.utils import timezone
 from ninja import File, Form, Router, UploadedFile
 from ninja.security import APIKeyHeader
 
-from crm.models import Client
+from crm.models import Org
 from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 from .schemas import (
     DashboardStatsSchema,
@@ -61,7 +61,7 @@ class AuthByApiKey(APIKeyHeader):
         if not allow:
             return
 
-        if key and Client.objects.filter(api_key=key).exists():
+        if key and Org.objects.filter(api_key=key).exists():
             return key
 
 
@@ -95,7 +95,7 @@ def session_or_api_key_auth(request):
             if allowed_ipv4_network and ip_addr in allowed_ipv4_network:
                 allow = True
 
-            if allow and Client.objects.filter(api_key=api_key).exists():
+            if allow and Org.objects.filter(api_key=api_key).exists():
                 return {'auth_type': 'api_key', 'key': api_key}
         except ValueError:
             pass
@@ -208,8 +208,8 @@ def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema],
     
     # Get the client associated with this API key
     try:
-        client = Client.objects.get(api_key=api_key)
-    except Client.DoesNotExist:
+        client = Org.objects.get(api_key=api_key)
+    except Org.DoesNotExist:
         return 403, {'message': 'Invalid API key'}
     
     # Get the device
@@ -279,7 +279,7 @@ def get_dashboard_stats(request):
     # Determine access level based on auth type
     if auth_info['auth_type'] == 'session':
         user = auth_info['user']
-        clients = Client.objects.all()
+        clients = Org.objects.all()
         designs = Design.objects.all()
         devices = Device.objects.all()
 
@@ -290,8 +290,8 @@ def get_dashboard_stats(request):
 
     else:  # api_key auth
         api_key = auth_info['key']
-        client = Client.objects.get(api_key=api_key)
-        clients = Client.objects.filter(pk=client.pk)
+        client = Org.objects.get(api_key=api_key)
+        clients = Org.objects.filter(pk=client.pk)
         designs = Design.objects.filter(client=client)
         devices = Device.objects.filter(design__client=client)
 

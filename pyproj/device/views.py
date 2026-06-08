@@ -21,12 +21,12 @@ from login_required import login_not_required
 
 from .forms import DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
-from crm.models import Client
+from crm.models import Org
 
 
 def dashboard(request):
     """Dashboard view showing summary statistics."""
-    clients = Client.objects.all()
+    clients = Org.objects.all()
     designs = Design.objects.all()
     devices = Device.objects.all()
 
@@ -70,7 +70,7 @@ def top(request):
     devices = Device.objects.prefetch_related("design").order_by('pk').all()
 
     if not request.user.is_staff:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         devices = devices.filter(design__client__in=clients)
 
     q = request.GET.get('q', '').strip()
@@ -100,7 +100,7 @@ def design_list(request):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
 
     if not request.user.is_staff:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         pcb_top_qs = pcb_top_qs.filter(internal=False)
 
     designs = Design.objects.prefetch_related(
@@ -138,7 +138,7 @@ def design_detail(request, design_id):
         design = get_object_or_404(Design, pk=design_id)
         assets = design.designasset_set.all()
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         design = get_object_or_404(Design, pk=design_id, client__in=clients)
         assets = design.designasset_set.filter(internal=False)
 
@@ -405,7 +405,7 @@ def device_detail(request, device_number):
         events = device.deviceevent_set.all()
         assets = device.deviceasset_set.all()
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
         events = device.deviceevent_set.exclude(internal=True)
         assets = device.deviceasset_set.filter(internal=False)
@@ -428,7 +428,7 @@ def device_action(request, device_number):
     if request.user.is_staff:
         device = get_object_or_404(Device, pk=device_number)
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
 
     context = {
@@ -453,7 +453,7 @@ def device_search(request):
 
         if not msg:
             if not request.user.is_staff:
-                clients = Client.objects.filter(users=request.user)
+                clients = Org.objects.filter(users=request.user)
                 device_set = device_set.filter(design__client__in=clients)
             if device_set:
                 device = device_set.first()

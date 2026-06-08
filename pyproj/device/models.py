@@ -8,7 +8,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
-from crm.models import Client
+from crm.models import Org
 
 # A special time (essentially pi), to use which suppresses the time on a datetime.
 # If you're still awake at this time and doing stuff, go home!
@@ -29,7 +29,7 @@ def get_dt_as_string(dt):
 
 
 class Design(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.PROTECT)
+    client = models.ForeignKey(Org, on_delete=models.PROTECT)
     sku = models.CharField(verbose_name='SKU', max_length=50)
     name = models.CharField(max_length=255)
     hw_version = models.CharField(max_length=20)

@@ -1,23 +1,20 @@
 import datetime
 import re
 import string
-import zoneinfo
 
-from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.utils import timezone
 from openpyxl import load_workbook
 
 from device.models import (
-    Client,
     Design,
     Device,
     DeviceEvent,
-    TestImage,
     TestRecord,
     tz,
     witching_hour,
 )
+from crm.models import Org
 
 timezone.activate(tz)
 
@@ -103,12 +100,12 @@ class Command(BaseCommand):
         # Import / update clients
         for id, name in client_map.items():
             try:
-                client = Client.objects.get(pk=id)
+                client = Org.objects.get(pk=id)
                 # print(f'Name in SQL: {client.company_name}; Name in XLSX: {name}')
                 # If we wanted to update client records in the db from the sheet, do it here.
-            except Client.DoesNotExist:
+            except Org.DoesNotExist:
                 # New client
-                client = Client(pk=id, company_name=name)
+                client = Org(pk=id, company_name=name)
                 client.save()
 
         # Import designs

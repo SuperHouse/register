@@ -1,9 +1,9 @@
 from ninja import ModelSchema
 
-from crm.models import Client
+from crm.models import Org
 
 
 class ClientSchema(ModelSchema):
     class Meta:
-        model = Client
+        model = Org
         fields = ('id', 'company_name')
