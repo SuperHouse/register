@@ -2,17 +2,12 @@ from datetime import datetime
 from typing import Literal
 from ninja import ModelSchema, Schema
 
-from device.models import Client, Device, Design, TestRecord, TestImage
+from crm.schema import ClientSchema
+from device.models import Design, TestRecord
 
 
 class Message(Schema):
     message: str
-
-
-class ClientSchema(ModelSchema):
-    class Meta:
-        model = Client
-        fields = ('id', 'company_name')
 
 
 class DesignSchema(ModelSchema):

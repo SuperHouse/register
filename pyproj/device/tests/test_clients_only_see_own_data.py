@@ -5,7 +5,8 @@ from django.utils import timezone
 import pytest
 
 from device.forms import TestRecordForm
-from device.models import Client, Design, Device, DeviceEvent, TestRecord
+from device.models import Design, Device, DeviceEvent, TestRecord
+from crm.models import Client
 
 
 # Helper: Create two users, and some corresponding client, design and device data

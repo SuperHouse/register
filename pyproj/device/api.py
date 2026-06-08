@@ -1,22 +1,20 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import ipaddress
-import json
 import re
 from datetime import datetime
+
 from django.conf import settings
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from ninja import File, Form, Router, UploadedFile
 from ninja.security import APIKeyHeader
 
-from device.models import Client, Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
-
+from crm.models import Client
+from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 from .schemas import (
-    ClientSchema,
     DashboardStatsSchema,
     DesignSchema,
     DeviceCreateSchema,
@@ -29,6 +27,7 @@ from .schemas import (
     TestRecordResponseSchema,
     TestRecordSchema,
 )
+
 
 # Browser-based API explorer: http://localhost:8000/api/v1/docs
 # (Doesn't need an API key, but you'll need to be logged in)
@@ -115,11 +114,6 @@ def endpoint_test_noauth(request):
 @router.get('test-endpoint/', response=Message)
 def endpoint_test_withauth(request):
     return {'message': 'Success.'}
-
-
-@router.get('clients/', response=list[ClientSchema])
-def get_clients(request):
-    return Client.objects.all()
 
 
 @router.get('designs/', response=list[DesignSchema])

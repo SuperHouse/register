@@ -1,7 +1,8 @@
 import pytest
 from django.db import IntegrityError
 
-from device.models import Client, Design
+from device.models import Design
+from crm.models import Client
 
 
 @pytest.mark.django_db

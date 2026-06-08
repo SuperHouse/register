@@ -3,7 +3,8 @@ from easy_thumbnails.files import get_thumbnailer
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Client, Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
+from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
+from crm.models import Client
 
 
 class DesignAssetInline(admin.TabularInline):
@@ -62,11 +63,6 @@ class TestRecordAdmin(admin.ModelAdmin):
     inlines = [TestImageInline]
 
 
-class TestRecordAdmin(admin.ModelAdmin):
-    inlines = [TestImageInline]
-
-
-admin.site.register(Client)
 admin.site.register(Design, DesignAdmin)
 admin.site.register(Device, DeviceAdmin)
 admin.site.register(DeviceEvent)

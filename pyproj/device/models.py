@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+from crm.models import Client
 
 # A special time (essentially pi), to use which suppresses the time on a datetime.
 # If you're still awake at this time and doing stuff, go home!
@@ -25,16 +26,6 @@ def get_dt_as_string(dt):
         return dt.strftime('%-d-%b-%Y')
     else:
         return dt.strftime('%-d-%b-%Y %H:%M:%S')
-
-
-class Client(models.Model):
-    company_name = models.CharField(max_length=255)
-    logo = models.ImageField(upload_to='clients/', null=True, blank=True)
-    users = models.ManyToManyField(settings.AUTH_USER_MODEL)
-    api_key = models.CharField(max_length=50, null=True, blank=True)
-
-    def __str__(self):
-        return self.company_name
 
 
 class Design(models.Model):

@@ -24,6 +24,7 @@ from django.views.generic.base import RedirectView
 from django.views.static import serve
 from ninja import NinjaAPI
 
+from crm import views
 from device import views as device_views
 from device.api import router as device_router
 
@@ -39,9 +40,9 @@ urlpatterns = [
     path('design/<int:design_id>/add-asset/', device_views.design_asset_add, name='design_asset_add'),
     path('design/da/<int:asset_id>/', device_views.design_asset_edit, name='design_asset_edit'),
     path('design/da/<int:asset_id>/delete/', device_views.design_asset_delete, name='design_asset_delete'),
-    path('organisation/', device_views.organisation_list, name='organisation_list'),
-    path('organisation/<int:client_id>/', device_views.organisation_detail, name='organisation_detail'),
-    path('organisation/<int:client_id>/edit/', device_views.organisation_edit, name='organisation_edit'),
+    path('organisation/', views.organisation_list, name='organisation_list'),
+    path('organisation/<int:client_id>/', views.organisation_detail, name='organisation_detail'),
+    path('organisation/<int:client_id>/edit/', views.organisation_edit, name='organisation_edit'),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

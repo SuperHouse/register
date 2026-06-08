@@ -5,7 +5,8 @@ from django import forms
 from django.forms.widgets import HiddenInput
 from django.utils import timezone
 
-from .models import Client, Design, Device, DeviceAsset, DeviceEvent, DeviceImage, DesignAsset, TestRecord
+from .models import Design, Device, DeviceAsset, DeviceEvent, DeviceImage, DesignAsset, TestRecord
+from crm.models import Client
 
 
 class DateTimeLocalInput(forms.DateTimeInput):
