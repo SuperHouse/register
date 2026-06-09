@@ -22,10 +22,16 @@ def copy_clients_from_device(apps, schema_editor):
 
     if clients:
         max_id = max(c[0] for c in clients)
-        cursor.execute(
-            "INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('crm_client', %s)",
-            [max_id],
-        )
+        vendor = schema_editor.connection.vendor
+        if vendor == "sqlite":
+            cursor.execute(
+                "INSERT OR REPLACE INTO sqlite_sequence (name, seq) VALUES ('crm_client', %s)",
+                [max_id],
+            )
+        elif vendor == "mysql":
+            cursor.execute(
+                "ALTER TABLE crm_client AUTO_INCREMENT = %s" % (max_id + 1,)
+            )
 
 
 def reverse_copy(apps, schema_editor):
