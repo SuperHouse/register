@@ -7,7 +7,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("crm", "0002_client_is_client_client_is_manufacturer_and_more"),
+        ("crm", "0004_copy_clients_from_device"),
         ("device", "0031_alter_design_client_delete_client"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

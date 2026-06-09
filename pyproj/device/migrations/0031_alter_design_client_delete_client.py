@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("crm", "0001_initial"),
+        ("crm", "0004_copy_clients_from_device"),
         ("device", "0030_add_device_asset"),
     ]
 
