@@ -3,9 +3,11 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 
+from django.db.models import Prefetch, Q
+
 from crm.models import Org
 from device.forms import ClientForm
-from device.models import Design, Device
+from device.models import Design, DesignAsset, Device
 
 
 # Create your views here.
@@ -34,13 +36,28 @@ def organisation_list(request):
 def organisation_detail(request, client_id):
     """Detail view for a single organisation."""
     client = get_object_or_404(Org, pk=client_id)
-    designs = Design.objects.filter(client=client).order_by('sku')
+    pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
+    designs = Design.objects.filter(client=client).prefetch_related(
+        Prefetch('designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
+    ).order_by('sku')
+    has_designs = designs.exists()
+
+    q = request.GET.get('q', '').strip()
+    if q:
+        designs = designs.filter(
+            Q(sku__icontains=q) |
+            Q(name__icontains=q) |
+            Q(hw_version__icontains=q)
+        )
+
     board_count = Device.objects.filter(design__client=client).count()
 
     context = {
         'client': client,
         'designs': designs,
+        'has_designs': has_designs,
         'board_count': board_count,
+        'q': q,
     }
 
     return render(request, 'device/organisation_detail.html', context)

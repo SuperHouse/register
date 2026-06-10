@@ -9,6 +9,7 @@ register/
 ├── pyproj/             # Django project root (run everything from here)
 │   ├── authuser/       # Custom user model app
 │   ├── conf/           # Django settings, URLs, middleware
+│   ├── crm/            # Org (client/customer) model, organisation views, API endpoint
 │   ├── device/         # Main app: all PCB/device logic, API, views
 │   └── manage.py
 ├── API.md              # Full REST API documentation
@@ -45,21 +46,21 @@ pytest
 
 ## Data Model
 
-The hierarchy is: **Client → Design → Device → TestRecord / DeviceEvent / DeviceImage**
+The hierarchy is: **Org → Design → Device → TestRecord / DeviceEvent / DeviceImage**
 
-| Model | Description | Key fields |
-|---|---|---|
-| `Client` | Organisation/customer | `company_name`, `logo`, `api_key`, M2M `users` |
-| `Design` | PCB board type | `sku`, `hw_version` (unique together), `client`, `price` |
-| `DesignAsset` | File attached to a design | `design`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
-| `DeviceAsset` | File attached to a device | `device`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
-| `Device` | Individual board | PK = serial number, `design`, `creation_dt`, `invoice`, `po`, `notes` |
-| `TestRecord` | Test result | `device`, `test_dt`, `result` (NEW/PASS/FAIL/HUH?), `notes` |
-| `TestImage` | Image on a test record | `test_record`, `image` |
-| `DeviceImage` | Image on a device | `device`, `image`, `image_dt`, `notes` |
-| `DeviceEvent` | Event on a device | `device`, `event_type` (NOTE/SW_VERSION/SHIPPING), `description`, `internal` |
+| Model | App | Description | Key fields |
+|---|---|---|---|
+| `Org` | `crm` | Organisation/customer | `company_name`, `logo`, `api_key`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier` |
+| `Design` | `device` | PCB board type | `sku`, `hw_version` (unique together), `client` (FK → `crm.Org`), `price` |
+| `DesignAsset` | `device` | File attached to a design | `design`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
+| `DeviceAsset` | `device` | File attached to a device | `device`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
+| `Device` | `device` | Individual board | PK = serial number, `design`, `creation_dt`, `invoice`, `po`, `notes` |
+| `TestRecord` | `device` | Test result | `device`, `test_dt`, `result` (NEW/PASS/FAIL/HUH?), `notes` |
+| `TestImage` | `device` | Image on a test record | `test_record`, `image` |
+| `DeviceImage` | `device` | Image on a device | `device`, `image`, `image_dt`, `notes` |
+| `DeviceEvent` | `device` | Event on a device | `device`, `event_type` (NOTE/SW_VERSION/SHIPPING), `description`, `internal` |
 
-`DeviceEvent.internal = True`, `DesignAsset.internal = True`, and `DeviceAsset.internal = True` hide records from non-staff users. `Device.pk` is the hardware serial number.
+`DeviceEvent.internal = True`, `DesignAsset.internal = True`, and `DeviceAsset.internal = True` hide records from non-staff users. `Device.pk` is the hardware serial number. `Org` has class methods `get_clients()`, `get_manufacturers()`, and `get_suppliers()` that filter by the corresponding boolean flags.
 
 ### Design Assets
 
@@ -85,17 +86,28 @@ The Attachments list is client-side sortable: clicking any column header sorts b
 
 ## Apps
 
+### `crm`
+
+Organisation (customer/supplier/manufacturer) data.
+
+- **[models.py](pyproj/crm/models.py)** — `Org` model (formerly `Client` in `device`). Fields: `company_name`, `logo`, `api_key`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier`.
+- **[views.py](pyproj/crm/views.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` views (all staff-only). Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design.
+- **[api.py](pyproj/crm/api.py)** — `GET /api/v1/clients/` endpoint; registers on the shared `device` router.
+- **[schema.py](pyproj/crm/schema.py)** — Pydantic schema for the `Org` API response.
+- **[admin.py](pyproj/crm/admin.py)** — Registers `Org` with the Django admin.
+- **[context_processor.py](pyproj/crm/context_processor.py)** — `get_client_logo_processor`: injects `client_logo` and `client_name` into all templates for non-staff users.
+
 ### `device` (main app)
 
 All PCB business logic lives here.
 
-- **[models.py](pyproj/device/models.py)** — All models. `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
-- **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Client`(s). List pages (Boards, Designs, Organisations) use server-side filtering (not client-side) so filtering works correctly with pagination. Designs and Organisations lists are paginated. Device asset views (`device_asset_add`, `device_asset_edit`, `device_asset_delete`) mirror the design asset views.
-- **[api.py](pyproj/device/api.py)** — Django Ninja REST API. Auth via `X-API-Key` header + IP allowlist.
-- **[schemas.py](pyproj/device/schemas.py)** — Pydantic schemas for the API.
+- **[models.py](pyproj/device/models.py)** — All device models. `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
+- **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Org`(s). List pages (Boards, Designs) use server-side filtering (not client-side) so filtering works correctly with pagination. Designs list is paginated. Device asset views (`device_asset_add`, `device_asset_edit`, `device_asset_delete`) mirror the design asset views.
+- **[api.py](pyproj/device/api.py)** — Django Ninja REST API router. Auth via `X-API-Key` header + IP allowlist. The `crm` app also registers endpoints on this router.
+- **[schemas.py](pyproj/device/schemas.py)** — Pydantic schemas for the device API endpoints.
 - **[admin.py](pyproj/device/admin.py)** — Django admin config at `/office/`.
 - **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`. Note: design and organisation URLs are in `conf/urls.py`, not here.
-- **[context_processor.py](pyproj/device/context_processor.py)** — Context processors injected into all templates: `background_processor` (deploy-type background), `demo_processor` (demo mode vars), `version_processor` (injects `app_version` from `settings.VERSION`), `get_client_logo_processor` (client logo/name for non-staff users).
+- **[context_processor.py](pyproj/device/context_processor.py)** — Context processors: `background_processor` (deploy-type background), `demo_processor` (demo mode vars), `version_processor` (injects `app_version` from `settings.VERSION`).
 - **[management/commands/import-xlsx.py](pyproj/device/management/commands/import-xlsx.py)** — Bulk import from Excel; expects sheets: Devices, Queue, DeviceTypes, Raw Serials, Patched Boards.
 
 ### `authuser`
@@ -117,7 +129,7 @@ Django project configuration.
 
 Base URL: `/api/v1/` — implemented with [Django Ninja](https://django-ninja.dev/).
 
-**Authentication:** `X-API-Key: <key>` header OR Django session cookies. Keys are stored on `Client` objects. API key requests are restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
+**Authentication:** `X-API-Key: <key>` header OR Django session cookies. Keys are stored on `Org` objects. API key requests are restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
 
 Key endpoints:
 
@@ -137,8 +149,8 @@ Full documentation in [API.md](API.md).
 
 ## Access Control
 
-- **Staff users** see all data across all clients.
-- **Non-staff users** only see `Client`, `Design`, and `Device` objects associated with their user account via the `Client.users` M2M relationship.
+- **Staff users** see all data across all organisations.
+- **Non-staff users** only see `Org`, `Design`, and `Device` objects associated with their user account via the `Org.users` M2M relationship.
 - Internal `DeviceEvent` records (`internal=True`) are hidden from non-staff users.
 - All views require login (enforced by `login_required` middleware).
 - **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling).
@@ -165,7 +177,7 @@ Access control: Users see only data for their associated clients (if non-staff).
 
 ## Version Number
 
-`settings.VERSION` holds the current app version string (format `YYYY.MM.DD.N`). It is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar as a link to the project source repository on GitHub, satisfying the AGPL network-use disclosure requirement.
+`settings.VERSION` holds the current app version string. It is set in [`__VERSION.py`](__VERSION.py) at the repo root (format `YYYY.MM.DD.N`). At import time it reads `.git/HEAD` and automatically appends the current branch name as a suffix (e.g. `2026.06.09.1-refactor-modules`); the suffix is omitted on `main` and when no `.git` directory exists (e.g. a non-git production deployment). The version is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar as a link to the project source repository on GitHub, satisfying the AGPL network-use disclosure requirement.
 
 ## License
 

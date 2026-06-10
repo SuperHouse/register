@@ -52,29 +52,60 @@
                 </div>
             </div>
 
-            {% if designs %}
+            {% if has_designs %}
                 <h5>Designs</h5>
-                <div class="card border-0 mb-4">
-                    <div class="card-body py-10">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Name</th>
-                                    <th>Version</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for design in designs %}
-                                    <tr style="cursor: pointer;" onclick="window.location='{% url 'design_detail' design.pk %}'">
-                                        <td>{{ design.sku }}</td>
-                                        <td>{{ design.name }}</td>
-                                        <td>{{ design.hw_version }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+
+                <div class="mb-3">
+                    <div class="input-group" style="max-width: 400px;">
+                        <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
+                        <input type="text" id="list-search" class="form-control" placeholder="Filter designs..."
+                               value="{{ q }}">
+                        <button class="btn btn-outline-secondary" type="button" id="list-search-clear"
+                                {% if not q %}style="display:none;"{% endif %} title="Clear filter">
+                            <i class="cil-x icon"></i>
+                        </button>
                     </div>
+                </div>
+
+                <div id="org-designs-results">
+                    {% if designs %}
+                        <div class="card border-0 mb-4">
+                            <div class="card-body py-10">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr class="highlight">
+                                            <th></th>
+                                            <th>SKU</th>
+                                            <th>Name</th>
+                                            <th>Version</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for design in designs %}
+                                            <tr style="cursor: pointer;" onclick="window.location='{% url 'design_detail' design.pk %}'">
+                                                <td style="width: 70px; padding: 4px 8px;">
+                                                    {% with design.pcb_top_assets|first as pcb_top %}
+                                                        {% if pcb_top %}
+                                                            <img src="{{ pcb_top.file.url }}"
+                                                                 alt="PCB Top View"
+                                                                 style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                                        {% endif %}
+                                                    {% endwith %}
+                                                </td>
+                                                <td>{{ design.sku }}</td>
+                                                <td>{{ design.name }}</td>
+                                                <td>{{ design.hw_version }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% else %}
+                        <p>
+                            <i>No designs match "{{ q }}".</i>
+                        </p>
+                    {% endif %}
                 </div>
             {% endif %}
 
@@ -85,3 +116,9 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    {% if has_designs %}
+        <script>initServerFilter('org-designs-results');</script>
+    {% endif %}
+{% endblock extra_js %}
