@@ -55,7 +55,10 @@ INSTALLED_APPS = [
     # Apps in this project
     'authuser',
     'device',
-    'crm'
+    'crm',
+    'erp',
+    'pcba',
+    "pcba.designs"
 ]
 
 MIDDLEWARE = [

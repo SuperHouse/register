@@ -8,8 +8,6 @@ app_name = 'device'
 urlpatterns = [
     path('', views.top, name='top'),  # Devices page at /device/
     path('dashboard/', RedirectView.as_view(url='/dashboard/', permanent=False), name='dashboard'),  # Redirect to root dashboard
-    path('bootstrap-demo/', views.bootstrap_demo, name='bootstrap_demo'),
-    # Test code uses this, not for actual people to use, except for demos
     path('perm-report/', views.perm_report, name='perm_report'),
     path('action/', views.general_action, name='general_action'),
     path('incdemo/', views.inc_demo, name='inc_demo'),

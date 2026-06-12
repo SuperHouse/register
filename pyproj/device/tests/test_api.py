@@ -77,8 +77,8 @@ def test_list_all_designs(create_users_and_user_data):
 
     u1c = data['user1'].client
     u2c = data['user2'].client
-    u1design = data['user1_device'].design
-    u2design = data['user2_device'].design
+    u1design = data['user1_device'].views_design
+    u2design = data['user2_device'].views_design
 
     api_client = TestClientWithAuth(router, data['api-key'])
     response = api_client.get('get_designs')
@@ -111,7 +111,7 @@ def test_list_designs_for_client(create_users_and_user_data):
     data = create_users_and_user_data
 
     u2c = data['user2'].client
-    u2design = data['user2_device'].design
+    u2design = data['user2_device'].views_design
 
     api_client = TestClientWithAuth(router, data['api-key'])
     response = api_client.get('get_designs', params={'client_pk': str(u2c.pk)})
@@ -142,7 +142,7 @@ def test_get_existing_device(create_users_and_user_data):
     assert response.status_code == 200
 
     expected_json = {
-        'design_pk': u2d.design.pk,
+        'design_pk': u2d.views_design.pk,
         'creation_dt': dt_as_utc_in_json(u2d.creation_dt),
     }
     actual_json = response.json()
@@ -166,7 +166,7 @@ def test_add_or_update_device(create_users_and_user_data):
     data = create_users_and_user_data
 
     u2d = data['user2_device']
-    u1design = data['user1_device'].design
+    u1design = data['user1_device'].views_design
 
     api_client = TestClientWithAuth(router, data['api-key'])
 
@@ -183,7 +183,7 @@ def test_add_or_update_device(create_users_and_user_data):
     # if the creation date is not provided (because it's set to now)
     data = {
         'pk': u2d.pk,
-        'design_pk': u2d.design.pk,
+        'design_pk': u2d.views_design.pk,
     }
     response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 200
@@ -205,7 +205,7 @@ def test_add_or_update_device(create_users_and_user_data):
     day_after = u2d.creation_dt + datetime.timedelta(days=1)
     data = {
         'pk': u2d.pk,
-        'design_pk': u2d.design.pk,
+        'design_pk': u2d.views_design.pk,
         'creation_dt': dt_as_utc_in_json(day_after),
     }
     response = api_client.post('add_or_update_device', json=data)
@@ -217,13 +217,13 @@ def test_add_or_update_device(create_users_and_user_data):
     new_pk = u2d.first_free_serial()
     data = {
         'pk': new_pk,
-        'design_pk': u2d.design.pk,
+        'design_pk': u2d.views_design.pk,
     }
     response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 201
 
     new_u2d = Device.objects.get(pk=new_pk)
-    assert new_u2d.design.pk == u2d.design.pk
+    assert new_u2d.design.pk == u2d.views_design.pk
 
 
 def test_program_device(create_users_and_user_data):

@@ -10,18 +10,14 @@ from django.utils import timezone
 
 from crm.models import Org
 
-# A special time (essentially pi), to use which suppresses the time on a datetime.
-# If you're still awake at this time and doing stuff, go home!
+
 tz = zoneinfo.ZoneInfo(settings.TIME_ZONE)
-witching_hour = datetime.time(3, 14, 15, 9, tzinfo=tz)
 
 
-# Return a string representation of a date and time in the local timezone for use in templates.
-# Dates imported with no times will use the witching hour (see above) as a time.
-# In this case, we return just the date.
 def get_dt_as_string(dt):
+    witching_hour = datetime.time(3, 14, 15, 9, tzinfo=tz)
     if dt.tzinfo == datetime.timezone.utc:
-        dt = dt.astimezone(tz)
+        timezone.make_aware(dt)
     if dt.time() == witching_hour:
         return dt.strftime('%-d-%b-%Y')
     else:
@@ -29,7 +25,7 @@ def get_dt_as_string(dt):
 
 
 class Design(models.Model):
-    client = models.ForeignKey(Org, on_delete=models.PROTECT)
+    client = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="legacy_client")
     sku = models.CharField(verbose_name='SKU', max_length=50)
     name = models.CharField(max_length=255)
     hw_version = models.CharField(max_length=20)
@@ -151,9 +147,8 @@ class DeviceImage(models.Model):
     def get_image_dt_as_string(self):
         return get_dt_as_string(self.image_dt)
 
-
 def design_asset_upload_path(instance, filename):
-    return f'design_assets/{instance.design.id}/{filename}'
+    return f'design_assets/{instance.views_design.id}/{filename}'
 
 
 def device_asset_upload_path(instance, filename):

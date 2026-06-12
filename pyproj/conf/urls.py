@@ -17,38 +17,34 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.admin.views.decorators import staff_member_required
 from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic.base import RedirectView
 from django.views.static import serve
-from ninja import NinjaAPI
 
-from crm import views
+from api.app import api
+from crm import views as crm_views
 from device import views as device_views
-from device.api import router as device_router
-
-api = NinjaAPI(docs_decorator=staff_member_required)
-
-api.add_router("/", device_router)
 
 urlpatterns = [
     path('', device_views.dashboard, name='home'),
     path('dashboard/', device_views.dashboard, name='dashboard'),
+
     path('design/', device_views.design_list, name='design_list'),
     path('design/<int:design_id>/', device_views.design_detail, name='design_detail'),
     path('design/<int:design_id>/add-asset/', device_views.design_asset_add, name='design_asset_add'),
     path('design/da/<int:asset_id>/', device_views.design_asset_edit, name='design_asset_edit'),
     path('design/da/<int:asset_id>/delete/', device_views.design_asset_delete, name='design_asset_delete'),
-    path('organisation/', views.organisation_list, name='organisation_list'),
-    path('organisation/<int:client_id>/', views.organisation_detail, name='organisation_detail'),
-    path('organisation/<int:client_id>/edit/', views.organisation_edit, name='organisation_edit'),
+    path('organisation/', crm_views.organisation_list, name='organisation_list'),
+    path('organisation/<int:client_id>/', crm_views.organisation_detail, name='organisation_detail'),
+    path('organisation/<int:client_id>/edit/', crm_views.organisation_edit, name='organisation_edit'),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),
     path('api/v1/', api.urls),
+
     # If we're running behind a web server, we won't see media requests, so this will do nothing.
     re_path(
         r'^media/(?P<path>.*)$',

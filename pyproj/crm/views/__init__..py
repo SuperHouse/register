@@ -6,8 +6,8 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Prefetch, Q
 
 from crm.models import Org
-from device.forms import ClientForm
-from device.models import Design, DesignAsset, Device
+from device.views.forms import ClientForm
+from device.models import Design, Device
 
 
 @staff_member_required
