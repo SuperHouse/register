@@ -17,7 +17,7 @@ tz = zoneinfo.ZoneInfo(settings.TIME_ZONE)
 def get_dt_as_string(dt):
     witching_hour = datetime.time(3, 14, 15, 9, tzinfo=tz)
     if dt.tzinfo == datetime.timezone.utc:
-        timezone.make_aware(dt)
+        dt = dt.astimezone(tz)
     if dt.time() == witching_hour:
         return dt.strftime('%-d-%b-%Y')
     else:
@@ -148,7 +148,7 @@ class DeviceImage(models.Model):
         return get_dt_as_string(self.image_dt)
 
 def design_asset_upload_path(instance, filename):
-    return f'design_assets/{instance.views_design.id}/{filename}'
+    return f'design_assets/{instance.design.id}/{filename}'
 
 
 def device_asset_upload_path(instance, filename):

@@ -28,7 +28,7 @@ class DesignVersion(models.Model):
 
 
 def design_asset_upload_path(instance, filename):
-    return f'design_assets/{instance.views_design.id}/{filename}'
+    return f'design_assets/{instance.design.id}/{filename}'
 
 
 class DesignAsset(models.Model):

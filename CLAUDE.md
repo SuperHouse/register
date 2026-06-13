@@ -9,8 +9,11 @@ register/
 ├── pyproj/             # Django project root (run everything from here)
 │   ├── authuser/       # Custom user model app
 │   ├── conf/           # Django settings, URLs, middleware
+│   ├── api/            # Django Ninja API app: NinjaAPI instance, shared router, auth
 │   ├── crm/            # Org (client/customer) model, organisation views, API endpoint
-│   ├── device/         # Main app: all PCB/device logic, API, views
+│   ├── erp/            # Placeholder app for future ERP features (not yet in use)
+│   ├── pcba/           # Placeholder app; pcba.designs holds a WIP redesign of Design/DesignAsset (not yet in use)
+│   ├── device/         # Main app: all PCB/device logic, API endpoints, views
 │   └── manage.py
 ├── API.md              # Full REST API documentation
 ├── BARCODES.md         # Planning notes for barcode scheme (future ERP/stock extension)
@@ -86,24 +89,45 @@ The Attachments list is client-side sortable: clicking any column header sorts b
 
 ## Apps
 
+### `api`
+
+Holds the shared Django Ninja API plumbing, split out of `device.api`.
+
+- **[app.py](pyproj/api/app.py)** — The `NinjaAPI` instance (`api`), with docs gated behind `@staff_member_required`. Mounted at `/api/v1/` in `conf/urls.py`.
+- **[routes.py](pyproj/api/routes.py)** — The shared `router` (auth via `AuthByApiKey`), added to `api` via `api.add_router("/", router)`. Endpoint modules (e.g. `device/api.py`) import this `router` and decorate functions on it.
+- **[auth.py](pyproj/api/auth.py)** — `AuthByApiKey` (API-key + IP-allowlist auth for the shared router) and `session_or_api_key_auth` (accepts either a Django session or an API key, used for endpoints like `dashboard-stats/`).
+
+**Known issue (WIP):** `device/api.py` calls `@router.get('dashboard-stats/', auth=session_or_api_key_auth, ...)` but does not import `session_or_api_key_auth` from `api.auth` — the equivalent function is defined but commented out locally in `device/api.py`. This will raise a `NameError` on import until fixed.
+
 ### `crm`
 
 Organisation (customer/supplier/manufacturer) data.
 
 - **[models.py](pyproj/crm/models.py)** — `Org` model (formerly `Client` in `device`). Fields: `company_name`, `logo`, `api_key`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier`.
-- **[views.py](pyproj/crm/views.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` views (all staff-only). Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design.
-- **[api.py](pyproj/crm/api.py)** — `GET /api/v1/clients/` endpoint; registers on the shared `device` router.
-- **[schema.py](pyproj/crm/schema.py)** — Pydantic schema for the `Org` API response.
+- **[views.py](pyproj/crm/views.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` views (all staff-only); this is the module actually wired up in `conf/urls.py`. Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design.
 - **[admin.py](pyproj/crm/admin.py)** — Registers `Org` with the Django admin.
 - **[context_processor.py](pyproj/crm/context_processor.py)** — `get_client_logo_processor`: injects `client_logo` and `client_name` into all templates for non-staff users.
+- **`views/` directory (WIP, currently unused/broken)** — `crm/views/api.py`, `crm/views/schema.py`, and `crm/views/__init__..py` (note the double dot — not a valid `__init__.py`) are leftovers from an in-progress attempt to split `crm/views.py` into a package. Because `__init__..py` isn't a real package init, `crm.views` still resolves to `crm/views.py` above. These files reference modules that don't exist (`device.views.forms`, `device.views.router`, `views.schema`) and should either be finished or removed.
+
+### `erp`
+
+Placeholder app for future ERP/stock-and-ordering features. Currently just `models.py`/`admin.py` stubs with no models defined; registered in `INSTALLED_APPS` but not yet used anywhere.
+
+### `pcba`
+
+Placeholder app, plus a `pcba.designs` sub-app (also in `INSTALLED_APPS`) containing a parallel, **not-yet-wired-up** redesign of the PCB design data model:
+
+- **[designs/models.py](pyproj/pcba/designs/models.py)** — New `Design` / `DesignVersion` / `DesignAsset` models. `Design` now holds only `name`, `sku`, `description`, and `owner` (FK → `crm.Org`); per-revision fields (`hw_version`, `price`, `DesignAsset`s) move to `DesignVersion`. `DesignAsset` here is a near-copy of `device.DesignAsset` but FKs to `DesignVersion` instead of `Design`.
+- **[designs/admin.py](pyproj/pcba/designs/admin.py)** — Admin registrations for the above (`DesignVersionAdmin` with inline `DesignAsset`, `DesignAdmin` with inline `DesignVersion`).
+- No views, URLs, or templates reference `pcba.designs` yet — the live Design/DesignAsset models are still `device.models.Design` / `device.models.DesignAsset`.
 
 ### `device` (main app)
 
 All PCB business logic lives here.
 
-- **[models.py](pyproj/device/models.py)** — All device models. `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
+- **[models.py](pyproj/device/models.py)** — All device models, plus the still-current `Design`/`DesignAsset` (see `pcba` above for their planned eventual replacements). `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
 - **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Org`(s). List pages (Boards, Designs) use server-side filtering (not client-side) so filtering works correctly with pagination. Designs list is paginated. Device asset views (`device_asset_add`, `device_asset_edit`, `device_asset_delete`) mirror the design asset views.
-- **[api.py](pyproj/device/api.py)** — Django Ninja REST API router. Auth via `X-API-Key` header + IP allowlist. The `crm` app also registers endpoints on this router.
+- **[api.py](pyproj/device/api.py)** — Device/design/test-record API endpoints, decorated onto the shared `router` imported from `api.routes`. See the `api` app above for the router/auth setup, and the known `session_or_api_key_auth` issue.
 - **[schemas.py](pyproj/device/schemas.py)** — Pydantic schemas for the device API endpoints.
 - **[admin.py](pyproj/device/admin.py)** — Django admin config at `/office/`.
 - **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`. Note: design and organisation URLs are in `conf/urls.py`, not here.
@@ -135,7 +159,7 @@ Key endpoints:
 
 | Method | URL | Description | Auth |
 |---|---|---|---|
-| GET | `/api/v1/clients/` | List all clients | API key |
+| GET | `/api/v1/clients/` | List all clients (currently **not registered** — only exists in the broken `crm/views/api.py`, see `crm` app notes) | API key |
 | GET | `/api/v1/designs/` | List designs (filter with `?client_pk=`) | API key |
 | POST | `/api/v1/device/add/` | Create or update a device | API key |
 | GET | `/api/v1/device/{pk}/` | Get device details | API key |

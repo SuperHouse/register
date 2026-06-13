@@ -219,7 +219,7 @@ def design_asset_add(request, design_id):
     if request.method == 'POST':
         form = DesignAssetForm(request.POST, request.FILES)
         if form.is_valid():
-            form.instance.views_design = design
+            form.instance.design = design
             asset_type = form.cleaned_data['asset_type']
             replaced = False
             if asset_type in DesignAsset.CORE_ASSET_TYPES:
