@@ -59,8 +59,12 @@
                     </form>
                 </div>
             </div>
+        </div>
+    </div>
 
-            {% if batch %}
+    {% if batch %}
+        <div class="row">
+            <div class="col-12 col-xl-10">
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Production Stages</h5>
@@ -83,9 +87,9 @@
                                         <td>{{ batch_production_stage.name }}</td>
                                         <form method="post" action="{% url 'erp:batch_production_stage_update' batch_production_stage.pk %}" class="d-contents">
                                             {% csrf_token %}
-                                            <td>{{ update_form.status }}</td>
-                                            <td>{{ update_form.due_date }}</td>
-                                            <td>{{ update_form.completion_date }}</td>
+                                            <td class="text-nowrap">{{ update_form.status }}</td>
+                                            <td class="text-nowrap">{{ update_form.due_date }}</td>
+                                            <td class="text-nowrap">{{ update_form.completion_date }}</td>
                                             <td>
                                                 <button type="submit" class="btn btn-sm btn-outline-secondary" title="Save">
                                                     <i class="cil-save"></i>
@@ -138,7 +142,7 @@
                         </div>
                     </div>
                 </div>
-            {% endif %}
+            </div>
         </div>
-    </div>
+    {% endif %}
 {% endblock content %}

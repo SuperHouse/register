@@ -56,13 +56,6 @@
                         Dashboard
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if app_name == 'device' %}active{% endif %}"
-                       href="{% url 'device:top' %}">
-                        <i class="nav-icon cil-memory"></i>
-                        Boards
-                    </a>
-                </li>
                 {% if user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link {% if url_name == 'batch_list' or url_name == 'batch_edit' or url_name == 'batch_add' %}active{% endif %}"
@@ -71,6 +64,15 @@
                             Batches
                         </a>
                     </li>
+                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link {% if app_name == 'device' %}active{% endif %}"
+                       href="{% url 'device:top' %}">
+                        <i class="nav-icon cil-memory"></i>
+                        Boards
+                    </a>
+                </li>
+                {% if user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' %}active{% endif %}"
                            href="{% url 'design_list' %}">

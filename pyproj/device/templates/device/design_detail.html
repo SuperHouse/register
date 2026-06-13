@@ -12,6 +12,13 @@
 {% block content %}
     <div class="col">
         <div class="col-12 col-md-10">
+            <div class="mb-3 d-flex gap-2">
+                <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
+                {% if user.is_staff %}
+                    <a href="{% url 'erp:batch_add' %}?design={{ design.pk }}" class="btn btn-primary">Add New Batch</a>
+                {% endif %}
+            </div>
+
             {% if pcb_top_asset %}
                 <div class="mb-4">
                     <img src="{{ pcb_top_asset.file.url }}"
@@ -269,9 +276,6 @@
                 </div>
             {% endif %}
 
-            <div class="mt-3">
-                <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
-            </div>
         </div>
     </div>
 {% endblock content %}

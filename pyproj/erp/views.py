@@ -285,7 +285,12 @@ def batch_add(request):
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
-        form = BatchForm()
+        initial = {}
+        design_id = request.GET.get('design')
+        if design_id:
+            initial['design'] = design_id
+
+        form = BatchForm(initial=initial)
         apply_template_form = BatchApplyTemplateForm()
 
     ctx = {
