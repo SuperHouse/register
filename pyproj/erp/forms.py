@@ -2,12 +2,12 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django import forms
 
-from .models import Operation, OperationTemplate, OperationTemplateStep
+from .models import ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
-class OperationForm(forms.ModelForm):
+class ProductionStageForm(forms.ModelForm):
     class Meta:
-        model = Operation
+        model = ProductionStage
         fields = ['name', 'color']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -15,9 +15,9 @@ class OperationForm(forms.ModelForm):
         }
 
 
-class OperationTemplateForm(forms.ModelForm):
+class ProductionStageTemplateForm(forms.ModelForm):
     class Meta:
-        model = OperationTemplate
+        model = ProductionStageTemplate
         fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -25,10 +25,10 @@ class OperationTemplateForm(forms.ModelForm):
         }
 
 
-class OperationTemplateStepForm(forms.ModelForm):
+class ProductionStageTemplateStepForm(forms.ModelForm):
     class Meta:
-        model = OperationTemplateStep
-        fields = ['operation']
+        model = ProductionStageTemplateStep
+        fields = ['production_stage']
         widgets = {
-            'operation': forms.Select(attrs={'class': 'form-select'}),
+            'production_stage': forms.Select(attrs={'class': 'form-select'}),
         }

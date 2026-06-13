@@ -1,0 +1,77 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Production Stages - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Production Stages
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        Production stages are the building blocks for production stage templates (e.g. "PCBs stocked", "Top SMT complete").
+        The colour is used to highlight the production stage in the UI.
+    </p>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th style="width: 60px;">Colour</th>
+                        <th>Name</th>
+                        <th style="width: 170px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for production_stage in production_stages %}
+                        <tr>
+                            <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ production_stage.color }};"></span></td>
+                            <td>{{ production_stage.name }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <form method="post" action="{% url 'erp:production_stage_move' production_stage.pk 'up' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move up" {% if forloop.first %}disabled{% endif %}>
+                                            <i class="cil-arrow-top"></i>
+                                        </button>
+                                    </form>
+                                    <form method="post" action="{% url 'erp:production_stage_move' production_stage.pk 'down' %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move down" {% if forloop.last %}disabled{% endif %}>
+                                            <i class="cil-arrow-bottom"></i>
+                                        </button>
+                                    </form>
+                                    <a href="{% url 'erp:production_stage_edit' production_stage.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'erp:production_stage_delete' production_stage.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3"><i>There are no production stages yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                    <tr>
+                        <form method="post">
+                            {% csrf_token %}
+                            <td>{{ form.color }}</td>
+                            <td>
+                                {{ form.name }}
+                                {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                            </td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock content %}

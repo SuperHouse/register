@@ -2,22 +2,22 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Operation, OperationTemplate, OperationTemplateStep
+from .models import ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
-@admin.register(Operation)
-class OperationAdmin(admin.ModelAdmin):
+@admin.register(ProductionStage)
+class ProductionStageAdmin(admin.ModelAdmin):
     list_display = ['name', 'color']
     search_fields = ['name']
 
 
-class OperationTemplateStepInline(admin.TabularInline):
-    model = OperationTemplateStep
+class ProductionStageTemplateStepInline(admin.TabularInline):
+    model = ProductionStageTemplateStep
     extra = 1
 
 
-@admin.register(OperationTemplate)
-class OperationTemplateAdmin(admin.ModelAdmin):
+@admin.register(ProductionStageTemplate)
+class ProductionStageTemplateAdmin(admin.ModelAdmin):
     list_display = ['name', 'description']
     search_fields = ['name']
-    inlines = [OperationTemplateStepInline]
+    inlines = [ProductionStageTemplateStepInline]

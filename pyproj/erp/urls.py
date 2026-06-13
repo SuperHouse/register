@@ -8,13 +8,14 @@ app_name = 'erp'
 
 urlpatterns = [
     path('', views.settings_index, name='settings_index'),
-    path('operations/', views.operation_list, name='operation_list'),
-    path('operations/<int:operation_id>/', views.operation_edit, name='operation_edit'),
-    path('operations/<int:operation_id>/delete/', views.operation_delete, name='operation_delete'),
-    path('templates/', views.template_list, name='template_list'),
-    path('templates/<int:template_id>/', views.template_edit, name='template_edit'),
-    path('templates/<int:template_id>/delete/', views.template_delete, name='template_delete'),
-    path('templates/<int:template_id>/add-step/', views.template_step_add, name='template_step_add'),
-    path('templates/step/<int:step_id>/delete/', views.template_step_delete, name='template_step_delete'),
-    path('templates/step/<int:step_id>/move-<str:direction>/', views.template_step_move, name='template_step_move'),
+    path('production-stages/', views.production_stage_list, name='production_stage_list'),
+    path('production-stages/<int:production_stage_id>/', views.production_stage_edit, name='production_stage_edit'),
+    path('production-stages/<int:production_stage_id>/delete/', views.production_stage_delete, name='production_stage_delete'),
+    path('production-stages/<int:production_stage_id>/move-<str:direction>/', views.production_stage_move, name='production_stage_move'),
+    path('production-stage-templates/', views.production_stage_template_list, name='production_stage_template_list'),
+    path('production-stage-templates/<int:template_id>/', views.production_stage_template_edit, name='production_stage_template_edit'),
+    path('production-stage-templates/<int:template_id>/delete/', views.production_stage_template_delete, name='production_stage_template_delete'),
+    path('production-stage-templates/<int:template_id>/add-step/', views.production_stage_template_step_add, name='production_stage_template_step_add'),
+    path('production-stage-templates/step/<int:step_id>/delete/', views.production_stage_template_step_delete, name='production_stage_template_step_delete'),
+    path('production-stage-templates/step/<int:step_id>/move-<str:direction>/', views.production_stage_template_step_move, name='production_stage_template_step_move'),
 ]

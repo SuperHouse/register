@@ -3,20 +3,21 @@
 from django.db import models
 
 
-class Operation(models.Model):
-    """A type of operation that can be performed on a batch (e.g. 'PCBs stocked', 'Top SMT complete')."""
+class ProductionStage(models.Model):
+    """A stage that a batch can pass through during production (e.g. 'PCBs stocked', 'Top SMT complete')."""
     name = models.CharField(max_length=100, unique=True)
-    color = models.CharField(max_length=7, default='#6c757d', help_text='Used to highlight this operation in the UI')
+    color = models.CharField(max_length=7, default='#6c757d', help_text='Used to highlight this production stage in the UI')
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['name']
+        ordering = ['order']
 
     def __str__(self):
         return self.name
 
 
-class OperationTemplate(models.Model):
-    """A reusable collection of operations that can be applied to a batch (e.g. 'Double-sided hi-rel load')."""
+class ProductionStageTemplate(models.Model):
+    """A reusable collection of production stages that can be applied to a batch (e.g. 'Double-sided hi-rel load')."""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
 
@@ -27,14 +28,14 @@ class OperationTemplate(models.Model):
         return self.name
 
 
-class OperationTemplateStep(models.Model):
-    """An operation at a particular position within an OperationTemplate."""
-    template = models.ForeignKey(OperationTemplate, on_delete=models.CASCADE, related_name='steps')
-    operation = models.ForeignKey(Operation, on_delete=models.PROTECT)
+class ProductionStageTemplateStep(models.Model):
+    """A production stage at a particular position within a ProductionStageTemplate."""
+    template = models.ForeignKey(ProductionStageTemplate, on_delete=models.CASCADE, related_name='steps')
+    production_stage = models.ForeignKey(ProductionStage, on_delete=models.PROTECT)
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ['order']
 
     def __str__(self):
-        return f'{self.template}: {self.order}. {self.operation}'
+        return f'{self.template}: {self.order}. {self.production_stage}'

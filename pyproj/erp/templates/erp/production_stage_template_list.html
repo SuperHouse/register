@@ -1,17 +1,17 @@
 {% extends "device/base-with-sidebar.html" %}
 
 {% block title %}
-    Operations - SuperHouse Device Register
+    Production Stage Templates - SuperHouse Device Register
 {% endblock title %}
 
 {% block h1 %}
-    Operations
+    Production Stage Templates
 {% endblock h1 %}
 
 {% block content %}
     <p class="text-body-secondary">
-        Operations are the building blocks for batch operation templates (e.g. "PCBs stocked", "Top SMT complete").
-        The colour is used to highlight the operation in the UI.
+        Templates are collections of production stages (e.g. "Double-sided hi-rel load") that can be applied to a batch
+        to quickly populate its list of production stages.
     </p>
 
     <div class="card">
@@ -19,38 +19,37 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr class="highlight">
-                        <th style="width: 60px;">Colour</th>
                         <th>Name</th>
-                        <th style="width: 120px;"></th>
+                        <th>Description</th>
+                        <th style="width: 80px;">Steps</th>
+                        <th style="width: 60px;"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for operation in operations %}
-                        <tr>
-                            <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ operation.color }};"></span></td>
-                            <td>{{ operation.name }}</td>
+                    {% for template in templates %}
+                        <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:production_stage_template_edit' template.pk %}'">
+                            <td>{{ template.name }}</td>
+                            <td>{{ template.description|default:"" }}</td>
+                            <td>{{ template.steps.count }}</td>
                             <td>
-                                <a href="{% url 'erp:operation_edit' operation.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
-                                    <i class="cil-pencil"></i>
-                                </a>
-                                <a href="{% url 'erp:operation_delete' operation.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <a href="{% url 'erp:production_stage_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
                                     <i class="cil-trash"></i>
                                 </a>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="3"><i>There are no operations yet.</i></td>
+                            <td colspan="4"><i>There are no production stage templates yet.</i></td>
                         </tr>
                     {% endfor %}
                     <tr>
                         <form method="post">
                             {% csrf_token %}
-                            <td>{{ form.color }}</td>
                             <td>
                                 {{ form.name }}
                                 {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
                             </td>
+                            <td colspan="2">{{ form.description }}</td>
                             <td>
                                 <button type="submit" class="btn btn-sm btn-primary">Add</button>
                             </td>
