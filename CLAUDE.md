@@ -11,7 +11,7 @@ register/
 │   ├── conf/           # Django settings, URLs, middleware
 │   ├── api/            # Django Ninja API app: NinjaAPI instance, shared router, auth
 │   ├── crm/            # Org (client/customer) model, organisation views, API endpoint
-│   ├── erp/            # Placeholder app for future ERP features (not yet in use)
+│   ├── erp/            # ERP app: Settings hub, Production Stages and Production Stage Templates (for future Batch tracking)
 │   ├── pcba/           # Placeholder app; pcba.designs holds a WIP redesign of Design/DesignAsset (not yet in use)
 │   ├── device/         # Main app: all PCB/device logic, API endpoints, views
 │   └── manage.py
@@ -111,7 +111,25 @@ Organisation (customer/supplier/manufacturer) data.
 
 ### `erp`
 
-Placeholder app for future ERP/stock-and-ordering features. Currently just `models.py`/`admin.py` stubs with no models defined; registered in `INSTALLED_APPS` but not yet used anywhere.
+ERP/stock-and-ordering features. Provides the **Settings** hub with **Production Stages** and **Production Stage Templates**, and **Batches** — production runs of a `Design` with an ordered checklist of production stages.
+
+- **[models.py](pyproj/erp/models.py)**:
+  - `ProductionStage` — a stage a batch can pass through during production (e.g. "PCBs stocked", "Top SMT complete"). Fields: `name` (unique), `color` (hex string, used to highlight the stage in the UI), `order` (controls display order and the order of choices in the `ProductionStageTemplateStep` dropdown — both use `Meta.ordering = ['order']`).
+  - `ProductionStageTemplate` — a named, reusable collection of production stages (e.g. "Double-sided hi-rel load"). Fields: `name` (unique), `description`.
+  - `ProductionStageTemplateStep` — a `ProductionStage` at a position within a `ProductionStageTemplate`. Fields: `template` (FK → `ProductionStageTemplate`, `related_name='steps'`, `CASCADE`), `production_stage` (FK → `ProductionStage`, `PROTECT` — a stage in use by any template cannot be deleted), `order`.
+  - `Batch` — a production run of a `Design`. Fields: `design` (FK → `device.Design`, `PROTECT`, `related_name='batches'`), `reference`, `quantity`, `notes`, `created_dt` (`Meta.ordering = ['-created_dt']`).
+  - `BatchProductionStage` — a production stage on a `Batch`, **snapshotted** from a `ProductionStage` at the time it was added (`name`/`color` copied at apply time, so later edits to the template or `ProductionStage` don't retroactively affect in-progress batches). Fields: `batch` (FK → `Batch`, `CASCADE`, `related_name='production_stages'`), `name`, `color`, `order` (`Meta.ordering = ['order']`), `status` (`NOT_STARTED`/`IN_PROGRESS`/`ON_HOLD`/`DONE`, via `STATUS_CHOICES`), `due_date`, `completion_date`. `get_bootstrap_table_class()` maps status to a table row class for the batch detail page.
+- **[views.py](pyproj/erp/views.py)** / **[urls.py](pyproj/erp/urls.py)** (all staff-only, `app_name = 'erp'`, mounted at the site root — each `path()` includes its own `settings/` or `batches/` prefix):
+  - `settings_index` (`/settings/`) — hub page with cards linking to each settings section.
+  - `production_stage_list` / `production_stage_edit` / `production_stage_delete` / `production_stage_move` (`/settings/production-stages/...`) — CRUD for `ProductionStage`, with an inline add row and up/down reordering (swaps `order` with the adjacent row). Delete is blocked with a warning message if the stage is referenced by a template (`ProtectedError`).
+  - `production_stage_template_list` / `production_stage_template_edit` / `production_stage_template_delete` (`/settings/production-stage-templates/...`) — CRUD for `ProductionStageTemplate`, with an inline add row on the list page.
+  - `production_stage_template_step_add` / `_delete` / `_move` — manage the ordered list of `ProductionStageTemplateStep`s on the template edit page (add via dropdown, remove, and up/down reordering by swapping `order`).
+  - `batch_list` / `batch_add` / `batch_edit` / `batch_delete` (`/batches/...`) — CRUD for `Batch`. `batch_edit` is also the detail page, managing the batch's `BatchProductionStage` list.
+  - `batch_apply_template` — applies a `ProductionStageTemplate` to a batch via `_apply_template_to_batch()`, which snapshots each `ProductionStageTemplateStep`'s stage into a new `BatchProductionStage`, appended after any existing stages. Stages whose `name` already exists on the batch are skipped, so re-applying (or applying a second template) only adds genuinely new stages.
+  - `batch_production_stage_add` / `_update` / `_delete` / `_move` — manage individual `BatchProductionStage` rows on a batch: manual add (snapshots name/color from a chosen `ProductionStage`), inline status/due-date/completion-date update, delete, and up/down reordering (swapping `order`).
+- **[forms.py](pyproj/erp/forms.py)** — `ProductionStageForm` (name + colour picker), `ProductionStageTemplateForm` (name + description), `ProductionStageTemplateStepForm` (production stage select, ordered per `ProductionStage.Meta.ordering`), `BatchForm` (design/reference/quantity/notes), `BatchApplyTemplateForm` (template select), `BatchProductionStageAddForm` (production stage select, for manual add), `BatchProductionStageUpdateForm` (status/due_date/completion_date).
+- **[admin.py](pyproj/erp/admin.py)** — registers `ProductionStage` and `ProductionStageTemplate` (with an inline `ProductionStageTemplateStep` editor), and `Batch` (with an inline `BatchProductionStage` editor).
+- Sidebar: staff users see a "Batches" link (`erp:batch_list`) alongside Boards, and a "Settings" link (`erp:settings_index`) below Organisations.
 
 ### `pcba`
 

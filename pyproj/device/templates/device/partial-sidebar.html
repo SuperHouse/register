@@ -65,6 +65,13 @@
                 </li>
                 {% if user.is_staff %}
                     <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'batch_list' or url_name == 'batch_edit' or url_name == 'batch_add' %}active{% endif %}"
+                           href="{% url 'erp:batch_list' %}">
+                            <i class="nav-icon cil-layers"></i>
+                            Batches
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' %}active{% endif %}"
                            href="{% url 'design_list' %}">
                             <i class="nav-icon cil-list"></i>
@@ -79,7 +86,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if app_name == 'erp' %}active{% endif %}"
+                        <a class="nav-link {% if app_name == 'erp' and url_name != 'batch_list' and url_name != 'batch_edit' and url_name != 'batch_add' %}active{% endif %}"
                            href="{% url 'erp:settings_index' %}">
                             <i class="nav-icon cil-settings"></i>
                             Settings

@@ -2,7 +2,7 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django import forms
 
-from .models import ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 class ProductionStageForm(forms.ModelForm):
@@ -31,4 +31,42 @@ class ProductionStageTemplateStepForm(forms.ModelForm):
         fields = ['production_stage']
         widgets = {
             'production_stage': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+
+class BatchForm(forms.ModelForm):
+    class Meta:
+        model = Batch
+        fields = ['design', 'reference', 'quantity', 'notes']
+        widgets = {
+            'design': forms.Select(attrs={'class': 'form-select'}),
+            'reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+
+class BatchApplyTemplateForm(forms.Form):
+    template = forms.ModelChoiceField(
+        queryset=ProductionStageTemplate.objects.all(),
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+
+class BatchProductionStageAddForm(forms.Form):
+    production_stage = forms.ModelChoiceField(
+        queryset=ProductionStage.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+
+class BatchProductionStageUpdateForm(forms.ModelForm):
+    class Meta:
+        model = BatchProductionStage
+        fields = ['status', 'due_date', 'completion_date']
+        widgets = {
+            'status': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
+            'completion_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
         }

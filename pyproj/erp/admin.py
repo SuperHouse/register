@@ -2,7 +2,7 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 @admin.register(ProductionStage)
@@ -21,3 +21,15 @@ class ProductionStageTemplateAdmin(admin.ModelAdmin):
     list_display = ['name', 'description']
     search_fields = ['name']
     inlines = [ProductionStageTemplateStepInline]
+
+
+class BatchProductionStageInline(admin.TabularInline):
+    model = BatchProductionStage
+    extra = 0
+
+
+@admin.register(Batch)
+class BatchAdmin(admin.ModelAdmin):
+    list_display = ['design', 'reference', 'quantity', 'created_dt']
+    search_fields = ['reference', 'design__name', 'design__sku']
+    inlines = [BatchProductionStageInline]

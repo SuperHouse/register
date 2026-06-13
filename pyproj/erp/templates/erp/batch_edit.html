@@ -1,0 +1,144 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    {% if batch %}Edit Batch{% else %}Add Batch{% endif %} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    {% if batch %}Edit Batch{% else %}Add Batch{% endif %}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.design.id_for_label }}" class="form-label">{{ form.design.label }}</label>
+                            {{ form.design }}
+                            {% if form.design.errors %}<div class="text-danger small">{{ form.design.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.reference.id_for_label }}" class="form-label">{{ form.reference.label }}</label>
+                            {{ form.reference }}
+                            {% if form.reference.errors %}<div class="text-danger small">{{ form.reference.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.quantity.id_for_label }}" class="form-label">{{ form.quantity.label }}</label>
+                            {{ form.quantity }}
+                            {% if form.quantity.errors %}<div class="text-danger small">{{ form.quantity.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}<div class="text-danger small">{{ form.notes.errors }}</div>{% endif %}
+                        </div>
+
+                        {% if not batch %}
+                            <div class="mb-3">
+                                <label for="{{ apply_template_form.template.id_for_label }}" class="form-label">Apply Production Stage Template</label>
+                                {{ apply_template_form.template }}
+                                <div class="form-text">Optionally pre-populate the production stages list from a template.</div>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'erp:batch_list' %}" class="btn btn-secondary">Back to Batches</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {% if batch %}
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Production Stages</h5>
+                        <table class="table table-striped align-middle mb-3">
+                            <thead>
+                                <tr class="highlight">
+                                    <th style="width: 40px;">Colour</th>
+                                    <th>Name</th>
+                                    <th style="width: 150px;">Status</th>
+                                    <th style="width: 150px;">Due Date</th>
+                                    <th style="width: 150px;">Completion Date</th>
+                                    <th style="width: 50px;"></th>
+                                    <th style="width: 130px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for batch_production_stage, update_form in production_stages_with_forms %}
+                                    <tr class="{{ batch_production_stage.get_bootstrap_table_class }}">
+                                        <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ batch_production_stage.color }};"></span></td>
+                                        <td>{{ batch_production_stage.name }}</td>
+                                        <form method="post" action="{% url 'erp:batch_production_stage_update' batch_production_stage.pk %}" class="d-contents">
+                                            {% csrf_token %}
+                                            <td>{{ update_form.status }}</td>
+                                            <td>{{ update_form.due_date }}</td>
+                                            <td>{{ update_form.completion_date }}</td>
+                                            <td>
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Save">
+                                                    <i class="cil-save"></i>
+                                                </button>
+                                            </td>
+                                        </form>
+                                        <td class="text-nowrap">
+                                            <div class="d-flex gap-1">
+                                                <form method="post" action="{% url 'erp:batch_production_stage_move' batch_production_stage.pk 'up' %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move up" {% if forloop.first %}disabled{% endif %}>
+                                                        <i class="cil-arrow-top"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="post" action="{% url 'erp:batch_production_stage_move' batch_production_stage.pk 'down' %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move down" {% if forloop.last %}disabled{% endif %}>
+                                                        <i class="cil-arrow-bottom"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="post" action="{% url 'erp:batch_production_stage_delete' batch_production_stage.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                        <i class="cil-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="7"><i>No production stages have been added to this batch yet.</i></td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <div class="d-flex flex-wrap gap-3">
+                            <form method="post" action="{% url 'erp:batch_apply_template' batch.pk %}" class="d-flex gap-2">
+                                {% csrf_token %}
+                                {{ apply_template_form.template }}
+                                <button type="submit" class="btn btn-primary text-nowrap">Apply Template</button>
+                            </form>
+
+                            <form method="post" action="{% url 'erp:batch_production_stage_add' batch.pk %}" class="d-flex gap-2">
+                                {% csrf_token %}
+                                {{ add_production_stage_form.production_stage }}
+                                <button type="submit" class="btn btn-primary text-nowrap">Add Production Stage</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}
