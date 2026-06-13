@@ -71,18 +71,20 @@
                         <table class="table table-striped align-middle mb-3">
                             <thead>
                                 <tr class="highlight">
-                                    <th style="width: 40px;">Colour</th>
+                                    <th style="width: 30px;"></th>
+                                    <th style="width: 40px;"></th>
                                     <th>Name</th>
                                     <th style="width: 150px;">Status</th>
                                     <th style="width: 150px;">Due Date</th>
                                     <th style="width: 150px;">Completion Date</th>
                                     <th style="width: 50px;"></th>
-                                    <th style="width: 130px;"></th>
+                                    <th style="width: 50px;"></th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="production-stages-body" data-reorder-url="{% url 'erp:batch_production_stage_reorder' batch.pk %}">
                                 {% for batch_production_stage, update_form in production_stages_with_forms %}
-                                    <tr class="{{ batch_production_stage.get_bootstrap_table_class }}">
+                                    <tr class="{{ batch_production_stage.get_bootstrap_table_class }}" data-stage-id="{{ batch_production_stage.pk }}">
+                                        <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
                                         <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ batch_production_stage.color }};"></span></td>
                                         <td>{{ batch_production_stage.name }}</td>
                                         <form method="post" action="{% url 'erp:batch_production_stage_update' batch_production_stage.pk %}" class="d-contents">
@@ -97,31 +99,17 @@
                                             </td>
                                         </form>
                                         <td class="text-nowrap">
-                                            <div class="d-flex gap-1">
-                                                <form method="post" action="{% url 'erp:batch_production_stage_move' batch_production_stage.pk 'up' %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move up" {% if forloop.first %}disabled{% endif %}>
-                                                        <i class="cil-arrow-top"></i>
-                                                    </button>
-                                                </form>
-                                                <form method="post" action="{% url 'erp:batch_production_stage_move' batch_production_stage.pk 'down' %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move down" {% if forloop.last %}disabled{% endif %}>
-                                                        <i class="cil-arrow-bottom"></i>
-                                                    </button>
-                                                </form>
-                                                <form method="post" action="{% url 'erp:batch_production_stage_delete' batch_production_stage.pk %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
-                                                        <i class="cil-trash"></i>
-                                                    </button>
-                                                </form>
-                                            </div>
+                                            <form method="post" action="{% url 'erp:batch_production_stage_delete' batch_production_stage.pk %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                    <i class="cil-trash"></i>
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="7"><i>No production stages have been added to this batch yet.</i></td>
+                                        <td colspan="8"><i>No production stages have been added to this batch yet.</i></td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -146,3 +134,46 @@
         </div>
     {% endif %}
 {% endblock content %}
+
+{% block extra_js %}
+    {% if batch %}
+        <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
+        <script>
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            const productionStagesBody = document.getElementById('production-stages-body');
+            if (productionStagesBody) {
+                Sortable.create(productionStagesBody, {
+                    handle: '.bi-grip-vertical',
+                    animation: 150,
+                    onEnd: function () {
+                        const order = Array.from(productionStagesBody.querySelectorAll('tr[data-stage-id]'))
+                            .map(function (row) { return row.dataset.stageId; });
+
+                        fetch(productionStagesBody.dataset.reorderUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': getCookie('csrftoken'),
+                            },
+                            body: JSON.stringify({ order: order }),
+                        });
+                    },
+                });
+            }
+        </script>
+    {% endif %}
+{% endblock extra_js %}

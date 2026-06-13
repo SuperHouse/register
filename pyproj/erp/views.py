@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import json
+
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import ProtectedError
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (
@@ -417,24 +420,17 @@ def batch_production_stage_delete(request, batch_production_stage_id):
 
 
 @staff_member_required
-def batch_production_stage_move(request, batch_production_stage_id, direction):
-    batch_production_stage = get_object_or_404(BatchProductionStage, pk=batch_production_stage_id)
-    batch_id = batch_production_stage.batch_id
+def batch_production_stage_reorder(request, batch_id):
+    batch = get_object_or_404(Batch, pk=batch_id)
 
     if request.method == 'POST':
-        stages = list(batch_production_stage.batch.production_stages.order_by('order'))
-        index = stages.index(batch_production_stage)
+        data = json.loads(request.body)
+        stages_by_id = {stage.pk: stage for stage in batch.production_stages.all()}
 
-        if direction == 'up' and index > 0:
-            other = stages[index - 1]
-        elif direction == 'down' and index < len(stages) - 1:
-            other = stages[index + 1]
-        else:
-            other = None
+        for index, stage_id in enumerate(data.get('order', []), start=1):
+            stage = stages_by_id.get(int(stage_id))
+            if stage and stage.order != index:
+                stage.order = index
+                stage.save(update_fields=['order'])
 
-        if other:
-            batch_production_stage.order, other.order = other.order, batch_production_stage.order
-            batch_production_stage.save()
-            other.save()
-
-    return redirect('erp:batch_edit', batch_id=batch_id)
+    return JsonResponse({'status': 'ok'})

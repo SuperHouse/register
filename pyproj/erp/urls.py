@@ -27,5 +27,5 @@ urlpatterns = [
     path('batches/<int:batch_id>/add-production-stage/', views.batch_production_stage_add, name='batch_production_stage_add'),
     path('batches/production-stage/<int:batch_production_stage_id>/update/', views.batch_production_stage_update, name='batch_production_stage_update'),
     path('batches/production-stage/<int:batch_production_stage_id>/delete/', views.batch_production_stage_delete, name='batch_production_stage_delete'),
-    path('batches/production-stage/<int:batch_production_stage_id>/move-<str:direction>/', views.batch_production_stage_move, name='batch_production_stage_move'),
+    path('batches/<int:batch_id>/reorder-production-stages/', views.batch_production_stage_reorder, name='batch_production_stage_reorder'),
 ]
