@@ -38,6 +38,7 @@ urlpatterns = [
     path('organisation/', crm_views.organisation_list, name='organisation_list'),
     path('organisation/<int:client_id>/', crm_views.organisation_detail, name='organisation_detail'),
     path('organisation/<int:client_id>/edit/', crm_views.organisation_edit, name='organisation_edit'),
+    path('settings/', include('erp.urls')),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

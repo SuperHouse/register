@@ -1,0 +1,38 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Settings - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Settings
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:operation_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-list-check me-2"></i>Operations</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage the list of operations that can be used to build batch operation templates.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:template_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-collection me-2"></i>Operation Templates</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage collections of operations that can be applied to a batch to quickly populate its operation list.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+{% endblock content %}
