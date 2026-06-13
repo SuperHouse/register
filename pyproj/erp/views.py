@@ -98,26 +98,18 @@ def production_stage_edit(request, production_stage_id):
 
 
 @staff_member_required
-def production_stage_move(request, production_stage_id, direction):
-    production_stage = get_object_or_404(ProductionStage, pk=production_stage_id)
-
+def production_stage_reorder(request):
     if request.method == 'POST':
-        stages = list(ProductionStage.objects.order_by('order'))
-        index = stages.index(production_stage)
+        data = json.loads(request.body)
+        stages_by_id = {stage.pk: stage for stage in ProductionStage.objects.all()}
 
-        if direction == 'up' and index > 0:
-            other = stages[index - 1]
-        elif direction == 'down' and index < len(stages) - 1:
-            other = stages[index + 1]
-        else:
-            other = None
+        for index, stage_id in enumerate(data.get('order', []), start=1):
+            stage = stages_by_id.get(int(stage_id))
+            if stage and stage.order != index:
+                stage.order = index
+                stage.save(update_fields=['order'])
 
-        if other:
-            production_stage.order, other.order = other.order, production_stage.order
-            production_stage.save()
-            other.save()
-
-    return redirect('erp:production_stage_list')
+    return JsonResponse({'status': 'ok'})
 
 
 @staff_member_required
@@ -237,27 +229,20 @@ def production_stage_template_step_delete(request, step_id):
 
 
 @staff_member_required
-def production_stage_template_step_move(request, step_id, direction):
-    step = get_object_or_404(ProductionStageTemplateStep, pk=step_id)
-    template_id = step.template_id
+def production_stage_template_step_reorder(request, template_id):
+    template = get_object_or_404(ProductionStageTemplate, pk=template_id)
 
     if request.method == 'POST':
-        steps = list(step.template.steps.order_by('order'))
-        index = steps.index(step)
+        data = json.loads(request.body)
+        steps_by_id = {step.pk: step for step in template.steps.all()}
 
-        if direction == 'up' and index > 0:
-            other = steps[index - 1]
-        elif direction == 'down' and index < len(steps) - 1:
-            other = steps[index + 1]
-        else:
-            other = None
+        for index, step_id in enumerate(data.get('order', []), start=1):
+            step = steps_by_id.get(int(step_id))
+            if step and step.order != index:
+                step.order = index
+                step.save(update_fields=['order'])
 
-        if other:
-            step.order, other.order = other.order, step.order
-            step.save()
-            other.save()
-
-    return redirect('erp:production_stage_template_edit', template_id=template_id)
+    return JsonResponse({'status': 'ok'})
 
 
 @staff_member_required

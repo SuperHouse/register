@@ -46,42 +46,30 @@
                     <table class="table table-striped align-middle mb-3">
                         <thead>
                             <tr class="highlight">
+                                <th style="width: 30px;"></th>
                                 <th style="width: 60px;">Colour</th>
                                 <th>Production Stage</th>
-                                <th style="width: 130px;"></th>
+                                <th style="width: 50px;"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="production-stages-body" data-reorder-url="{% url 'erp:production_stage_template_step_reorder' template.pk %}">
                             {% for step in steps %}
-                                <tr>
+                                <tr data-stage-id="{{ step.pk }}">
+                                    <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
                                     <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ step.production_stage.color }};"></span></td>
                                     <td>{{ step.production_stage.name }}</td>
                                     <td class="text-nowrap">
-                                        <div class="d-flex gap-1">
-                                            <form method="post" action="{% url 'erp:production_stage_template_step_move' step.pk 'up' %}">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move up" {% if forloop.first %}disabled{% endif %}>
-                                                    <i class="cil-arrow-top"></i>
-                                                </button>
-                                            </form>
-                                            <form method="post" action="{% url 'erp:production_stage_template_step_move' step.pk 'down' %}">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Move down" {% if forloop.last %}disabled{% endif %}>
-                                                    <i class="cil-arrow-bottom"></i>
-                                                </button>
-                                            </form>
-                                            <form method="post" action="{% url 'erp:production_stage_template_step_delete' step.pk %}">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
-                                                    <i class="cil-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
+                                        <form method="post" action="{% url 'erp:production_stage_template_step_delete' step.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                <i class="cil-trash"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="3"><i>No production stages have been added to this template yet.</i></td>
+                                    <td colspan="4"><i>No production stages have been added to this template yet.</i></td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -97,3 +85,10 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
+    <script>
+        initSortableReorder('production-stages-body');
+    </script>
+{% endblock extra_js %}

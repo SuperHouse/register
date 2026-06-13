@@ -139,41 +139,7 @@
     {% if batch %}
         <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
         <script>
-            function getCookie(name) {
-                let cookieValue = null;
-                if (document.cookie && document.cookie !== '') {
-                    const cookies = document.cookie.split(';');
-                    for (let i = 0; i < cookies.length; i++) {
-                        const cookie = cookies[i].trim();
-                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                            break;
-                        }
-                    }
-                }
-                return cookieValue;
-            }
-
-            const productionStagesBody = document.getElementById('production-stages-body');
-            if (productionStagesBody) {
-                Sortable.create(productionStagesBody, {
-                    handle: '.bi-grip-vertical',
-                    animation: 150,
-                    onEnd: function () {
-                        const order = Array.from(productionStagesBody.querySelectorAll('tr[data-stage-id]'))
-                            .map(function (row) { return row.dataset.stageId; });
-
-                        fetch(productionStagesBody.dataset.reorderUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': getCookie('csrftoken'),
-                            },
-                            body: JSON.stringify({ order: order }),
-                        });
-                    },
-                });
-            }
+            initSortableReorder('production-stages-body');
         </script>
     {% endif %}
 {% endblock extra_js %}

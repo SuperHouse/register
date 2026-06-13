@@ -1,3 +1,44 @@
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Enables drag-and-drop reordering of <tr> rows within the <tbody> identified by tbodyId.
+// Each row must have a data-stage-id attribute; the new order is posted to the URL in the
+// tbody's data-reorder-url attribute as JSON: {"order": [id, id, ...]}.
+function initSortableReorder(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody || typeof Sortable === 'undefined') return;
+
+    Sortable.create(tbody, {
+        handle: '.bi-grip-vertical',
+        animation: 150,
+        onEnd: function () {
+            const order = Array.from(tbody.querySelectorAll('tr[data-stage-id]'))
+                .map(function (row) { return row.dataset.stageId; });
+
+            fetch(tbody.dataset.reorderUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ order: order }),
+            });
+        },
+    });
+}
+
 function initServerFilter(resultsId) {
     const input = document.getElementById('list-search');
     const clearBtn = document.getElementById('list-search-clear');
