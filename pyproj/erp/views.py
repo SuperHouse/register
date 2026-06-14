@@ -7,6 +7,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from .forms import (
     BatchApplyTemplateForm,
@@ -390,6 +391,25 @@ def batch_production_stage_update(request, batch_production_stage_id):
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
 
     return redirect('erp:batch_edit', batch_id=batch_production_stage.batch_id)
+
+
+@staff_member_required
+def batch_production_stage_set_status(request, batch_production_stage_id, status):
+    batch_production_stage = get_object_or_404(BatchProductionStage, pk=batch_production_stage_id)
+
+    if request.method != 'POST' or status not in dict(BatchProductionStage.STATUS_CHOICES):
+        return JsonResponse({'status': 'error'}, status=400)
+
+    batch_production_stage.status = status
+    if status == BatchProductionStage.DONE:
+        batch_production_stage.completion_date = timezone.now()
+    batch_production_stage.save()
+
+    return JsonResponse({
+        'status': batch_production_stage.status,
+        'table_class': batch_production_stage.get_bootstrap_table_class(),
+        'completion_date': timezone.localtime(batch_production_stage.completion_date).strftime('%Y-%m-%dT%H:%M:%S') if batch_production_stage.completion_date else '',
+    })
 
 
 @staff_member_required

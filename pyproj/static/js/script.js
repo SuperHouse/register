@@ -39,6 +39,51 @@ function initSortableReorder(tbodyId) {
     });
 }
 
+// Wires up .status-btn buttons within the <tbody> identified by tbodyId so clicking one
+// posts to its data-url and updates the row's status highlighting, table colour class,
+// and completion date input (if returned) without reloading the page.
+function initStatusButtons(tbodyId) {
+    const tbody = document.getElementById(tbodyId);
+    if (!tbody) return;
+
+    tbody.addEventListener('click', function (event) {
+        const button = event.target.closest('.status-btn');
+        if (!button) return;
+
+        const row = button.closest('tr');
+        const group = button.closest('.status-buttons');
+
+        fetch(button.dataset.url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+        })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                if (!data.status) return;
+
+                group.querySelectorAll('.status-btn').forEach(function (btn) {
+                    const color = btn.dataset.color;
+                    btn.classList.remove('btn-' + color, 'btn-outline-' + color);
+                    btn.classList.add(btn.dataset.status === data.status ? 'btn-' + color : 'btn-outline-' + color);
+                });
+
+                row.classList.remove('table-info', 'table-warning', 'table-success');
+                if (data.table_class) {
+                    row.classList.add(data.table_class);
+                }
+
+                if (data.completion_date) {
+                    const completionInput = row.querySelector('input[name="completion_date"]');
+                    if (completionInput) {
+                        completionInput.value = data.completion_date;
+                    }
+                }
+            });
+    });
+}
+
 function initServerFilter(resultsId) {
     const input = document.getElementById('list-search');
     const clearBtn = document.getElementById('list-search-clear');

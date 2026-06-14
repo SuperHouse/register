@@ -74,9 +74,9 @@
                                     <th style="width: 30px;"></th>
                                     <th style="width: 40px;"></th>
                                     <th>Name</th>
-                                    <th style="width: 150px;">Status</th>
+                                    <th style="width: 170px;">Status</th>
                                     <th style="width: 150px;">Due Date</th>
-                                    <th style="width: 150px;">Completion Date</th>
+                                    <th style="width: 220px;">Completion Date</th>
                                     <th style="width: 50px;"></th>
                                     <th style="width: 50px;"></th>
                                 </tr>
@@ -87,9 +87,24 @@
                                         <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
                                         <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ batch_production_stage.color }};"></span></td>
                                         <td>{{ batch_production_stage.name }}</td>
+                                        <td class="text-nowrap">
+                                            <div class="d-flex gap-1 status-buttons">
+                                                <button type="button" class="btn btn-sm status-btn {% if batch_production_stage.status == 'NOT_STARTED' %}btn-secondary{% else %}btn-outline-secondary{% endif %}" data-status="NOT_STARTED" data-color="secondary" data-url="{% url 'erp:batch_production_stage_set_status' batch_production_stage.pk 'NOT_STARTED' %}" title="Not Started">
+                                                    <i class="bi bi-circle"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm status-btn {% if batch_production_stage.status == 'IN_PROGRESS' %}btn-info{% else %}btn-outline-info{% endif %}" data-status="IN_PROGRESS" data-color="info" data-url="{% url 'erp:batch_production_stage_set_status' batch_production_stage.pk 'IN_PROGRESS' %}" title="In Progress">
+                                                    <i class="bi bi-play-circle"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm status-btn {% if batch_production_stage.status == 'ON_HOLD' %}btn-warning{% else %}btn-outline-warning{% endif %}" data-status="ON_HOLD" data-color="warning" data-url="{% url 'erp:batch_production_stage_set_status' batch_production_stage.pk 'ON_HOLD' %}" title="On Hold">
+                                                    <i class="bi bi-pause-circle"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm status-btn {% if batch_production_stage.status == 'DONE' %}btn-success{% else %}btn-outline-success{% endif %}" data-status="DONE" data-color="success" data-url="{% url 'erp:batch_production_stage_set_status' batch_production_stage.pk 'DONE' %}" title="Done">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                            </div>
+                                        </td>
                                         <form method="post" action="{% url 'erp:batch_production_stage_update' batch_production_stage.pk %}" class="d-contents">
                                             {% csrf_token %}
-                                            <td class="text-nowrap">{{ update_form.status }}</td>
                                             <td class="text-nowrap">{{ update_form.due_date }}</td>
                                             <td class="text-nowrap">{{ update_form.completion_date }}</td>
                                             <td>
@@ -140,6 +155,7 @@
         <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
         <script>
             initSortableReorder('production-stages-body');
+            initStatusButtons('production-stages-body');
         </script>
     {% endif %}
 {% endblock extra_js %}

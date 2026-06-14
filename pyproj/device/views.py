@@ -152,11 +152,15 @@ def design_detail(request, design_id):
         (DesignAsset.SCHEMATIC, 'Schematic Design File'),
         (DesignAsset.PCB_DESIGN, 'PCB Design File'),
         (DesignAsset.BOM, 'Bill of Materials'),
+    ]
+    testing_type_order = [
         (DesignAsset.FIRMWARE, 'Firmware Binary'),
     ]
     existing_core = {a.asset_type: a for a in assets.filter(asset_type__in=DesignAsset.CORE_ASSET_TYPES)}
     core_assets = [(type_key, label, existing_core.get(type_key)) for type_key, label in core_type_order]
-    has_core_assets = bool(existing_core)
+    has_core_assets = any(asset for _, _, asset in core_assets)
+    testing_assets = [(type_key, label, existing_core.get(type_key)) for type_key, label in testing_type_order]
+    has_testing_assets = any(asset for _, _, asset in testing_assets)
 
     attachments = assets.filter(asset_type=DesignAsset.ATTACHMENT)
     pcb_top_asset = existing_core.get(DesignAsset.PCB_TOP)
@@ -167,6 +171,8 @@ def design_detail(request, design_id):
         'device_count': devices.count(),
         'core_assets': core_assets,
         'has_core_assets': has_core_assets,
+        'testing_assets': testing_assets,
+        'has_testing_assets': has_testing_assets,
         'attachments': attachments,
         'asset_form': DesignAssetForm() if request.user.is_staff else None,
         'pcb_top_asset': pcb_top_asset,

@@ -81,7 +81,7 @@ class BatchProductionStage(models.Model):
     order = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=NOT_STARTED)
     due_date = models.DateField(null=True, blank=True)
-    completion_date = models.DateField(null=True, blank=True)
+    completion_date = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['order']

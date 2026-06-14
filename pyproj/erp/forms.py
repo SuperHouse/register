@@ -64,9 +64,11 @@ class BatchProductionStageAddForm(forms.Form):
 class BatchProductionStageUpdateForm(forms.ModelForm):
     class Meta:
         model = BatchProductionStage
-        fields = ['status', 'due_date', 'completion_date']
+        fields = ['due_date', 'completion_date']
         widgets = {
-            'status': forms.Select(attrs={'class': 'form-select form-select-sm'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
-            'completion_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-sm'}),
+            'completion_date': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'step': '1', 'class': 'form-control form-control-sm'},
+                format='%Y-%m-%dT%H:%M:%S',
+            ),
         }
