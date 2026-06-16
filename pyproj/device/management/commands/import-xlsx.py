@@ -35,10 +35,9 @@ class Command(BaseCommand):
 
         wb = load_workbook(filename=filename)
 
-        known_sheets = 'Devices/Queue/DeviceTypes/Raw Serials/Patched Boards'
-        assert set(known_sheets.split('/')) == set(
-            wb.sheetnames
-        ), f'Expected sheets: {known_sheets}; Actual sheets: {wb.sheetnames}'
+        required_sheets = {'Devices', 'DeviceTypes'}
+        missing = required_sheets - set(wb.sheetnames)
+        assert not missing, f'Missing required sheets: {missing}; Actual sheets: {wb.sheetnames}'
 
         # Read from the second sheet, DeviceTypes
         ws_design = wb['DeviceTypes']
