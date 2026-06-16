@@ -3,7 +3,7 @@
 from django import forms
 
 from device.models import Design
-from .models import Batch, BatchProductionStage, Location, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -104,6 +104,39 @@ def _get_descendant_pks(all_locations, root_pk):
                 result.add(loc.pk)
                 to_visit.append(loc.pk)
     return result
+
+
+class PartForm(forms.ModelForm):
+    class Meta:
+        model = Part
+        fields = ['name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'image', 'notes']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'device': forms.TextInput(attrs={'class': 'form-control'}),
+            'package': forms.TextInput(attrs={'class': 'form-control'}),
+            'value': forms.TextInput(attrs={'class': 'form-control'}),
+            'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
+            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['category'].required = False
+        self.fields['category'].empty_label = '(uncategorised)'
+
+
+class PartAssetForm(forms.ModelForm):
+    class Meta:
+        model = PartAsset
+        fields = ['file', 'name', 'description']
+        widgets = {
+            'file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+        }
 
 
 class PartCategoryForm(forms.ModelForm):

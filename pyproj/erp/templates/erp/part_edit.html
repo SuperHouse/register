@@ -1,0 +1,191 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    {% if part %}{{ part.name }}{% else %}Add Part{% endif %} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    {% if part %}{{ part.name }}{% else %}Add Part{% endif %}
+{% endblock h1 %}
+
+{% block content %}
+    {% if part and part.image %}
+        <div class="mb-4">
+            <img src="{{ part.image.url }}" alt="{{ part.name }}"
+                 class="rounded" style="max-width: 300px; max-height: 300px; object-fit: contain;">
+        </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>{% if part %}Edit Details{% else %}Add Part{% endif %}</strong>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Name</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">Description</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
+                    {{ form.category }}
+                    {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-4">
+                        <label for="{{ form.device.id_for_label }}" class="form-label fw-semibold">Device</label>
+                        {{ form.device }}
+                        {% if form.device.errors %}<div class="text-danger small mt-1">{{ form.device.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="{{ form.package.id_for_label }}" class="form-label fw-semibold">Package</label>
+                        {{ form.package }}
+                        {% if form.package.errors %}<div class="text-danger small mt-1">{{ form.package.errors }}</div>{% endif %}
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label for="{{ form.value.id_for_label }}" class="form-label fw-semibold">Value</label>
+                        {{ form.value }}
+                        {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.fusion_library.id_for_label }}" class="form-label fw-semibold">Fusion Library</label>
+                    {{ form.fusion_library }}
+                    {% if form.fusion_library.errors %}<div class="text-danger small mt-1">{{ form.fusion_library.errors }}</div>{% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Image</label>
+                    {{ form.image }}
+                    {% if form.image.errors %}<div class="text-danger small mt-1">{{ form.image.errors }}</div>{% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.notes.id_for_label }}" class="form-label fw-semibold">Notes</label>
+                    {{ form.notes }}
+                    {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors }}</div>{% endif %}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        {% if part %}Save Changes{% else %}Add Part{% endif %}
+                    </button>
+                    <a href="{% url 'erp:part_list' %}" class="btn btn-secondary">Cancel</a>
+                    {% if part %}
+                        <a href="{% url 'erp:part_delete' part.pk %}" class="btn btn-outline-danger ms-auto">
+                            <i class="cil-trash"></i> Delete Part
+                        </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if part %}
+        <div class="card">
+            <div class="card-header">
+                <strong>Attachments</strong>
+            </div>
+            <div class="card-body">
+                {% if part.assets.all %}
+                    <table class="table table-sm align-middle mb-4">
+                        <thead>
+                            <tr class="highlight">
+                                <th style="width: 24px;"></th>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Uploaded</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in part.assets.all %}
+                                <tr>
+                                    <td><i class="{{ asset.get_icon_class }} text-secondary"></i></td>
+                                    <td>
+                                        <a href="{{ asset.file.url }}" target="_blank" rel="noopener noreferrer">
+                                            {{ asset.name }}
+                                        </a>
+                                    </td>
+                                    <td class="text-body-secondary">{{ asset.description|default:"" }}</td>
+                                    <td class="text-body-secondary text-nowrap"
+                                        title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">
+                                        {{ asset.uploaded_dt|date:"j-M-Y" }}
+                                    </td>
+                                    <td>
+                                        <form method="post" action="{% url 'erp:part_asset_delete' asset.pk %}"
+                                              onsubmit="return confirm('Delete this attachment?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="cil-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-body-secondary fst-italic">No attachments yet.</p>
+                {% endif %}
+
+                <form method="post" action="{% url 'erp:part_asset_add' part.pk %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label form-label-sm">File</label>
+                            {{ asset_form.file }}
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label form-label-sm">Name</label>
+                            {{ asset_form.name }}
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label form-label-sm">Description</label>
+                            {{ asset_form.description }}
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                <i class="cil-plus"></i> Upload
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Auto-populate Name from filename when a file is selected
+    document.addEventListener('DOMContentLoaded', function () {
+        const fileInput = document.querySelector('input[name="file"]');
+        const nameInput = document.querySelector('input[name="name"]');
+        if (fileInput && nameInput) {
+            fileInput.addEventListener('change', function () {
+                if (this.files.length && !nameInput.value) {
+                    const filename = this.files[0].name;
+                    nameInput.value = filename.replace(/\.[^.]+$/, '');
+                }
+            });
+        }
+    });
+</script>
+{% endblock extra_js %}

@@ -1,9 +1,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import os
+
 from django.db import models
 from django.utils import timezone
 
 from device.models import Design
+
+
+def part_asset_upload_path(instance, filename):
+    return f'part_assets/{instance.part_id}/{filename}'
 
 
 class ProductionStage(models.Model):
@@ -76,6 +82,59 @@ class Location(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class Part(models.Model):
+    """A component part that can be used in designs."""
+    name = models.CharField(max_length=200)
+    description = models.TextField(null=True, blank=True)
+    category = models.ForeignKey(
+        'PartCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='parts'
+    )
+    device = models.CharField(max_length=200, blank=True, help_text='Component device or part identifier')
+    package = models.CharField(max_length=100, blank=True, help_text='Package type (e.g. 0402, SOT-23)')
+    value = models.CharField(max_length=100, blank=True, help_text='Component value (e.g. 10k, 100nF)')
+    fusion_library = models.CharField(max_length=200, blank=True, help_text='Fusion Electronics library name')
+    image = models.ImageField(upload_to='part_images/', null=True, blank=True)
+    notes = models.TextField(null=True, blank=True)
+    created_dt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        if self.value:
+            return f'{self.name} ({self.value})'
+        return self.name
+
+
+class PartAsset(models.Model):
+    """A file attachment on a Part (e.g. datasheet)."""
+    part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='assets')
+    file = models.FileField(upload_to=part_asset_upload_path)
+    name = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    uploaded_dt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f'{self.part}: {self.name}'
+
+    @property
+    def filename(self):
+        return os.path.basename(self.file.name)
+
+    def get_icon_class(self):
+        ext = os.path.splitext(self.file.name)[1].lower()
+        icons = {
+            '.pdf': 'bi-file-earmark-pdf',
+            '.zip': 'bi-file-earmark-zip',
+            '.xlsx': 'bi-file-earmark-spreadsheet',
+            '.csv': 'bi-file-earmark-spreadsheet',
+        }
+        return icons.get(ext, 'bi-paperclip')
 
 
 class PartCategory(models.Model):

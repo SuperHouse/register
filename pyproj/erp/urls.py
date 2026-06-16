@@ -7,6 +7,14 @@ from . import views
 app_name = 'erp'
 
 urlpatterns = [
+    path('parts/', views.part_list, name='part_list'),
+    path('parts/import-bom/', views.part_import_bom, name='part_import_bom'),
+    path('parts/add/', views.part_add, name='part_add'),
+    path('parts/<int:part_id>/', views.part_edit, name='part_edit'),
+    path('parts/<int:part_id>/delete/', views.part_delete, name='part_delete'),
+    path('parts/<int:part_id>/add-asset/', views.part_asset_add, name='part_asset_add'),
+    path('parts/asset/<int:asset_id>/delete/', views.part_asset_delete, name='part_asset_delete'),
+
     path('settings/', views.settings_index, name='settings_index'),
     path('settings/production-stages/', views.production_stage_list, name='production_stage_list'),
     path('settings/production-stages/<int:production_stage_id>/', views.production_stage_edit, name='production_stage_edit'),

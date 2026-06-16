@@ -2,7 +2,21 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Batch, BatchProductionStage, Location, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+
+
+class PartAssetInline(admin.TabularInline):
+    model = PartAsset
+    extra = 0
+    readonly_fields = ['uploaded_dt']
+
+
+@admin.register(Part)
+class PartAdmin(admin.ModelAdmin):
+    list_display = ['name', 'category', 'value', 'package', 'device', 'fusion_library']
+    list_select_related = ['category']
+    search_fields = ['name', 'description', 'device', 'package', 'value', 'fusion_library']
+    inlines = [PartAssetInline]
 
 
 @admin.register(Location)

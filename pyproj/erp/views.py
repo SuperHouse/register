@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import csv
+import io
 import json
 
 from django.contrib import messages
@@ -15,13 +17,15 @@ from .forms import (
     BatchProductionStageAddForm,
     BatchProductionStageUpdateForm,
     LocationForm,
+    PartAssetForm,
     PartCategoryForm,
+    PartForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
 from device.models import DesignAsset
-from .models import Batch, BatchProductionStage, Location, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 def _apply_template_to_batch(batch, template):
@@ -333,6 +337,150 @@ def location_delete(request, location_id):
 
     ctx = {'location': location, 'child_count': child_count}
     return render(request, 'erp/location_delete.html', ctx)
+
+
+# --- Part views ---
+
+@staff_member_required
+def part_list(request):
+    uncategorised = list(Part.objects.filter(category__isnull=True).order_by('name'))
+    categories_with_parts = (
+        PartCategory.objects
+        .filter(parts__isnull=False)
+        .prefetch_related(Prefetch('parts', queryset=Part.objects.order_by('name')))
+        .distinct()
+        .order_by('order', 'name')
+    )
+    ctx = {
+        'uncategorised': uncategorised,
+        'categories_with_parts': categories_with_parts,
+    }
+    return render(request, 'erp/part_list.html', ctx)
+
+
+@staff_member_required
+def part_import_bom(request):
+    if request.method != 'POST':
+        return redirect('erp:part_list')
+
+    csv_file = request.FILES.get('csv_file')
+    if not csv_file:
+        messages.warning(request, 'No file was uploaded.')
+        return redirect('erp:part_list')
+
+    try:
+        content = csv_file.read().decode('utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+
+        added = 0
+        skipped = 0
+
+        for row in reader:
+            device = (row.get('device') or '').strip()
+            package = (row.get('package') or '').strip()
+            value = (row.get('value') or '').strip()
+            library = (row.get('library') or '').strip()
+
+            if Part.objects.filter(device=device, package=package, value=value, fusion_library=library).exists():
+                skipped += 1
+                continue
+
+            name = ' '.join(p for p in [value, package, device.capitalize()] if p) or 'Unnamed Part'
+            Part.objects.create(name=name, device=device, package=package, value=value, fusion_library=library)
+            added += 1
+
+        messages.success(
+            request,
+            f'BOM import complete: {added} part{"s" if added != 1 else ""} added, '
+            f'{skipped} duplicate{"s" if skipped != 1 else ""} skipped.',
+        )
+    except Exception as e:
+        messages.warning(request, f'Error reading CSV: {e}')
+
+    return redirect('erp:part_list')
+
+
+@staff_member_required
+def part_add(request):
+    if request.method == 'POST':
+        form = PartForm(request.POST, request.FILES)
+        if form.is_valid():
+            part = form.save()
+            messages.success(request, 'Part added.')
+            return redirect('erp:part_edit', part_id=part.pk)
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = PartForm()
+
+    ctx = {'form': form}
+    return render(request, 'erp/part_edit.html', ctx)
+
+
+@staff_member_required
+def part_edit(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        form = PartForm(request.POST, request.FILES, instance=part)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Part updated.')
+            return redirect('erp:part_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = PartForm(instance=part)
+
+    ctx = {
+        'form': form,
+        'part': part,
+        'asset_form': PartAssetForm(),
+    }
+    return render(request, 'erp/part_edit.html', ctx)
+
+
+@staff_member_required
+def part_delete(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        if part.image:
+            part.image.delete(save=False)
+        part.delete()
+        messages.success(request, 'Part deleted.')
+        return redirect('erp:part_list')
+
+    ctx = {'part': part}
+    return render(request, 'erp/part_delete.html', ctx)
+
+
+@staff_member_required
+def part_asset_add(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        form = PartAssetForm(request.POST, request.FILES)
+        if form.is_valid():
+            asset = form.save(commit=False)
+            asset.part = part
+            asset.save()
+            messages.success(request, 'Attachment added.')
+        else:
+            messages.warning(request, 'Please correct the errors below.')
+
+    return redirect('erp:part_edit', part_id=part.pk)
+
+
+@staff_member_required
+def part_asset_delete(request, asset_id):
+    asset = get_object_or_404(PartAsset, pk=asset_id)
+    part_id = asset.part_id
+
+    if request.method == 'POST':
+        asset.file.delete(save=False)
+        asset.delete()
+        messages.success(request, 'Attachment deleted.')
+
+    return redirect('erp:part_edit', part_id=part_id)
 
 
 # --- Part Category views ---
