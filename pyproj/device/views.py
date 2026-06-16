@@ -164,6 +164,7 @@ def design_detail(request, design_id):
 
     attachments = assets.filter(asset_type=DesignAsset.ATTACHMENT)
     pcb_top_asset = existing_core.get(DesignAsset.PCB_TOP)
+    pcb_bottom_asset = existing_core.get(DesignAsset.PCB_BOTTOM)
 
     context = {
         'design': design,
@@ -176,6 +177,7 @@ def design_detail(request, design_id):
         'attachments': attachments,
         'asset_form': DesignAssetForm() if request.user.is_staff else None,
         'pcb_top_asset': pcb_top_asset,
+        'pcb_bottom_asset': pcb_bottom_asset,
     }
 
     return render(request, 'device/design_detail.html', context)

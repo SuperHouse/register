@@ -19,12 +19,20 @@
                 {% endif %}
             </div>
 
-            {% if pcb_top_asset %}
-                <div class="mb-4">
-                    <img src="{{ pcb_top_asset.file.url }}"
-                         alt="PCB Top View"
-                         class="img-fluid rounded"
-                         style="max-height: 400px;">
+            {% if pcb_top_asset or pcb_bottom_asset %}
+                <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
+                    {% if pcb_top_asset %}
+                        <img src="{{ pcb_top_asset.file.url }}"
+                             alt="PCB Top View"
+                             class="rounded"
+                             style="max-width: 400px; width: 100%;">
+                    {% endif %}
+                    {% if pcb_bottom_asset %}
+                        <img src="{{ pcb_bottom_asset.file.url }}"
+                             alt="PCB Bottom View"
+                             class="rounded"
+                             style="max-width: 400px; width: 100%;">
+                    {% endif %}
                 </div>
             {% endif %}
             <div class="card border-0 mb-4">
