@@ -15,12 +15,13 @@ from .forms import (
     BatchProductionStageAddForm,
     BatchProductionStageUpdateForm,
     LocationForm,
+    PartCategoryForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
 from device.models import DesignAsset
-from .models import Batch, BatchProductionStage, Location, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 def _apply_template_to_batch(batch, template):
@@ -332,6 +333,79 @@ def location_delete(request, location_id):
 
     ctx = {'location': location, 'child_count': child_count}
     return render(request, 'erp/location_delete.html', ctx)
+
+
+# --- Part Category views ---
+
+def _build_part_category_tree(all_categories, parent_id=None, depth=0):
+    """Return a flat list of (category, depth) tuples in depth-first tree order."""
+    result = []
+    for cat in all_categories:
+        if cat.parent_id == parent_id:
+            result.append((cat, depth))
+            result.extend(_build_part_category_tree(all_categories, cat.pk, depth + 1))
+    return result
+
+
+@staff_member_required
+def part_category_list(request):
+    all_categories = list(PartCategory.objects.select_related('parent').all())
+    tree = _build_part_category_tree(all_categories)
+    ctx = {'tree': tree}
+    return render(request, 'erp/part_category_list.html', ctx)
+
+
+@staff_member_required
+def part_category_add(request):
+    initial = {}
+    parent_id = request.GET.get('parent')
+    if parent_id:
+        initial['parent'] = parent_id
+
+    if request.method == 'POST':
+        form = PartCategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Part category added.')
+            return redirect('erp:part_category_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = PartCategoryForm(initial=initial)
+
+    ctx = {'form': form}
+    return render(request, 'erp/part_category_edit.html', ctx)
+
+
+@staff_member_required
+def part_category_edit(request, part_category_id):
+    part_category = get_object_or_404(PartCategory, pk=part_category_id)
+
+    if request.method == 'POST':
+        form = PartCategoryForm(request.POST, instance=part_category, exclude_pk=part_category.pk)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Part category updated.')
+            return redirect('erp:part_category_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = PartCategoryForm(instance=part_category, exclude_pk=part_category.pk)
+
+    ctx = {'form': form, 'part_category': part_category}
+    return render(request, 'erp/part_category_edit.html', ctx)
+
+
+@staff_member_required
+def part_category_delete(request, part_category_id):
+    part_category = get_object_or_404(PartCategory, pk=part_category_id)
+    child_count = part_category.children.count()
+
+    if request.method == 'POST':
+        part_category.delete()
+        messages.success(request, 'Part category deleted.')
+        return redirect('erp:part_category_list')
+
+    ctx = {'part_category': part_category, 'child_count': child_count}
+    return render(request, 'erp/part_category_delete.html', ctx)
 
 
 @staff_member_required

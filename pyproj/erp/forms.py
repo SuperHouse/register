@@ -3,7 +3,7 @@
 from django import forms
 
 from device.models import Design
-from .models import Batch, BatchProductionStage, Location, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -104,6 +104,26 @@ def _get_descendant_pks(all_locations, root_pk):
                 result.add(loc.pk)
                 to_visit.append(loc.pk)
     return result
+
+
+class PartCategoryForm(forms.ModelForm):
+    class Meta:
+        model = PartCategory
+        fields = ['parent', 'name', 'description']
+        widgets = {
+            'parent': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        exclude_pk = kwargs.pop('exclude_pk', None)
+        super().__init__(*args, **kwargs)
+        self.fields['parent'].required = False
+        self.fields['parent'].empty_label = '(top level)'
+        if exclude_pk:
+            excluded = _get_descendant_pks(list(PartCategory.objects.all()), exclude_pk) | {exclude_pk}
+            self.fields['parent'].queryset = PartCategory.objects.exclude(pk__in=excluded)
 
 
 class BatchProductionStageUpdateForm(forms.ModelForm):

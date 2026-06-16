@@ -78,6 +78,23 @@ class Location(models.Model):
         return self.name
 
 
+class PartCategory(models.Model):
+    """A category in a hierarchy for classifying parts (e.g. Passives > Resistors > SMD)."""
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'name']
+        verbose_name_plural = 'part categories'
+
+    def __str__(self):
+        return self.name
+
+
 class BatchProductionStage(models.Model):
     """A production stage on a Batch, snapshotted from a ProductionStage at the time it was added."""
     NOT_STARTED = 'NOT_STARTED'
