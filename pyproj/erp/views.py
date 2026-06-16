@@ -134,6 +134,19 @@ def production_stage_delete(request, production_stage_id):
 
 
 @staff_member_required
+def production_stage_template_reorder(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        templates_by_id = {t.pk: t for t in ProductionStageTemplate.objects.all()}
+        for index, template_id in enumerate(data.get('order', []), start=1):
+            template = templates_by_id.get(int(template_id))
+            if template and template.order != index:
+                template.order = index
+                template.save(update_fields=['order'])
+    return JsonResponse({'status': 'ok'})
+
+
+@staff_member_required
 def production_stage_template_list(request):
     templates = ProductionStageTemplate.objects.all()
 

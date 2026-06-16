@@ -19,32 +19,37 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr class="highlight">
+                        <th style="width: 30px;"></th>
                         <th>Name</th>
                         <th>Description</th>
                         <th style="width: 80px;">Steps</th>
                         <th style="width: 60px;"></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="production-stage-templates-body" data-reorder-url="{% url 'erp:production_stage_template_reorder' %}">
                     {% for template in templates %}
-                        <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:production_stage_template_edit' template.pk %}'">
+                        <tr data-stage-id="{{ template.pk }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:production_stage_template_edit' template.pk %}'">
+                            <td class="text-center" style="cursor: grab;" onclick="event.stopPropagation();"><i class="bi bi-grip-vertical"></i></td>
                             <td>{{ template.name }}</td>
                             <td>{{ template.description|default:"" }}</td>
                             <td>{{ template.steps.count }}</td>
-                            <td>
-                                <a href="{% url 'erp:production_stage_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
+                            <td onclick="event.stopPropagation();">
+                                <a href="{% url 'erp:production_stage_template_delete' template.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
                                     <i class="cil-trash"></i>
                                 </a>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4"><i>There are no production stage templates yet.</i></td>
+                            <td colspan="5"><i>There are no production stage templates yet.</i></td>
                         </tr>
                     {% endfor %}
+                </tbody>
+                <tbody>
                     <tr>
-                        <form method="post">
+                        <form method="post" class="d-contents">
                             {% csrf_token %}
+                            <td></td>
                             <td>
                                 {{ form.name }}
                                 {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
@@ -60,3 +65,10 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
+    <script>
+        initSortableReorder('production-stage-templates-body');
+    </script>
+{% endblock extra_js %}

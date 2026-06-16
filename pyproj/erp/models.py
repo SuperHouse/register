@@ -23,9 +23,10 @@ class ProductionStageTemplate(models.Model):
     """A reusable collection of production stages that can be applied to a batch (e.g. 'Double-sided hi-rel load')."""
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ['name']
+        ordering = ['order', 'name']
 
     def __str__(self):
         return self.name

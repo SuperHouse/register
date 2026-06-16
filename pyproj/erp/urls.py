@@ -13,6 +13,7 @@ urlpatterns = [
     path('settings/production-stages/<int:production_stage_id>/delete/', views.production_stage_delete, name='production_stage_delete'),
     path('settings/production-stages/reorder/', views.production_stage_reorder, name='production_stage_reorder'),
     path('settings/production-stage-templates/', views.production_stage_template_list, name='production_stage_template_list'),
+    path('settings/production-stage-templates/reorder/', views.production_stage_template_reorder, name='production_stage_template_reorder'),
     path('settings/production-stage-templates/<int:template_id>/', views.production_stage_template_edit, name='production_stage_template_edit'),
     path('settings/production-stage-templates/<int:template_id>/delete/', views.production_stage_template_delete, name='production_stage_template_delete'),
     path('settings/production-stage-templates/<int:template_id>/add-step/', views.production_stage_template_step_add, name='production_stage_template_step_add'),

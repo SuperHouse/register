@@ -60,7 +60,7 @@ class BatchForm(forms.ModelForm):
 
 class BatchApplyTemplateForm(forms.Form):
     template = forms.ModelChoiceField(
-        queryset=ProductionStageTemplate.objects.all(),
+        queryset=ProductionStageTemplate.objects.order_by('order', 'name'),
         required=False,
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
