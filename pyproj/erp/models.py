@@ -62,6 +62,22 @@ class Batch(models.Model):
         return f'{self.design} x{self.quantity}'
 
 
+class Location(models.Model):
+    """A physical location in a hierarchy (e.g. building > room > shelf)."""
+    parent = models.ForeignKey(
+        'self', null=True, blank=True, on_delete=models.CASCADE, related_name='children'
+    )
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+    order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class BatchProductionStage(models.Model):
     """A production stage on a Batch, snapshotted from a ProductionStage at the time it was added."""
     NOT_STARTED = 'NOT_STARTED'

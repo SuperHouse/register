@@ -1,0 +1,70 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Locations - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Locations
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        Manage physical locations in a hierarchy (e.g. building &rsaquo; room &rsaquo; shelf).
+        Locations can be associated with assets for tracking purposes.
+    </p>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{% url 'erp:location_add' %}" class="btn btn-primary">
+            <i class="cil-plus"></i> Add Top-Level Location
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if tree %}
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th style="width: 130px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for location, depth in tree %}
+                            <tr>
+                                <td style="padding-left: calc({{ depth }}rem + 0.75rem);">
+                                    {% if depth > 0 %}<span class="text-muted me-1">&#x2514;</span>{% endif %}
+                                    {{ location.name }}
+                                </td>
+                                <td class="text-body-secondary">{{ location.description|default:"" }}</td>
+                                <td class="text-nowrap">
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="{% url 'erp:location_add' %}?parent={{ location.pk }}"
+                                           class="btn btn-sm btn-outline-secondary"
+                                           title="Add child location">
+                                            <i class="cil-plus"></i>
+                                        </a>
+                                        <a href="{% url 'erp:location_edit' location.pk %}"
+                                           class="btn btn-sm btn-outline-secondary"
+                                           title="Edit">
+                                            <i class="cil-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'erp:location_delete' location.pk %}"
+                                           class="btn btn-sm btn-outline-danger"
+                                           title="Delete">
+                                            <i class="cil-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic mb-0">No locations have been added yet.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}

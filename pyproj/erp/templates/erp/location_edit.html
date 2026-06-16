@@ -1,0 +1,52 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    {% if location %}Edit Location{% else %}Add Location{% endif %} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    {% if location %}Edit Location{% else %}Add Location{% endif %}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.parent.id_for_label }}" class="form-label">Parent location</label>
+                            {{ form.parent }}
+                            {% if form.parent.errors %}<div class="text-danger small mt-1">{{ form.parent.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Name</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                {% if location %}Save Changes{% else %}Add Location{% endif %}
+                            </button>
+                            <a href="{% url 'erp:location_list' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

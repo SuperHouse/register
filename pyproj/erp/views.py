@@ -14,12 +14,13 @@ from .forms import (
     BatchForm,
     BatchProductionStageAddForm,
     BatchProductionStageUpdateForm,
+    LocationForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
 from device.models import DesignAsset
-from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 def _apply_template_to_batch(batch, template):
@@ -258,6 +259,79 @@ def production_stage_template_step_reorder(request, template_id):
                 step.save(update_fields=['order'])
 
     return JsonResponse({'status': 'ok'})
+
+
+# --- Location views ---
+
+def _build_location_tree(all_locations, parent_id=None, depth=0):
+    """Return a flat list of (location, depth) tuples in depth-first tree order."""
+    result = []
+    for loc in all_locations:
+        if loc.parent_id == parent_id:
+            result.append((loc, depth))
+            result.extend(_build_location_tree(all_locations, loc.pk, depth + 1))
+    return result
+
+
+@staff_member_required
+def location_list(request):
+    all_locations = list(Location.objects.select_related('parent').all())
+    tree = _build_location_tree(all_locations)
+    ctx = {'tree': tree}
+    return render(request, 'erp/location_list.html', ctx)
+
+
+@staff_member_required
+def location_add(request):
+    initial = {}
+    parent_id = request.GET.get('parent')
+    if parent_id:
+        initial['parent'] = parent_id
+
+    if request.method == 'POST':
+        form = LocationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Location added.')
+            return redirect('erp:location_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = LocationForm(initial=initial)
+
+    ctx = {'form': form}
+    return render(request, 'erp/location_edit.html', ctx)
+
+
+@staff_member_required
+def location_edit(request, location_id):
+    location = get_object_or_404(Location, pk=location_id)
+
+    if request.method == 'POST':
+        form = LocationForm(request.POST, instance=location, exclude_pk=location.pk)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Location updated.')
+            return redirect('erp:location_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = LocationForm(instance=location, exclude_pk=location.pk)
+
+    ctx = {'form': form, 'location': location}
+    return render(request, 'erp/location_edit.html', ctx)
+
+
+@staff_member_required
+def location_delete(request, location_id):
+    location = get_object_or_404(Location, pk=location_id)
+    child_count = location.children.count()
+
+    if request.method == 'POST':
+        location.delete()
+        messages.success(request, 'Location deleted.')
+        return redirect('erp:location_list')
+
+    ctx = {'location': location, 'child_count': child_count}
+    return render(request, 'erp/location_delete.html', ctx)
 
 
 @staff_member_required

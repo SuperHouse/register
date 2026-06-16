@@ -2,7 +2,14 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ['name', 'parent', 'description']
+    list_select_related = ['parent']
+    search_fields = ['name', 'description']
 
 
 @admin.register(ProductionStage)
