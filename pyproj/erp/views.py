@@ -4,7 +4,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import ProtectedError
+from django.db.models import Prefetch, ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -18,6 +18,7 @@ from .forms import (
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
+from device.models import DesignAsset
 from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
@@ -248,7 +249,10 @@ def production_stage_template_step_reorder(request, template_id):
 
 @staff_member_required
 def batch_list(request):
-    batches = Batch.objects.select_related('design')
+    pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
+    batches = Batch.objects.select_related('design__client').prefetch_related(
+        Prefetch('design__designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
+    )
 
     ctx = {
         'batches': batches,

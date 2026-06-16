@@ -20,6 +20,7 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr class="highlight">
+                        <th></th>
                         <th>Design</th>
                         <th>Reference</th>
                         <th>Quantity</th>
@@ -31,6 +32,15 @@
                 <tbody>
                     {% for batch in batches %}
                         <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                            <td style="width: 70px; padding: 4px 8px;">
+                                {% with batch.design.pcb_top_assets|first as pcb_top %}
+                                    {% if pcb_top %}
+                                        <img src="{{ pcb_top.file.url }}"
+                                             alt="PCB Top View"
+                                             style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
                             <td>{{ batch.design }}</td>
                             <td>{{ batch.reference }}</td>
                             <td>{{ batch.quantity }}</td>
@@ -44,7 +54,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="6"><i>There are no batches yet.</i></td>
+                            <td colspan="7"><i>There are no batches yet.</i></td>
                         </tr>
                     {% endfor %}
                 </tbody>

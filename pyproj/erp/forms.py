@@ -2,7 +2,13 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django import forms
 
+from device.models import Design
 from .models import Batch, BatchProductionStage, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+
+
+class DesignChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return f'{obj.client.company_name} {obj.sku}: {obj.name} {obj.hw_version}'
 
 
 class ProductionStageForm(forms.ModelForm):
@@ -35,11 +41,17 @@ class ProductionStageTemplateStepForm(forms.ModelForm):
 
 
 class BatchForm(forms.ModelForm):
+    design = DesignChoiceField(
+        queryset=Design.objects.select_related('client').order_by(
+            'client__company_name', 'sku', 'name', 'hw_version'
+        ),
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     class Meta:
         model = Batch
         fields = ['design', 'reference', 'quantity', 'notes']
         widgets = {
-            'design': forms.Select(attrs={'class': 'form-select'}),
             'reference': forms.TextInput(attrs={'class': 'form-control'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
