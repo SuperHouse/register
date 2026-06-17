@@ -381,7 +381,7 @@ def part_import_bom(request):
             value = (row.get('value') or '').strip()
             library = (row.get('library') or '').strip()
 
-            if Part.objects.filter(device=device, package=package, value=value, fusion_library=library).exists():
+            if Part.objects.filter(device=device, package=package, value=value).exists():
                 skipped += 1
                 continue
 
