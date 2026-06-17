@@ -106,6 +106,26 @@ def _get_descendant_pks(all_locations, root_pk):
     return result
 
 
+class PartImageWidget(forms.ClearableFileInput):
+    """ClearableFileInput that omits "Currently" and shows only the bare filename."""
+    initial_text = ''
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        if context['widget'].get('is_initial') and hasattr(value, 'name'):
+            from pathlib import Path
+            _url = value.url
+            _filename = Path(value.name).name
+
+            class _FileProxy:
+                url = _url
+                def __str__(self_):
+                    return _filename
+
+            context['widget']['value'] = _FileProxy()
+        return context
+
+
 class PartForm(forms.ModelForm):
     class Meta:
         model = Part
@@ -118,7 +138,7 @@ class PartForm(forms.ModelForm):
             'package': forms.TextInput(attrs={'class': 'form-control'}),
             'value': forms.TextInput(attrs={'class': 'form-control'}),
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
-            'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):

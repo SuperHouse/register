@@ -9,12 +9,6 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div id="part-image-preview" class="mb-4" {% if not part or not part.image %}style="display:none;"{% endif %}>
-        <img id="part-image-tag" src="{% if part and part.image %}{{ part.image.url }}{% endif %}"
-             alt="{{ part.name }}" class="rounded"
-             style="max-width: 300px; max-height: 300px; object-fit: contain;">
-    </div>
-
     <div class="card mb-4">
         <div class="card-header">
             <strong>{% if part %}Edit Details{% else %}Add Part{% endif %}</strong>
@@ -27,34 +21,42 @@
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
 
-                <div class="mb-3">
-                    <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Name</label>
-                    {{ form.name }}
-                    {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
-                </div>
-
-                <div class="row g-3 mb-3">
-                    <div class="col-12 col-md-4">
-                        <label for="{{ form.device.id_for_label }}" class="form-label fw-semibold">Device</label>
-                        {{ form.device }}
-                        {% if form.device.errors %}<div class="text-danger small mt-1">{{ form.device.errors }}</div>{% endif %}
+                <div class="row g-4 mb-3">
+                    {% if part and part.image %}
+                    <div class="col-auto">
+                        <a href="{{ part.image.url }}" id="part-image-link" title="View full size">
+                            <img src="{{ part.image.url }}" alt="{{ part.name }}" class="rounded"
+                                 style="max-width: 250px; max-height: 320px; object-fit: contain; cursor: zoom-in;">
+                        </a>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label for="{{ form.package.id_for_label }}" class="form-label fw-semibold">Package</label>
-                        {{ form.package }}
-                        {% if form.package.errors %}<div class="text-danger small mt-1">{{ form.package.errors }}</div>{% endif %}
+                    {% endif %}
+                    <div class="col">
+                        <div class="mb-3">
+                            <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Name</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.device.id_for_label }}" class="form-label fw-semibold">Device</label>
+                            {{ form.device }}
+                            {% if form.device.errors %}<div class="text-danger small mt-1">{{ form.device.errors }}</div>{% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.package.id_for_label }}" class="form-label fw-semibold">Package</label>
+                            {{ form.package }}
+                            {% if form.package.errors %}<div class="text-danger small mt-1">{{ form.package.errors }}</div>{% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.value.id_for_label }}" class="form-label fw-semibold">Value</label>
+                            {{ form.value }}
+                            {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
+                        </div>
+                        <div class="mb-3">
+                            <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
+                            {{ form.category }}
+                            {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}
+                        </div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <label for="{{ form.value.id_for_label }}" class="form-label fw-semibold">Value</label>
-                        {{ form.value }}
-                        {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
-                    {{ form.category }}
-                    {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}
                 </div>
 
                 <div class="mb-3">
@@ -316,13 +318,7 @@
                 });
                 const data = await resp.json();
                 if (data.ok) {
-                    if (data.image_url) {
-                        const preview = document.getElementById('part-image-preview');
-                        const img = document.getElementById('part-image-tag');
-                        img.src = data.image_url;
-                        preview.style.display = '';
-                    }
-                    if (data.source_saved) {
+                    if (data.source_saved || data.image_url) {
                         window.location.reload();
                     } else {
                         form.querySelector('[name="supplier_name"]').value = data.supplier_name;
@@ -342,6 +338,32 @@
                 iconEl.classList.replace('bi-hourglass-split', 'bi-arrow-clockwise');
                 btnEl.disabled = false;
             }
+        }
+
+        // Lightbox
+        const lightboxLink = document.getElementById('part-image-link');
+        if (lightboxLink) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;';
+            const fullImg = document.createElement('img');
+            fullImg.src = lightboxLink.href;
+            fullImg.style.cssText = 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px;box-shadow:0 4px 32px rgba(0,0,0,0.6);';
+            overlay.appendChild(fullImg);
+            document.body.appendChild(overlay);
+
+            function openLightbox(e) {
+                e.preventDefault();
+                overlay.style.display = 'flex';
+                document.addEventListener('keydown', onKey);
+            }
+            function closeLightbox() {
+                overlay.style.display = 'none';
+                document.removeEventListener('keydown', onKey);
+            }
+            function onKey(e) { if (e.key === 'Escape') closeLightbox(); }
+
+            lightboxLink.addEventListener('click', openLightbox);
+            overlay.addEventListener('click', closeLightbox);
         }
 
         document.getElementById('lcsc-fetch-btn')?.addEventListener('click', function () {
