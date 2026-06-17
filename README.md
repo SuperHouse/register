@@ -135,6 +135,34 @@ MOUSER_API_KEY = "your-api-key"
 
 Restart the development server and the Mouser fetch button will be active immediately — no further setup is required.
 
+## Element14 / Farnell / Newark API Integration
+
+Element14 lookup (also covers Farnell and Newark regional storefronts) requires a free developer account. Like Mouser, it uses a simple API key — no OAuth flow is needed.
+
+### 1. Register for an Element14 API key
+
+1. Sign in or create an account at [partner.element14.com](https://partner.element14.com)
+2. Create a new application and note the **API key**
+
+### 2. Configure the environment
+
+Add the following to `pyproj/.env`:
+
+```
+ELEMENT14_API_KEY = "your-api-key"
+ELEMENT14_STORE_ID = "au.element14.com"
+```
+
+Set `ELEMENT14_STORE_ID` to the regional storefront you source from:
+
+| Region | Store ID |
+|---|---|
+| Australia / Asia-Pacific | `au.element14.com` |
+| UK / Europe | `uk.farnell.com` |
+| USA | `www.newark.com` |
+
+Restart the development server and the E14 fetch button will be active immediately.
+
 ## Data Export and Import
 
 All application data (database records and uploaded media files) can be exported

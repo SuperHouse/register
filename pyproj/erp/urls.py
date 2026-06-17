@@ -20,6 +20,7 @@ urlpatterns = [
     path('parts/source/fetch-lcsc/', views.part_source_fetch_lcsc, name='part_source_fetch_lcsc'),
     path('parts/source/fetch-digikey/', views.part_source_fetch_digikey, name='part_source_fetch_digikey'),
     path('parts/source/fetch-mouser/', views.part_source_fetch_mouser, name='part_source_fetch_mouser'),
+    path('parts/source/fetch-element14/', views.part_source_fetch_element14, name='part_source_fetch_element14'),
     path('parts/source/digikey-connect/', views.digikey_connect, name='digikey_connect'),
     path('parts/source/digikey-callback/', views.digikey_callback, name='digikey_callback'),
 

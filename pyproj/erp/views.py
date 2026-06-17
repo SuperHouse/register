@@ -767,6 +767,125 @@ def part_source_fetch_mouser(request):
         return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
 
 
+@staff_member_required
+def part_source_fetch_element14(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        sku = (data.get('sku') or '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body'}, status=400)
+
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'No SKU provided'})
+
+    part_id = data.get('part_id')
+    part = get_object_or_404(Part, pk=part_id) if part_id else None
+
+    try:
+        import requests as http_requests
+        from django.core.files.base import ContentFile
+
+        api_key = os.environ.get('ELEMENT14_API_KEY', '').strip()
+        store_id = os.environ.get('ELEMENT14_STORE_ID', 'au.element14.com').strip()
+        if not api_key:
+            return JsonResponse({'ok': False, 'error': 'ELEMENT14_API_KEY is not configured in .env.'})
+
+        resp = http_requests.get(
+            'https://api.element14.com/catalog/products',
+            params={
+                'term': f'sku:{sku}',
+                'storeInfo.id': store_id,
+                'resultsSettings.offset': 0,
+                'resultsSettings.numberOfResults': 1,
+                'resultsSettings.responseGroup': 'large',
+                'callInfo.responseDataFormat': 'json',
+                'id': api_key,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        products = result.get('keywordSearchReturn', {}).get('products', [])
+        if not products:
+            return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Element14'})
+
+        p = products[0]
+        element14_sku = p.get('sku') or sku
+
+        mfr_pns = p.get('manufacturerPartNumberList') or []
+        manufacturer_pn = str(mfr_pns[0]) if isinstance(mfr_pns, list) and mfr_pns else ''
+
+        element14_description = p.get('description') or ''
+
+        stock = p.get('stock')
+        try:
+            stock = int(stock) if stock is not None else None
+        except (ValueError, TypeError):
+            stock = None
+
+        packaging = ''
+        for attr in (p.get('attributes') or []):
+            if 'packag' in (attr.get('attributeLabel') or '').lower():
+                packaging = attr.get('attributeValue') or ''
+                break
+        if not packaging:
+            pack_size = p.get('packSize')
+            if pack_size and int(pack_size) > 1:
+                packaging = f'Pack of {pack_size}'
+
+        image_remote_url = ''
+        image_list = (p.get('imageList') or {}).get('image') or []
+        if image_list:
+            raw_url = image_list[0].get('url') or ''
+            if raw_url.startswith('//'):
+                raw_url = 'https:' + raw_url
+            image_remote_url = raw_url
+
+        product_url = p.get('productDetailUrl') or ''
+
+        if part and not part.description and element14_description:
+            part.description = element14_description
+            part.save(update_fields=['description'])
+
+        image_url = None
+        if part and not part.image and image_remote_url:
+            img_resp = http_requests.get(image_remote_url, timeout=10)
+            img_resp.raise_for_status()
+            ext = os.path.splitext(image_remote_url.split('?')[0])[1] or '.jpg'
+            part.image.save(f'element14_{element14_sku}{ext}', ContentFile(img_resp.content), save=True)
+            image_url = part.image.url
+
+        source_saved = False
+        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
+            PartSource.objects.create(
+                part=part,
+                supplier_name='Element14',
+                supplier_sku=element14_sku,
+                manufacturer_sku=manufacturer_pn,
+                packaging=packaging,
+                url=product_url,
+                stock=stock,
+            )
+            source_saved = True
+
+        return JsonResponse({
+            'ok': True,
+            'supplier_name': 'Element14',
+            'manufacturer_sku': manufacturer_pn,
+            'packaging': packaging,
+            'url': product_url,
+            'stock': stock,
+            'image_url': image_url,
+            'source_saved': source_saved,
+        })
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
+
+
 def _get_digikey_access_token():
     """
     Return a valid DigiKey access token, refreshing it if expired.
@@ -1019,6 +1138,54 @@ def part_source_refresh(request, source_id):
             supplier_description = p.get('Description') or ''
             image_remote_url = p.get('ImagePath') or ''
             image_filename_prefix = f'mouser_{sku.replace("/", "_")}'
+
+        elif 'element14' in supplier or 'farnell' in supplier or 'newark' in supplier:
+            api_key = os.environ.get('ELEMENT14_API_KEY', '').strip()
+            store_id = os.environ.get('ELEMENT14_STORE_ID', 'au.element14.com').strip()
+            if not api_key:
+                return JsonResponse({'ok': False, 'error': 'ELEMENT14_API_KEY is not configured in .env.'})
+            resp = http_requests.get(
+                'https://api.element14.com/catalog/products',
+                params={
+                    'term': f'sku:{sku}',
+                    'storeInfo.id': store_id,
+                    'resultsSettings.offset': 0,
+                    'resultsSettings.numberOfResults': 1,
+                    'resultsSettings.responseGroup': 'large',
+                    'callInfo.responseDataFormat': 'json',
+                    'id': api_key,
+                },
+                timeout=15,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            products = result.get('keywordSearchReturn', {}).get('products', [])
+            if not products:
+                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Element14'})
+            p = products[0]
+            mfr_pns = p.get('manufacturerPartNumberList') or []
+            manufacturer_sku = str(mfr_pns[0]) if isinstance(mfr_pns, list) and mfr_pns else ''
+            url = p.get('productDetailUrl') or ''
+            stock_raw = p.get('stock')
+            try:
+                stock = int(stock_raw) if stock_raw is not None else None
+            except (ValueError, TypeError):
+                stock = None
+            packaging = ''
+            for attr in (p.get('attributes') or []):
+                if 'packag' in (attr.get('attributeLabel') or '').lower():
+                    packaging = attr.get('attributeValue') or ''
+                    break
+            if not packaging:
+                pack_size = p.get('packSize')
+                if pack_size and int(pack_size) > 1:
+                    packaging = f'Pack of {pack_size}'
+            supplier_description = p.get('description') or ''
+            image_list = (p.get('imageList') or {}).get('image') or []
+            if image_list:
+                raw_url = image_list[0].get('url') or ''
+                image_remote_url = ('https:' + raw_url) if raw_url.startswith('//') else raw_url
+            image_filename_prefix = f'element14_{sku}'
 
         else:
             return JsonResponse({'ok': False, 'error': f'No API integration for supplier "{source.supplier_name}"'})

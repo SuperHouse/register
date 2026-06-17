@@ -172,6 +172,10 @@
                                         title="Fetch from Mouser">
                                     <i class="bi bi-arrow-clockwise" id="mouser-fetch-icon"></i> Mouser
                                 </button>
+                                <button type="button" class="btn btn-outline-secondary" id="element14-fetch-btn"
+                                        title="Fetch from Element14">
+                                    <i class="bi bi-arrow-clockwise" id="element14-fetch-icon"></i> E14
+                                </button>
                             </div>
                             <div id="source-fetch-error" class="text-danger small mt-1" style="display:none;"></div>
                         </div>
@@ -374,6 +378,9 @@
         });
         document.getElementById('mouser-fetch-btn')?.addEventListener('click', function () {
             fetchSupplierData('{% url "erp:part_source_fetch_mouser" %}', this, document.getElementById('mouser-fetch-icon'));
+        });
+        document.getElementById('element14-fetch-btn')?.addEventListener('click', function () {
+            fetchSupplierData('{% url "erp:part_source_fetch_element14" %}', this, document.getElementById('element14-fetch-icon'));
         });
 
         document.querySelectorAll('.source-refresh-btn').forEach(function (btn) {
