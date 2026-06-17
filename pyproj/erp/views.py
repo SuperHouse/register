@@ -3,12 +3,15 @@
 import csv
 import io
 import json
+import os
+from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Prefetch, ProtectedError, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import (
@@ -20,12 +23,13 @@ from .forms import (
     PartAssetForm,
     PartCategoryForm,
     PartForm,
+    PartSourceForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
 from device.models import DesignAsset
-from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 def _apply_template_to_batch(batch, template):
@@ -443,6 +447,7 @@ def part_edit(request, part_id):
     ctx = {
         'form': form,
         'part': part,
+        'source_form': PartSourceForm(),
         'asset_form': PartAssetForm(),
     }
     return render(request, 'erp/part_edit.html', ctx)
@@ -489,6 +494,567 @@ def part_asset_delete(request, asset_id):
         asset.file.delete(save=False)
         asset.delete()
         messages.success(request, 'Attachment deleted.')
+
+    return redirect('erp:part_edit', part_id=part_id)
+
+
+@staff_member_required
+def part_source_add(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        form = PartSourceForm(request.POST)
+        if form.is_valid():
+            source = form.save(commit=False)
+            source.part = part
+            source.save()
+            messages.success(request, 'Source added.')
+        else:
+            messages.warning(request, 'Please correct the errors below.')
+
+    return redirect('erp:part_edit', part_id=part.pk)
+
+
+def _digikey_base_url():
+    """Return the appropriate DigiKey base URL based on DIGIKEY_CLIENT_SANDBOX."""
+    sandbox = os.environ.get('DIGIKEY_CLIENT_SANDBOX', '').lower() in ('true', '1', 'yes')
+    return 'https://sandbox-api.digikey.com' if sandbox else 'https://api.digikey.com'
+
+
+@staff_member_required
+def digikey_connect(request):
+    client_id = os.environ.get('DIGIKEY_CLIENT_ID', '').strip()
+    if not client_id:
+        messages.warning(request, 'DIGIKEY_CLIENT_ID is not configured in .env.')
+        return redirect('erp:part_list')
+
+    callback_url = request.build_absolute_uri(reverse('erp:digikey_callback'))
+    from urllib.parse import urlencode
+    auth_url = _digikey_base_url() + '/v1/oauth2/authorize?' + urlencode({
+        'response_type': 'code',
+        'client_id': client_id,
+        'redirect_uri': callback_url,
+    })
+    return redirect(auth_url)
+
+
+@staff_member_required
+def digikey_callback(request):
+    import time
+    import requests as http_requests
+    from pathlib import Path
+
+    error = request.GET.get('error')
+    if error:
+        messages.warning(request, f'DigiKey authorisation denied: {error}')
+        return redirect('erp:part_list')
+
+    code = request.GET.get('code')
+    if not code:
+        messages.warning(request, 'No authorisation code received from DigiKey.')
+        return redirect('erp:part_list')
+
+    client_id = os.environ.get('DIGIKEY_CLIENT_ID', '').strip()
+    client_secret = os.environ.get('DIGIKEY_CLIENT_SECRET', '').strip()
+    storage_path = os.environ.get('DIGIKEY_STORAGE_PATH', '').strip()
+
+    if not client_id or not client_secret or not storage_path:
+        messages.warning(request, 'DigiKey credentials are not fully configured in .env.')
+        return redirect('erp:part_list')
+
+    callback_url = request.build_absolute_uri(reverse('erp:digikey_callback'))
+
+    try:
+        r = http_requests.post(
+            _digikey_base_url() + '/v1/oauth2/token',
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            data={
+                'grant_type': 'authorization_code',
+                'code': code,
+                'client_id': client_id,
+                'client_secret': client_secret,
+                'redirect_uri': callback_url,
+            },
+            timeout=15,
+        )
+        r.raise_for_status()
+        token_json = r.json()
+        token_json['expires'] = int(token_json['expires_in']) + time.time() - 60
+
+        token_file = Path(storage_path) / 'token_storage.json'
+        token_file.parent.mkdir(parents=True, exist_ok=True)
+        token_file.write_text(json.dumps(token_json))
+
+        messages.success(request, 'DigiKey connected successfully. You can now use the DigiKey fetch button.')
+    except Exception as e:
+        messages.warning(request, f'DigiKey token exchange failed: {e}')
+
+    return redirect('erp:part_list')
+
+
+@staff_member_required
+def part_source_fetch_lcsc(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        sku = (data.get('sku') or '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body'}, status=400)
+
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'No SKU provided'})
+
+    part_id = data.get('part_id')
+    part = get_object_or_404(Part, pk=part_id) if part_id else None
+
+    try:
+        import os
+        import requests as http_requests
+        from django.core.files.base import ContentFile
+        from lcsc import LcscClient
+        from lcsc.errors import LcscError
+
+        with LcscClient() as c:
+            result = c.search(sku)
+        if not result.is_product:
+            return JsonResponse({'ok': False, 'error': f'No product found for "{sku}"'})
+        p = result.product
+
+        image_url = None
+        if part and not part.image and p.product_images:
+            remote_url = p.product_images[0]
+            img_resp = http_requests.get(remote_url, timeout=10)
+            img_resp.raise_for_status()
+            ext = os.path.splitext(remote_url)[1] or '.jpg'
+            part.image.save(f'lcsc_{p.product_code}{ext}', ContentFile(img_resp.content), save=True)
+            image_url = part.image.url
+
+        lcsc_packaging = p.product_arrange or ''
+
+        if part and not part.description and p.product_intro_en:
+            part.description = p.product_intro_en
+            part.save(update_fields=['description'])
+
+        source_saved = False
+        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
+            PartSource.objects.create(
+                part=part,
+                supplier_name='LCSC',
+                supplier_sku=p.product_code,
+                manufacturer_sku=p.product_model or '',
+                packaging=lcsc_packaging,
+                url=f'https://www.lcsc.com/product-detail/{p.product_code}.html',
+                stock=p.stock_number,
+            )
+            source_saved = True
+
+        return JsonResponse({
+            'ok': True,
+            'supplier_name': 'LCSC',
+            'manufacturer_sku': p.product_model or '',
+            'packaging': lcsc_packaging,
+            'url': f'https://www.lcsc.com/product-detail/{p.product_code}.html',
+            'stock': p.stock_number,
+            'image_url': image_url,
+            'source_saved': source_saved,
+        })
+    except LcscError as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
+
+
+@staff_member_required
+def part_source_fetch_mouser(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        sku = (data.get('sku') or '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body'}, status=400)
+
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'No SKU provided'})
+
+    part_id = data.get('part_id')
+    part = get_object_or_404(Part, pk=part_id) if part_id else None
+
+    try:
+        import requests as http_requests
+        from django.core.files.base import ContentFile
+
+        api_key = os.environ.get('MOUSER_API_KEY', '').strip()
+        if not api_key:
+            return JsonResponse({'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'})
+
+        resp = http_requests.post(
+            f'https://api.mouser.com/api/v1/search/partnumber?apiKey={api_key}',
+            json={'SearchByPartRequest': {'mouserPartNumber': sku, 'partSearchOptions': ''}},
+            headers={'Content-Type': 'application/json', 'Accept': 'application/json'},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        result = resp.json()
+
+        errors = result.get('Errors', [])
+        if errors:
+            return JsonResponse({'ok': False, 'error': f'Mouser API error: {errors[0]}'})
+
+        parts = result.get('SearchResults', {}).get('Parts', [])
+        if not parts:
+            return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Mouser'})
+
+        p = next((x for x in parts if x.get('MouserPartNumber', '').lower() == sku.lower()), parts[0])
+
+        mouser_pn = p.get('MouserPartNumber') or sku
+        manufacturer_pn = p.get('ManufacturerPartNumber') or ''
+        mouser_description = p.get('Description') or ''
+        product_url = p.get('ProductDetailUrl') or ''
+        image_remote_url = p.get('ImagePath') or ''
+
+        stock_str = p.get('AvailabilityInStock') or ''
+        try:
+            stock = int(stock_str) if stock_str else None
+        except (ValueError, TypeError):
+            stock = None
+
+        packaging = ''
+        for attr in p.get('ProductAttributes', []):
+            if 'packag' in (attr.get('AttributeName') or '').lower():
+                packaging = attr.get('AttributeValue') or ''
+                break
+
+        if part and not part.description and mouser_description:
+            part.description = mouser_description
+            part.save(update_fields=['description'])
+
+        image_url = None
+        if part and not part.image and image_remote_url:
+            img_resp = http_requests.get(image_remote_url, timeout=10)
+            img_resp.raise_for_status()
+            ext = os.path.splitext(image_remote_url)[1] or '.jpg'
+            part.image.save(f'mouser_{mouser_pn.replace("/", "_")}{ext}', ContentFile(img_resp.content), save=True)
+            image_url = part.image.url
+
+        source_saved = False
+        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
+            PartSource.objects.create(
+                part=part,
+                supplier_name='Mouser',
+                supplier_sku=mouser_pn,
+                manufacturer_sku=manufacturer_pn,
+                packaging=packaging,
+                url=product_url,
+                stock=stock,
+            )
+            source_saved = True
+
+        return JsonResponse({
+            'ok': True,
+            'supplier_name': 'Mouser',
+            'manufacturer_sku': manufacturer_pn,
+            'packaging': packaging,
+            'url': product_url,
+            'stock': stock,
+            'image_url': image_url,
+            'source_saved': source_saved,
+        })
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
+
+
+def _get_digikey_access_token():
+    """
+    Return a valid DigiKey access token, refreshing it if expired.
+    Saves the refreshed token back to token_storage.json in the same format
+    that digikey_callback uses, so the digikey-api library stays in sync.
+    Raises RuntimeError if credentials are missing or the refresh request fails.
+    """
+    import time
+    import requests as http_requests
+
+    client_id = os.environ.get('DIGIKEY_CLIENT_ID', '').strip()
+    client_secret = os.environ.get('DIGIKEY_CLIENT_SECRET', '').strip()
+    storage_path = os.environ.get('DIGIKEY_STORAGE_PATH', '').strip()
+    if not client_id or not client_secret:
+        raise RuntimeError('DigiKey credentials are not configured in .env.')
+    if not storage_path:
+        raise RuntimeError('DIGIKEY_STORAGE_PATH is not configured in .env.')
+
+    token_file = Path(storage_path) / 'token_storage.json'
+    if not token_file.exists():
+        raise RuntimeError('DigiKey token not found. Visit /parts/source/digikey-connect/ to authorise.')
+
+    token_data = json.loads(token_file.read_text())
+
+    if time.time() >= token_data.get('expires', 0):
+        r = http_requests.post(
+            _digikey_base_url() + '/v1/oauth2/token',
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            data={
+                'grant_type': 'refresh_token',
+                'refresh_token': token_data['refresh_token'],
+                'client_id': client_id,
+                'client_secret': client_secret,
+            },
+            timeout=15,
+        )
+        if r.status_code != 200:
+            raise RuntimeError(
+                f'Token refresh failed ({r.status_code}). '
+                'Re-authorise by visiting /parts/source/digikey-connect/'
+            )
+        token_data = r.json()
+        token_data['expires'] = int(token_data['expires_in']) + time.time() - 60
+        token_file.write_text(json.dumps(token_data))
+
+    return client_id, token_data['access_token']
+
+
+@staff_member_required
+def part_source_fetch_digikey(request):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        sku = (data.get('sku') or '').strip()
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'ok': False, 'error': 'Invalid request body'}, status=400)
+
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'No SKU provided'})
+
+    part_id = data.get('part_id')
+    part = get_object_or_404(Part, pk=part_id) if part_id else None
+
+    try:
+        import requests as http_requests
+        from django.core.files.base import ContentFile
+
+        client_id, access_token = _get_digikey_access_token()
+
+        resp = http_requests.get(
+            _digikey_base_url() + f'/products/v4/search/{sku}/productdetails',
+            headers={
+                'Authorization': f'Bearer {access_token}',
+                'X-DIGIKEY-Client-Id': client_id,
+                'Accept': 'application/json',
+            },
+            timeout=15,
+        )
+        if resp.status_code in (401, 403):
+            try:
+                body = resp.json()
+                detail = body.get('ErrorMessage') or body.get('error_description') or body.get('message') or str(body)
+            except Exception:
+                detail = resp.text[:300]
+            return JsonResponse({'ok': False, 'error': f'DigiKey API {resp.status_code}: {detail}'})
+        if resp.status_code == 404:
+            return JsonResponse({'ok': False, 'error': f'No product found for "{sku}"'})
+        resp.raise_for_status()
+        p = resp.json()
+
+        # v4 wraps the product in a 'Product' key; field names differ from v3
+        product = p.get('Product') or p
+        digi_key_pn = product.get('DigiKeyPartNumber') or sku
+        manufacturer_pn = product.get('ManufacturerProductNumber') or ''
+        product_url = product.get('ProductUrl') or f'https://www.digikey.com/en/products/detail/{sku}'
+        quantity = product.get('QuantityAvailable')
+        stock = int(quantity) if quantity is not None else None
+        primary_photo = product.get('PhotoUrl')
+        variations = product.get('ProductVariations', [])
+        dk_packaging = ''
+        for v in variations:
+            if v.get('DigiKeyProductNumber', '').lower() == sku.lower():
+                dk_packaging = v.get('PackageType', {}).get('Name', '')
+                break
+
+        image_url = None
+        if part and not part.image and primary_photo:
+            img_resp = http_requests.get(primary_photo, timeout=10)
+            img_resp.raise_for_status()
+            ext = os.path.splitext(primary_photo)[1] or '.jpg'
+            part.image.save(f'digikey_{digi_key_pn.replace("/", "_")}{ext}', ContentFile(img_resp.content), save=True)
+            image_url = part.image.url
+
+        dk_description = (product.get('Description') or {}).get('DetailedDescription', '')
+        if part and not part.description and dk_description:
+            part.description = dk_description
+            part.save(update_fields=['description'])
+
+        source_saved = False
+        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
+            PartSource.objects.create(
+                part=part,
+                supplier_name='DigiKey',
+                supplier_sku=digi_key_pn,
+                manufacturer_sku=manufacturer_pn,
+                packaging=dk_packaging,
+                url=product_url,
+                stock=stock,
+            )
+            source_saved = True
+
+        return JsonResponse({
+            'ok': True,
+            'supplier_name': 'DigiKey',
+            'manufacturer_sku': manufacturer_pn,
+            'packaging': dk_packaging,
+            'url': product_url,
+            'stock': stock,
+            'image_url': image_url,
+            'source_saved': source_saved,
+        })
+    except RuntimeError as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
+
+
+@staff_member_required
+def part_source_refresh(request, source_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    source = get_object_or_404(PartSource, pk=source_id)
+    part = source.part
+    sku = source.supplier_sku
+    supplier = source.supplier_name.lower()
+
+    try:
+        import requests as http_requests
+        from django.core.files.base import ContentFile
+
+        image_remote_url = None
+
+        if supplier == 'lcsc':
+            from lcsc import LcscClient
+            with LcscClient() as c:
+                result = c.search(sku)
+            if not result.is_product:
+                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on LCSC'})
+            p = result.product
+            manufacturer_sku = p.product_model or ''
+            packaging = p.product_arrange or ''
+            url = f'https://www.lcsc.com/product-detail/{p.product_code}.html'
+            stock = p.stock_number
+            supplier_description = p.product_intro_en or ''
+            if p.product_images:
+                image_remote_url = p.product_images[0]
+            image_filename_prefix = f'lcsc_{p.product_code}'
+
+        elif 'digikey' in supplier:
+            client_id, access_token = _get_digikey_access_token()
+            resp = http_requests.get(
+                _digikey_base_url() + f'/products/v4/search/{sku}/productdetails',
+                headers={
+                    'Authorization': f'Bearer {access_token}',
+                    'X-DIGIKEY-Client-Id': client_id,
+                    'Accept': 'application/json',
+                },
+                timeout=15,
+            )
+            if resp.status_code in (401, 403):
+                try:
+                    body = resp.json()
+                    detail = body.get('ErrorMessage') or body.get('error_description') or body.get('message') or str(body)
+                except Exception:
+                    detail = resp.text[:300]
+                return JsonResponse({'ok': False, 'error': f'DigiKey API {resp.status_code}: {detail}'})
+            if resp.status_code == 404:
+                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on DigiKey'})
+            resp.raise_for_status()
+            product = resp.json().get('Product') or resp.json()
+            manufacturer_sku = product.get('ManufacturerProductNumber') or ''
+            url = product.get('ProductUrl') or ''
+            quantity = product.get('QuantityAvailable')
+            stock = int(quantity) if quantity is not None else None
+            image_remote_url = product.get('PhotoUrl')
+            image_filename_prefix = f'digikey_{sku.replace("/", "_")}'
+            variations = product.get('ProductVariations', [])
+            packaging = ''
+            for v in variations:
+                if v.get('DigiKeyProductNumber', '').lower() == sku.lower():
+                    packaging = v.get('PackageType', {}).get('Name', '')
+                    break
+            supplier_description = (product.get('Description') or {}).get('DetailedDescription', '')
+
+        elif supplier == 'mouser':
+            import requests as http_requests
+            api_key = os.environ.get('MOUSER_API_KEY', '').strip()
+            if not api_key:
+                return JsonResponse({'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'})
+            resp = http_requests.post(
+                f'https://api.mouser.com/api/v1/search/partnumber?apiKey={api_key}',
+                json={'SearchByPartRequest': {'mouserPartNumber': sku, 'partSearchOptions': ''}},
+                headers={'Content-Type': 'application/json', 'Accept': 'application/json'},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+            errors = result.get('Errors', [])
+            if errors:
+                return JsonResponse({'ok': False, 'error': f'Mouser API error: {errors[0]}'})
+            parts = result.get('SearchResults', {}).get('Parts', [])
+            if not parts:
+                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Mouser'})
+            p = next((x for x in parts if x.get('MouserPartNumber', '').lower() == sku.lower()), parts[0])
+            manufacturer_sku = p.get('ManufacturerPartNumber') or ''
+            url = p.get('ProductDetailUrl') or ''
+            stock_str = p.get('AvailabilityInStock') or ''
+            try:
+                stock = int(stock_str) if stock_str else None
+            except (ValueError, TypeError):
+                stock = None
+            packaging = ''
+            for attr in p.get('ProductAttributes', []):
+                if 'packag' in (attr.get('AttributeName') or '').lower():
+                    packaging = attr.get('AttributeValue') or ''
+                    break
+            supplier_description = p.get('Description') or ''
+            image_remote_url = p.get('ImagePath') or ''
+            image_filename_prefix = f'mouser_{sku.replace("/", "_")}'
+
+        else:
+            return JsonResponse({'ok': False, 'error': f'No API integration for supplier "{source.supplier_name}"'})
+
+        source.manufacturer_sku = manufacturer_sku
+        source.packaging = packaging
+        source.url = url
+        source.stock = stock
+        source.save()
+
+        if not part.description and supplier_description:
+            part.description = supplier_description
+            part.save(update_fields=['description'])
+
+        if not part.image and image_remote_url:
+            img_resp = http_requests.get(image_remote_url, timeout=10)
+            img_resp.raise_for_status()
+            ext = os.path.splitext(image_remote_url)[1] or '.jpg'
+            part.image.save(f'{image_filename_prefix}{ext}', ContentFile(img_resp.content), save=True)
+
+        return JsonResponse({'ok': True})
+
+    except RuntimeError as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Refresh failed: {e}'})
+
+
+@staff_member_required
+def part_source_delete(request, source_id):
+    source = get_object_or_404(PartSource, pk=source_id)
+    part_id = source.part_id
+
+    if request.method == 'POST':
+        source.delete()
+        messages.success(request, 'Source deleted.')
 
     return redirect('erp:part_edit', part_id=part_id)
 

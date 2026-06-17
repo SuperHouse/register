@@ -3,7 +3,7 @@
 from django import forms
 
 from device.models import Design
-from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -125,6 +125,20 @@ class PartForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['category'].required = False
         self.fields['category'].empty_label = '(uncategorised)'
+
+
+class PartSourceForm(forms.ModelForm):
+    class Meta:
+        model = PartSource
+        fields = ['supplier_name', 'supplier_sku', 'url', 'manufacturer_sku', 'packaging', 'stock']
+        widgets = {
+            'supplier_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'supplier_sku': forms.TextInput(attrs={'class': 'form-control'}),
+            'url': forms.URLInput(attrs={'class': 'form-control'}),
+            'manufacturer_sku': forms.TextInput(attrs={'class': 'form-control'}),
+            'packaging': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+        }
 
 
 class PartAssetForm(forms.ModelForm):

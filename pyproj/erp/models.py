@@ -107,6 +107,23 @@ class Part(models.Model):
         return self.name
 
 
+class PartSource(models.Model):
+    """A supplier or purchase source for a Part."""
+    part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='sources')
+    supplier_name = models.CharField(max_length=200)
+    supplier_sku = models.CharField(max_length=200, blank=True)
+    url = models.URLField(blank=True)
+    manufacturer_sku = models.CharField(max_length=200, blank=True)
+    packaging = models.CharField(max_length=100, blank=True)
+    stock = models.PositiveIntegerField(null=True, blank=True, help_text='Leave blank if stock level is unknown')
+
+    class Meta:
+        ordering = ['supplier_name']
+
+    def __str__(self):
+        return f'{self.part}: {self.supplier_name}'
+
+
 class PartAsset(models.Model):
     """A file attachment on a Part (e.g. datasheet)."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='assets')

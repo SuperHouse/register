@@ -38,6 +38,103 @@ assigned, which are an embodiment of a design.
 It's written as a Django + React application and can use either SQLite 
 or MariaDB / MySQL.
 
+## Supplier API Integration
+
+The Parts library can look up component data from LCSC, DigiKey, and Mouser to auto-populate part source records (manufacturer SKU, stock, packaging, description, and product image).
+
+## LCSC API Integration
+
+LCSC lookup uses the [`lcsc`](https://pypi.org/project/lcsc/) Python library and requires no API key or account. It works out of the box.
+
+## DigiKey API Integration
+
+DigiKey lookup requires a free DigiKey developer account and a one-time OAuth setup.
+
+### 1. Register a DigiKey API application
+
+1. Sign in or create an account at [developer.digikey.com](https://developer.digikey.com)
+2. Create a new application and subscribe it to the **Production Information V4** API product
+3. When asked for an **OAuth Callback URL**, enter:
+   ```
+   https://localhost:8000/parts/source/digikey-callback/
+   ```
+   (For a production deployment, use your actual domain, e.g. `https://register.example.com/parts/source/digikey-callback/`)
+4. Once the application is created, copy the **Client ID** and **Client Secret**
+
+### 2. Configure the environment
+
+Create a directory to store the OAuth token:
+
+```bash
+mkdir pyproj/.digikey
+```
+
+Add the following to `pyproj/.env`:
+
+```
+DIGIKEY_CLIENT_ID = "your-client-id"
+DIGIKEY_CLIENT_SECRET = "your-client-secret"
+DIGIKEY_STORAGE_PATH = "/absolute/path/to/pyproj/.digikey"
+DIGIKEY_CLIENT_SANDBOX = False
+```
+
+Set `DIGIKEY_CLIENT_SANDBOX = True` if your DigiKey application only has sandbox (not production) API access. Note that the sandbox catalog contains only a limited set of test parts.
+
+### 3. Set up local HTTPS for development
+
+DigiKey requires HTTPS for the OAuth callback, even on localhost. The easiest approach uses `mkcert` to create a locally-trusted certificate and `runserver_plus` (included with `django-extensions`, which is already installed) to serve over HTTPS.
+
+Install `mkcert` and generate a localhost certificate:
+
+```bash
+brew install mkcert
+mkcert -install
+cd pyproj
+mkcert localhost
+```
+
+This creates `localhost.pem` and `localhost-key.pem` in `pyproj/`.
+
+### 4. Complete the one-time OAuth flow
+
+Start the development server with SSL:
+
+```bash
+cd pyproj
+source venv/bin/activate
+python manage.py runserver_plus --cert-file localhost.pem --key-file localhost-key.pem
+```
+
+Then visit:
+
+```
+https://localhost:8000/parts/source/digikey-connect/
+```
+
+This redirects to the DigiKey login page. After you log in and grant access, DigiKey redirects back to the app, which exchanges the code for a token and saves it to `DIGIKEY_STORAGE_PATH`. The token refreshes automatically on subsequent use — this step is only needed once (or if the refresh token expires).
+
+> **Note:** For day-to-day use after the token is saved, you can run the normal `python manage.py runserver` without SSL — HTTPS is only needed for the initial OAuth flow.
+
+## Mouser API Integration
+
+Mouser lookup requires a free Mouser developer account. Unlike DigiKey, authentication is a simple API key — no OAuth flow is needed.
+
+### 1. Register for a Mouser Search API key
+
+1. Sign in or create an account at [mouser.com/api-hub](https://www.mouser.com/api-hub/)
+2. Under **Search API**, generate an API key
+3. Copy the key
+
+### 2. Configure the environment
+
+Add the following to `pyproj/.env`:
+
+```
+MOUSER_API_KEY = "your-api-key"
+```
+
+Restart the development server and the Mouser fetch button will be active immediately — no further setup is required.
+
 ## Data Export and Import
 
 All application data (database records and uploaded media files) can be exported
