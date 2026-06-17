@@ -1,0 +1,20 @@
+<tr style="cursor: pointer;" onclick="window.location='{% url 'erp:part_edit' part.pk %}'">
+    <td style="padding: 4px 8px;">
+        {% if part.image %}
+            <img src="{{ part.image.url }}" alt="{{ part.name }}"
+                 style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+        {% endif %}
+    </td>
+    <td>{{ part.name }}</td>
+    <td>{{ part.value }}</td>
+    <td>{{ part.package }}</td>
+    <td>{{ part.device }}</td>
+    <td>
+        <a href="{% url 'erp:part_delete' part.pk %}"
+           class="btn btn-sm btn-outline-danger"
+           title="Delete"
+           onclick="event.stopPropagation();">
+            <i class="cil-trash"></i>
+        </a>
+    </td>
+</tr>

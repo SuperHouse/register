@@ -12,12 +12,27 @@
 {% block content %}
     <div class="col">
         <div class="col-12 col-md-10">
-            {% if pcb_top_asset %}
-                <div class="mb-4">
-                    <img src="{{ pcb_top_asset.file.url }}"
-                         alt="PCB Top View"
-                         class="img-fluid rounded"
-                         style="max-height: 400px;">
+            <div class="mb-3 d-flex gap-2">
+                <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
+                {% if user.is_staff %}
+                    <a href="{% url 'erp:batch_add' %}?design={{ design.pk }}" class="btn btn-primary">Add New Batch</a>
+                {% endif %}
+            </div>
+
+            {% if pcb_top_asset or pcb_bottom_asset %}
+                <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
+                    {% if pcb_top_asset %}
+                        <img src="{{ pcb_top_asset.file.url }}"
+                             alt="PCB Top View"
+                             class="rounded"
+                             style="max-width: 400px; width: 100%;">
+                    {% endif %}
+                    {% if pcb_bottom_asset %}
+                        <img src="{{ pcb_bottom_asset.file.url }}"
+                             alt="PCB Bottom View"
+                             class="rounded"
+                             style="max-width: 400px; width: 100%;">
+                    {% endif %}
                 </div>
             {% endif %}
             <div class="card border-0 mb-4">
@@ -150,6 +165,89 @@
                 </div>
             {% endif %}
 
+            {% if user.is_staff or has_testing_assets %}
+                <h5 class="mt-4">Testing</h5>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        <table class="table core-file-table">
+                            <tbody>
+                                {% for type_key, label, asset in testing_assets %}
+                                    {% if asset or user.is_staff %}
+                                        {% if asset %}
+                                            <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                                <td class="text-nowrap" style="width:1px">
+                                                    {% if type_key == 'FUSION' %}
+                                                        <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                                    {% else %}
+                                                        <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-nowrap">{{ label }}</td>
+                                                <td>
+                                                    {{ asset.filename }}
+                                                    {% if user.is_staff and asset.internal %}
+                                                        <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                                                    {% endif %}
+                                                </td>
+                                                {% if user.is_staff %}
+                                                    <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                        <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                           class="btn btn-sm btn-primary me-1"
+                                                           title="Edit">
+                                                            <i class="cil-pencil"></i>
+                                                        </a>
+                                                        <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                           class="btn btn-sm btn-danger"
+                                                           title="Delete">
+                                                            <i class="cil-trash"></i>
+                                                        </a>
+                                                    </td>
+                                                {% endif %}
+                                            </tr>
+                                        {% else %}
+                                            <tr class="core-upload-trigger"
+                                                data-type="{{ type_key }}"
+                                                style="cursor:pointer"
+                                                title="Click to upload {{ label }}">
+                                                <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
+                                                <td class="text-nowrap">{{ label }}</td>
+                                                <td><span class="text-muted fst-italic">Not uploaded</span></td>
+                                                <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                                    <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
+                                                </td>
+                                            </tr>
+                                            <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
+                                                <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                                    <form method="post"
+                                                          action="{% url 'design_asset_add' design.pk %}"
+                                                          enctype="multipart/form-data"
+                                                          class="d-flex align-items-end gap-3 flex-wrap">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="asset_type" value="{{ type_key }}">
+                                                        <div>
+                                                            <label class="form-label small mb-1">File</label>
+                                                            <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
+                                                        </div>
+                                                        <div>
+                                                            <label class="form-label small mb-1">Name</label>
+                                                            <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
+                                                        </div>
+                                                        <div class="d-flex gap-2">
+                                                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                            <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
+                                                        </div>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if attachments or user.is_staff %}
                 <h5 class="mt-4">Attachments</h5>
                 <div class="card border-0 mb-3">
@@ -269,9 +367,6 @@
                 </div>
             {% endif %}
 
-            <div class="mt-3">
-                <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
-            </div>
         </div>
     </div>
 {% endblock content %}
@@ -313,11 +408,13 @@
 
         // Stripe visible rows only, skipping hidden inline-upload-row elements
         (function restripeCoreTbl() {
-            let idx = 0;
-            document.querySelectorAll('.core-file-table tbody tr').forEach(function (row) {
-                if (row.classList.contains('inline-upload-row')) return;
-                row.style.setProperty('--bs-table-accent-bg', idx % 2 === 1 ? 'rgba(0,0,0,.05)' : 'transparent');
-                idx++;
+            document.querySelectorAll('.core-file-table').forEach(function (table) {
+                let idx = 0;
+                table.querySelectorAll('tbody tr').forEach(function (row) {
+                    if (row.classList.contains('inline-upload-row')) return;
+                    row.style.setProperty('--bs-table-accent-bg', idx % 2 === 1 ? 'rgba(0,0,0,.05)' : 'transparent');
+                    idx++;
+                });
             });
         }());
 

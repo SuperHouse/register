@@ -56,6 +56,15 @@
                         Dashboard
                     </a>
                 </li>
+                {% if user.is_staff %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if url_name == 'batch_list' or url_name == 'batch_edit' or url_name == 'batch_add' %}active{% endif %}"
+                           href="{% url 'erp:batch_list' %}">
+                            <i class="nav-icon cil-layers"></i>
+                            Batches
+                        </a>
+                    </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link {% if app_name == 'device' %}active{% endif %}"
                        href="{% url 'device:top' %}">
@@ -76,6 +85,20 @@
                            href="{% url 'organisation_list' %}">
                             <i class="nav-icon cil-building"></i>
                             Organisations
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'erp' and url_name|slice:":5" == "part_" and url_name|slice:":6" != "part_c" %}active{% endif %}"
+                           href="{% url 'erp:part_list' %}">
+                            <i class="nav-icon cil-puzzle"></i>
+                            Parts
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'erp' and url_name != 'batch_list' and url_name != 'batch_edit' and url_name != 'batch_add' and url_name|slice:":5" != "part_" %}active{% elif app_name == 'erp' and url_name|slice:":14" == "part_category_" %}active{% endif %}"
+                           href="{% url 'erp:settings_index' %}">
+                            <i class="nav-icon cil-settings"></i>
+                            Settings
                         </a>
                     </li>
                 {% endif %}

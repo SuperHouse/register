@@ -55,6 +55,10 @@ INSTALLED_APPS = [
     # Apps in this project
     'authuser',
     'device',
+    'crm',
+    'erp',
+    'pcba',
+    "pcba.designs"
 ]
 
 MIDDLEWARE = [
@@ -83,9 +87,9 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'crm.context_processor.get_client_logo_processor',
                 'device.context_processor.background_processor',  # Variables for customising the background
                 'device.context_processor.demo_processor',  # Variables for the demo level
-                'device.context_processor.get_client_logo_processor',  # Variables for the client logo
                 'device.context_processor.version_processor',  # App version number
             ],
         },

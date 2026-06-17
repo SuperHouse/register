@@ -19,13 +19,14 @@ from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
-from .forms import ClientForm, DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
-from .models import Client, Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
+from .forms import DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
+from crm.models import Org
 
 
 def dashboard(request):
     """Dashboard view showing summary statistics."""
-    clients = Client.objects.all()
+    clients = Org.objects.all()
     designs = Design.objects.all()
     devices = Device.objects.all()
 
@@ -65,75 +66,11 @@ def dashboard(request):
     return render(request, 'device/dashboard.html', context)
 
 
-@staff_member_required
-def organisation_list(request):
-    """List all clients/organisations."""
-    clients = Client.objects.all().order_by('company_name')
-
-    q = request.GET.get('q', '').strip()
-    if q:
-        clients = clients.filter(company_name__icontains=q)
-
-    paginator = Paginator(clients, 50)
-    page_obj = paginator.get_page(request.GET.get('page'))
-
-    context = {
-        'clients': page_obj,
-        'page_obj': page_obj,
-        'q': q,
-    }
-
-    return render(request, 'device/organisation_list.html', context)
-
-
-@staff_member_required
-def organisation_detail(request, client_id):
-    """Detail view for a single organisation."""
-    client = get_object_or_404(Client, pk=client_id)
-    designs = Design.objects.filter(client=client).order_by('sku')
-    board_count = Device.objects.filter(design__client=client).count()
-
-    context = {
-        'client': client,
-        'designs': designs,
-        'board_count': board_count,
-    }
-
-    return render(request, 'device/organisation_detail.html', context)
-
-
-@staff_member_required
-def organisation_edit(request, client_id):
-    """Edit a client/organisation."""
-    client = get_object_or_404(Client, pk=client_id)
-    
-    if request.method == "POST":
-        form = ClientForm(request.POST, request.FILES, instance=client)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Organisation updated successfully.')
-            return redirect("organisation_detail", client_id=client.pk)
-        else:
-            messages.warning(
-                request,
-                "Some field values have errors. Please review, and amend as required.",
-            )
-    else:
-        form = ClientForm(instance=client)
-    
-    context = {
-        'form': form,
-        'client': client,
-    }
-    
-    return render(request, 'device/organisation_edit.html', context)
-
-
 def top(request):
     devices = Device.objects.prefetch_related("design").order_by('pk').all()
 
     if not request.user.is_staff:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         devices = devices.filter(design__client__in=clients)
 
     q = request.GET.get('q', '').strip()
@@ -163,7 +100,7 @@ def design_list(request):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
 
     if not request.user.is_staff:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         pcb_top_qs = pcb_top_qs.filter(internal=False)
 
     designs = Design.objects.prefetch_related(
@@ -201,7 +138,7 @@ def design_detail(request, design_id):
         design = get_object_or_404(Design, pk=design_id)
         assets = design.designasset_set.all()
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         design = get_object_or_404(Design, pk=design_id, client__in=clients)
         assets = design.designasset_set.filter(internal=False)
 
@@ -215,14 +152,19 @@ def design_detail(request, design_id):
         (DesignAsset.SCHEMATIC, 'Schematic Design File'),
         (DesignAsset.PCB_DESIGN, 'PCB Design File'),
         (DesignAsset.BOM, 'Bill of Materials'),
+    ]
+    testing_type_order = [
         (DesignAsset.FIRMWARE, 'Firmware Binary'),
     ]
     existing_core = {a.asset_type: a for a in assets.filter(asset_type__in=DesignAsset.CORE_ASSET_TYPES)}
     core_assets = [(type_key, label, existing_core.get(type_key)) for type_key, label in core_type_order]
-    has_core_assets = bool(existing_core)
+    has_core_assets = any(asset for _, _, asset in core_assets)
+    testing_assets = [(type_key, label, existing_core.get(type_key)) for type_key, label in testing_type_order]
+    has_testing_assets = any(asset for _, _, asset in testing_assets)
 
     attachments = assets.filter(asset_type=DesignAsset.ATTACHMENT)
     pcb_top_asset = existing_core.get(DesignAsset.PCB_TOP)
+    pcb_bottom_asset = existing_core.get(DesignAsset.PCB_BOTTOM)
 
     context = {
         'design': design,
@@ -230,9 +172,12 @@ def design_detail(request, design_id):
         'device_count': devices.count(),
         'core_assets': core_assets,
         'has_core_assets': has_core_assets,
+        'testing_assets': testing_assets,
+        'has_testing_assets': has_testing_assets,
         'attachments': attachments,
         'asset_form': DesignAssetForm() if request.user.is_staff else None,
         'pcb_top_asset': pcb_top_asset,
+        'pcb_bottom_asset': pcb_bottom_asset,
     }
 
     return render(request, 'device/design_detail.html', context)
@@ -351,12 +296,6 @@ def design_asset_delete(request, asset_id):
     return render(request, 'device/design_asset_delete.html', ctx)
 
 
-def bootstrap_demo(request):
-    context = {}
-
-    return render(request, 'device/bootstrap-demo.html', context)
-
-
 def inc_demo(request):
     demo_names = (
         'normal',
@@ -468,7 +407,7 @@ def device_detail(request, device_number):
         events = device.deviceevent_set.all()
         assets = device.deviceasset_set.all()
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
         events = device.deviceevent_set.exclude(internal=True)
         assets = device.deviceasset_set.filter(internal=False)
@@ -491,7 +430,7 @@ def device_action(request, device_number):
     if request.user.is_staff:
         device = get_object_or_404(Device, pk=device_number)
     else:
-        clients = Client.objects.filter(users=request.user)
+        clients = Org.objects.filter(users=request.user)
         device = get_object_or_404(Device, design__client__in=clients, pk=device_number)
 
     context = {
@@ -516,7 +455,7 @@ def device_search(request):
 
         if not msg:
             if not request.user.is_staff:
-                clients = Client.objects.filter(users=request.user)
+                clients = Org.objects.filter(users=request.user)
                 device_set = device_set.filter(design__client__in=clients)
             if device_set:
                 device = device_set.first()

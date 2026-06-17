@@ -3,20 +3,21 @@ from easy_thumbnails.files import get_thumbnailer
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Client, Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
+from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestImage, TestRecord
+from crm.models import Org
 
 
-class DesignAssetInline(admin.TabularInline):
-    model = DesignAsset
-    extra = 0
-    readonly_fields = ['uploaded_dt']
-
-
-class DesignAdmin(admin.ModelAdmin):
-    fields = ['client', ('sku', 'hw_version'), 'name', 'description', 'price', 'price2']
-    list_filter = ['client', 'sku']
-    search_fields = ['sku', 'name', 'hw_version']
-    inlines = [DesignAssetInline]
+# class DesignAssetInline(admin.TabularInline):
+#     model = DesignAsset
+#     extra = 0
+#     readonly_fields = ['uploaded_dt']
+#
+#
+# class DesignAdmin(admin.ModelAdmin):
+#     fields = ['client', ('sku', 'hw_version'), 'name', 'description', 'price', 'price2']
+#     list_filter = ['client', 'sku']
+#     search_fields = ['sku', 'name', 'hw_version']
+#     inlines = [DesignAssetInline]
 
 
 class TestRecordInline(admin.StackedInline):
@@ -36,7 +37,7 @@ class DeviceAssetInline(admin.TabularInline):
 
 
 class DeviceAdmin(admin.ModelAdmin):
-    autocomplete_fields = ['design']
+    # autocomplete_fields = ['design']
     inlines = [TestRecordInline, DeviceEventInline, DeviceAssetInline]
     search_fields = ['id']
 
@@ -62,12 +63,7 @@ class TestRecordAdmin(admin.ModelAdmin):
     inlines = [TestImageInline]
 
 
-class TestRecordAdmin(admin.ModelAdmin):
-    inlines = [TestImageInline]
-
-
-admin.site.register(Client)
-admin.site.register(Design, DesignAdmin)
+# admin.site.register(Design, DesignAdmin)
 admin.site.register(Device, DeviceAdmin)
 admin.site.register(DeviceEvent)
 admin.site.register(DeviceImage)

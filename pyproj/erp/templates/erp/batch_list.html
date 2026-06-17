@@ -1,0 +1,64 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Batches - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Batches
+{% endblock h1 %}
+
+{% block content %}
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{% url 'erp:batch_add' %}" class="btn btn-primary">
+            <i class="cil-plus"></i> Add Batch
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th></th>
+                        <th>Design</th>
+                        <th>Reference</th>
+                        <th>Quantity</th>
+                        <th>Created</th>
+                        <th>Progress</th>
+                        <th style="width: 60px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                        <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                            <td style="width: 70px; padding: 4px 8px;">
+                                {% with batch.design.pcb_top_assets|first as pcb_top %}
+                                    {% if pcb_top %}
+                                        <img src="{{ pcb_top.file.url }}"
+                                             alt="PCB Top View"
+                                             style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                            <td>{{ batch.design }}</td>
+                            <td>{{ batch.reference }}</td>
+                            <td>{{ batch.quantity }}</td>
+                            <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
+                            <td>{{ batch.production_stages.all|length }} production stage{{ batch.production_stages.all|length|pluralize }}</td>
+                            <td>
+                                <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
+                                    <i class="cil-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7"><i>There are no batches yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock content %}

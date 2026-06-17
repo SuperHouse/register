@@ -1,52 +1,21 @@
 import datetime
 import re
 import string
-import zoneinfo
 
-from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.utils import timezone
 from openpyxl import load_workbook
 
 from device.models import (
-    Client,
     Design,
     Device,
     DeviceEvent,
-    TestImage,
     TestRecord,
-    tz,
-    witching_hour,
 )
+from crm.models import Org
+from utils import date_from_str, int_map
 
-timezone.activate(tz)
-
-
-def int_map(i):
-    try:
-        return int(i)
-    except TypeError:
-        return None
-
-
-def date_from_str(s):
-    matchers = (
-        '%d-%b-%Y',
-        '%Y-%m-%d',
-        '%d/%m/%Y',
-    )
-    for matcher in matchers:
-        w = witching_hour
-        try:
-            # Make a timezone-aware datetime from a string and a timezone
-            matched_date = timezone.datetime.strptime(s, matcher).date()
-            dt = datetime.datetime.combine(matched_date, witching_hour, tzinfo=tz)
-
-            return dt
-        except ValueError:
-            pass
-
-    raise ValueError(f"oh dear, couldn't parse {s} as a date.")
+# timezone.activate(tz)
 
 
 class Command(BaseCommand):
@@ -66,10 +35,9 @@ class Command(BaseCommand):
 
         wb = load_workbook(filename=filename)
 
-        known_sheets = 'Devices/Queue/DeviceTypes/Raw Serials/Patched Boards'
-        assert set(known_sheets.split('/')) == set(
-            wb.sheetnames
-        ), f'Expected sheets: {known_sheets}; Actual sheets: {wb.sheetnames}'
+        required_sheets = {'Devices', 'DeviceTypes'}
+        missing = required_sheets - set(wb.sheetnames)
+        assert not missing, f'Missing required sheets: {missing}; Actual sheets: {wb.sheetnames}'
 
         # Read from the second sheet, DeviceTypes
         ws_design = wb['DeviceTypes']
@@ -103,12 +71,12 @@ class Command(BaseCommand):
         # Import / update clients
         for id, name in client_map.items():
             try:
-                client = Client.objects.get(pk=id)
+                client = Org.objects.get(pk=id)
                 # print(f'Name in SQL: {client.company_name}; Name in XLSX: {name}')
                 # If we wanted to update client records in the db from the sheet, do it here.
-            except Client.DoesNotExist:
+            except Org.DoesNotExist:
                 # New client
-                client = Client(pk=id, company_name=name)
+                client = Org(pk=id, company_name=name)
                 client.save()
 
         # Import designs
@@ -248,7 +216,7 @@ class Command(BaseCommand):
 
             if tested:
                 assert type(tested) is datetime.datetime
-                test_dt = datetime.datetime.combine(tested.date(), witching_hour, tzinfo=tz)
+                test_dt = timezone.make_aware(datetime.datetime.combine(tested.date(), datetime.time()))
                 tr_data = {
                     'device_id': device_id,
                     'test_dt': test_dt,
@@ -260,7 +228,7 @@ class Command(BaseCommand):
             device_data = {
                 'id': device_id,
                 'design_id': design_id,
-                'creation_dt': datetime.datetime.combine(creation_dt.date(), witching_hour, tzinfo=tz),
+                'creation_dt': timezone.make_aware(datetime.datetime.combine(creation_dt.date(), datetime.time())),
                 'invoice': invoice,
                 'po': porder,
                 'notes': notes,

@@ -1,0 +1,62 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Settings - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Settings
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:production_stage_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-list-check me-2"></i>Production Stages</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage the list of production stages that can be used to build production stage templates.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:production_stage_template_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-collection me-2"></i>Production Stage Templates</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage collections of production stages that can be applied to a batch to quickly populate its list of production stages.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:location_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-geo-alt me-2"></i>Locations</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage a hierarchy of physical locations (e.g. building &rsaquo; room &rsaquo; shelf) for tracking assets.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <a href="{% url 'erp:part_category_list' %}" class="text-decoration-none">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="bi-tags me-2"></i>Part Categories</h5>
+                        <p class="card-text text-body-secondary mb-0">
+                            Manage a hierarchy of part categories (e.g. Passives &rsaquo; Resistors &rsaquo; SMD) for classifying parts.
+                        </p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+{% endblock content %}

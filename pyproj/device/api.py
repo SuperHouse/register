@@ -1,22 +1,19 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
-import ipaddress
-import json
 import re
 from datetime import datetime
-from django.conf import settings
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
+
 from django.db.models import Count
 from django.db.models.functions import TruncMonth
-from ninja import File, Form, Router, UploadedFile
-from ninja.security import APIKeyHeader
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from ninja import File, Form, UploadedFile
 
-from device.models import Client, Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
-
+from api.auth import session_or_api_key_auth
+from api.routes import router
+from crm.models import Org
+from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 from .schemas import (
-    ClientSchema,
     DashboardStatsSchema,
     DesignSchema,
     DeviceCreateSchema,
@@ -30,82 +27,6 @@ from .schemas import (
     TestRecordSchema,
 )
 
-# Browser-based API explorer: http://localhost:8000/api/v1/docs
-# (Doesn't need an API key, but you'll need to be logged in)
-
-
-class AuthByApiKey(APIKeyHeader):
-    param_name = 'X-API-Key'
-
-    allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
-    local_network = ipaddress.ip_network('127.0.0.0/24')
-
-    # https://stackoverflow.com/questions/4581789/how-do-i-get-user-ip-address-in-django
-    def get_client_ip(self, request):
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0]
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
-
-    def authenticate(self, request, key):
-        request_from = self.get_client_ip(request)
-        ip_addr = ipaddress.ip_address(request_from)
-
-        allow = False
-        if ip_addr in self.local_network:
-            allow = True
-        if self.allowed_ipv4_network and ip_addr in self.allowed_ipv4_network:
-            allow = True
-
-        if not allow:
-            return
-
-        if key and Client.objects.filter(api_key=key).exists():
-            return key
-
-
-header_key_auth = AuthByApiKey()
-
-
-def session_or_api_key_auth(request):
-    """Auth that accepts either Django session auth or API key auth."""
-    # Try session auth first
-    if request.user and request.user.is_authenticated:
-        return {'auth_type': 'session', 'user': request.user}
-
-    # Try API key auth
-    api_key = request.headers.get('X-API-Key')
-    if api_key:
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            request_from = x_forwarded_for.split(',')[0]
-        else:
-            request_from = request.META.get('REMOTE_ADDR')
-
-        try:
-            ip_addr = ipaddress.ip_address(request_from)
-
-            allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
-            local_network = ipaddress.ip_network('127.0.0.0/24')
-
-            allow = False
-            if ip_addr in local_network:
-                allow = True
-            if allowed_ipv4_network and ip_addr in allowed_ipv4_network:
-                allow = True
-
-            if allow and Client.objects.filter(api_key=api_key).exists():
-                return {'auth_type': 'api_key', 'key': api_key}
-        except ValueError:
-            pass
-
-    return None
-
-
-router = Router(auth=header_key_auth)
-
 
 @router.get('test-endpoint-noauth/', auth=None, response=Message)
 def endpoint_test_noauth(request):
@@ -115,11 +36,6 @@ def endpoint_test_noauth(request):
 @router.get('test-endpoint/', response=Message)
 def endpoint_test_withauth(request):
     return {'message': 'Success.'}
-
-
-@router.get('clients/', response=list[ClientSchema])
-def get_clients(request):
-    return Client.objects.all()
 
 
 @router.get('designs/', response=list[DesignSchema])
@@ -214,8 +130,8 @@ def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema],
     
     # Get the client associated with this API key
     try:
-        client = Client.objects.get(api_key=api_key)
-    except Client.DoesNotExist:
+        client = Org.objects.get(api_key=api_key)
+    except Org.DoesNotExist:
         return 403, {'message': 'Invalid API key'}
     
     # Get the device
@@ -285,7 +201,7 @@ def get_dashboard_stats(request):
     # Determine access level based on auth type
     if auth_info['auth_type'] == 'session':
         user = auth_info['user']
-        clients = Client.objects.all()
+        clients = Org.objects.all()
         designs = Design.objects.all()
         devices = Device.objects.all()
 
@@ -296,8 +212,8 @@ def get_dashboard_stats(request):
 
     else:  # api_key auth
         api_key = auth_info['key']
-        client = Client.objects.get(api_key=api_key)
-        clients = Client.objects.filter(pk=client.pk)
+        client = Org.objects.get(api_key=api_key)
+        clients = Org.objects.filter(pk=client.pk)
         designs = Design.objects.filter(client=client)
         devices = Device.objects.filter(design__client=client)
 

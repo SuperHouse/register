@@ -5,13 +5,14 @@ from django.utils import timezone
 import pytest
 
 from device.forms import TestRecordForm
-from device.models import Client, Design, Device, DeviceEvent, TestRecord
+from device.models import Design, Device, DeviceEvent, TestRecord
+from crm.models import Org
 
 
 # Helper: Create two users, and some corresponding client, design and device data
 @pytest.fixture
 def create_users_and_user_data(django_user_model):
-    client1 = Client(company_name='Client One', api_key='api-key-for-testing-1')
+    client1 = Org(company_name='Client One', api_key='api-key-for-testing-1')
     client1.save()
     user1 = django_user_model.objects.create_user(email='user1@example.com', password='pass1')
     user1.client = client1
@@ -23,7 +24,7 @@ def create_users_and_user_data(django_user_model):
     device1 = Device(design=design1, creation_dt=mothers_day, notes='Pink soldermask')
     device1.save()
 
-    client2 = Client(company_name='Client Two')
+    client2 = Org(company_name='Client Two')
     client2.save()
     user2 = django_user_model.objects.create_user(email='user2@example.com', password='pass2')
     user2.client = client2

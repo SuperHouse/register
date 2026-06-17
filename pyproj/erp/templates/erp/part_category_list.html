@@ -1,0 +1,70 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Part Categories - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Part Categories
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        Manage part categories in a hierarchy (e.g. Passives &rsaquo; Resistors &rsaquo; SMD).
+        Categories can be associated with parts for classification and filtering.
+    </p>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{% url 'erp:part_category_add' %}" class="btn btn-primary">
+            <i class="cil-plus"></i> Add Top-Level Category
+        </a>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if tree %}
+                <table class="table table-striped align-middle">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th style="width: 130px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for part_category, depth in tree %}
+                            <tr>
+                                <td style="padding-left: calc({{ depth }}rem + 0.75rem);">
+                                    {% if depth > 0 %}<span class="text-muted me-1">&#x2514;</span>{% endif %}
+                                    {{ part_category.name }}
+                                </td>
+                                <td class="text-body-secondary">{{ part_category.description|default:"" }}</td>
+                                <td class="text-nowrap">
+                                    <div class="d-flex gap-1 justify-content-end">
+                                        <a href="{% url 'erp:part_category_add' %}?parent={{ part_category.pk }}"
+                                           class="btn btn-sm btn-outline-secondary"
+                                           title="Add child category">
+                                            <i class="cil-plus"></i>
+                                        </a>
+                                        <a href="{% url 'erp:part_category_edit' part_category.pk %}"
+                                           class="btn btn-sm btn-outline-secondary"
+                                           title="Edit">
+                                            <i class="cil-pencil"></i>
+                                        </a>
+                                        <a href="{% url 'erp:part_category_delete' part_category.pk %}"
+                                           class="btn btn-sm btn-outline-danger"
+                                           title="Delete">
+                                            <i class="cil-trash"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic mb-0">No part categories have been added yet.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}

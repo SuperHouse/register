@@ -1,6 +1,7 @@
 import pytest
 
-from device.api import router, AuthByApiKey
+from api.auth import AuthByApiKey
+from device.api import router
 from device.tests.test_api import TestClientWithAuth
 from device.tests.test_clients_only_see_own_data import create_users_and_user_data
 from ninja.testing import TestClient
