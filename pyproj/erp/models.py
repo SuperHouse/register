@@ -96,7 +96,6 @@ class Part(models.Model):
     value = models.CharField(max_length=100, blank=True, help_text='Component value (e.g. 10k, 100nF)')
     fusion_library = models.CharField(max_length=200, blank=True, help_text='Fusion Electronics library name')
     image = models.ImageField(upload_to='part_images/', null=True, blank=True)
-    notes = models.TextField(null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
 
     class Meta:

@@ -109,7 +109,7 @@ def _get_descendant_pks(all_locations, root_pk):
 class PartForm(forms.ModelForm):
     class Meta:
         model = Part
-        fields = ['name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'image', 'notes']
+        fields = ['name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'image']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -119,7 +119,6 @@ class PartForm(forms.ModelForm):
             'value': forms.TextInput(attrs={'class': 'form-control'}),
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
             'image': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
         }
 
     def __init__(self, *args, **kwargs):

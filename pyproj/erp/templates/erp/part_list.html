@@ -9,14 +9,25 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div class="d-flex justify-content-end gap-2 mb-3">
-        <button type="button" class="btn btn-outline-secondary"
-                data-coreui-toggle="modal" data-coreui-target="#bomImportModal">
-            <i class="cil-cloud-upload"></i> Populate from BOM
-        </button>
-        <a href="{% url 'erp:part_add' %}" class="btn btn-primary">
-            <i class="cil-plus"></i> Add Part
-        </a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="input-group" style="max-width: 400px;">
+            <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
+            <input type="text" id="list-search" class="form-control" placeholder="Filter parts..."
+                   value="{{ q }}">
+            <button class="btn btn-outline-secondary" type="button" id="list-search-clear"
+                    {% if not q %}style="display:none;"{% endif %} title="Clear filter">
+                <i class="cil-x icon"></i>
+            </button>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary"
+                    data-coreui-toggle="modal" data-coreui-target="#bomImportModal">
+                <i class="cil-cloud-upload"></i> Populate from BOM
+            </button>
+            <a href="{% url 'erp:part_add' %}" class="btn btn-primary">
+                <i class="cil-plus"></i> Add Part
+            </a>
+        </div>
     </div>
 
     <div class="modal fade" id="bomImportModal" tabindex="-1" aria-labelledby="bomImportModalLabel" aria-hidden="true">
@@ -51,47 +62,55 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-body">
-            {% if uncategorised or categories_with_parts %}
-                <table class="table align-middle mb-0">
-                    <thead>
-                        <tr class="highlight">
-                            <th style="width: 70px;"></th>
-                            <th>Name</th>
-                            <th>Value</th>
-                            <th>Package</th>
-                            <th>Device</th>
-                            <th style="width: 60px;"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if uncategorised %}
-                            <tr class="table-secondary">
-                                <td colspan="6" class="fw-semibold text-body-secondary py-2">
-                                    Uncategorised
-                                </td>
+    <div id="parts-results">
+        <div class="card">
+            <div class="card-body">
+                {% if uncategorised or categories_with_parts %}
+                    <table class="table align-middle mb-0">
+                        <thead>
+                            <tr class="highlight">
+                                <th style="width: 70px;"></th>
+                                <th>Name</th>
+                                <th>Value</th>
+                                <th>Package</th>
+                                <th>Device</th>
+                                <th style="width: 60px;"></th>
                             </tr>
-                            {% for part in uncategorised %}
-                                {% include "erp/part_list_row.html" %}
-                            {% endfor %}
-                        {% endif %}
+                        </thead>
+                        <tbody>
+                            {% if uncategorised %}
+                                <tr class="table-secondary">
+                                    <td colspan="6" class="fw-semibold text-body-secondary py-2">
+                                        Uncategorised
+                                    </td>
+                                </tr>
+                                {% for part in uncategorised %}
+                                    {% include "erp/part_list_row.html" %}
+                                {% endfor %}
+                            {% endif %}
 
-                        {% for category in categories_with_parts %}
-                            <tr class="table-secondary">
-                                <td colspan="6" class="fw-semibold py-2">
-                                    {{ category.name }}
-                                </td>
-                            </tr>
-                            {% for part in category.parts.all %}
-                                {% include "erp/part_list_row.html" %}
+                            {% for category in categories_with_parts %}
+                                <tr class="table-secondary">
+                                    <td colspan="6" class="fw-semibold py-2">
+                                        {{ category.name }}
+                                    </td>
+                                </tr>
+                                {% for part in category.parts.all %}
+                                    {% include "erp/part_list_row.html" %}
+                                {% endfor %}
                             {% endfor %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="text-body-secondary fst-italic mb-0">No parts have been added yet.</p>
-            {% endif %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-body-secondary fst-italic mb-0">
+                        {% if q %}No parts match "{{ q }}".{% else %}No parts have been added yet.{% endif %}
+                    </p>
+                {% endif %}
+            </div>
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script>initServerFilter('parts-results');</script>
+{% endblock extra_js %}

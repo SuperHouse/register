@@ -6,7 +6,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Prefetch, ProtectedError
+from django.db.models import Prefetch, ProtectedError, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -343,17 +343,27 @@ def location_delete(request, location_id):
 
 @staff_member_required
 def part_list(request):
-    uncategorised = list(Part.objects.filter(category__isnull=True).order_by('name'))
+    q = request.GET.get('q', '').strip()
+    parts_qs = Part.objects.order_by('name')
+    if q:
+        q_filter = Q(name__icontains=q) | Q(value__icontains=q) | Q(package__icontains=q) | Q(device__icontains=q)
+        parts_qs = parts_qs.filter(q_filter)
+        category_filter = Q(parts__in=Part.objects.filter(q_filter))
+    else:
+        category_filter = Q(parts__isnull=False)
+
+    uncategorised = list(parts_qs.filter(category__isnull=True))
     categories_with_parts = (
         PartCategory.objects
-        .filter(parts__isnull=False)
-        .prefetch_related(Prefetch('parts', queryset=Part.objects.order_by('name')))
+        .filter(category_filter)
+        .prefetch_related(Prefetch('parts', queryset=parts_qs))
         .distinct()
         .order_by('order', 'name')
     )
     ctx = {
         'uncategorised': uncategorised,
         'categories_with_parts': categories_with_parts,
+        'q': q,
     }
     return render(request, 'erp/part_list.html', ctx)
 
@@ -381,7 +391,7 @@ def part_import_bom(request):
             value = (row.get('value') or '').strip()
             library = (row.get('library') or '').strip()
 
-            if Part.objects.filter(device=device, package=package, value=value).exists():
+            if Part.objects.filter(device__iexact=device, package__iexact=package, value__iexact=value).exists():
                 skipped += 1
                 continue
 
