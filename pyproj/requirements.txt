@@ -16,7 +16,6 @@ django-dbbackup>=5.0
 django-extensions>=3.2.3
 django_ninja>=1.2
 fusionextractor>=1.2.0
-lcsc>=0.1.1
 digikey-api>=1.1.0
 zipfile-zstd>=0.0.4
 # gunicorn
