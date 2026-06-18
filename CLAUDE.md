@@ -31,7 +31,7 @@ source venv/bin/activate
 python manage.py runserver
 ```
 
-**Production (Linux):** uWSGI Emperor manages apps via ini files in `/etc/uwsgi-emperor/vassals/`. Touch an ini file to restart the app (`sudo touch /etc/uwsgi-emperor/vassals/register.ini`). See [SETUP.md](SETUP.md) for full setup instructions.
+**Production (Linux):** uWSGI Emperor manages apps via ini files in `/etc/uwsgi-emperor/vassals/`. Touch an ini file to restart the app (`sudo touch /etc/uwsgi-emperor/vassals/register.ini`). `register.ini` and `register-test.ini` are both symlinks to the shared `/etc/uwsgi-emperor/django-app-template.ini`, which uses uWSGI's `%n` (vassal name) magic variable for `chdir`/`virtualenv`/socket/log paths — so changes to the template affect both apps. uWSGI embeds its own Python interpreter via the `python3` plugin (currently built for 3.12) rather than exec'ing the venv's own binary; each app's `env` venv **must** be created with the matching Python minor version, or uWSGI fails at startup with a generic "no python application found" (the real `ModuleNotFoundError` only shows in the per-app log under `/var/log/uwsgi/app/%n.log` right after a restart). See [SETUP.md](SETUP.md) for full setup instructions.
 
 - Dashboard: http://127.0.0.1:8000/
 - Boards: http://127.0.0.1:8000/device/
@@ -183,7 +183,7 @@ All PCB business logic lives here.
 - **[context_processor.py](pyproj/device/context_processor.py)** — Context processors: `background_processor` (deploy-type background), `demo_processor` (demo mode vars), `version_processor` (injects `app_version` from `settings.VERSION`).
 - **[management/commands/import-xlsx.py](pyproj/device/management/commands/import-xlsx.py)** — Bulk import from Excel; requires sheets `Devices` and `DeviceTypes` (any additional sheets such as Queue or Patched Boards are ignored).
 - **[management/commands/export_data.py](pyproj/device/management/commands/export_data.py)** — Exports all `crm`, `device`, and `erp` records plus `MEDIA_ROOT` files (excluding thumbnail cache) to a self-contained ZIP archive. User accounts are not included. Run with `python manage.py export_data [output.zip]`.
-- **[management/commands/import_data.py](pyproj/device/management/commands/import_data.py)** — Imports a ZIP produced by `export_data`, performing a clean-slate replace (deletes all existing app data first). The database flush and load run inside a single transaction so a failure rolls back cleanly. Run with `python manage.py import_data archive.zip [--yes]`.
+- **[management/commands/import_data.py](pyproj/device/management/commands/import_data.py)** — Imports a ZIP produced by `export_data`, performing a clean-slate replace (deletes all existing app data first). The database flush and load run inside a single transaction so a failure rolls back cleanly. Run with `python manage.py import_data archive.zip [--yes]`. Run as a different user than the one that owns existing `MEDIA_ROOT` files (e.g. running manually as a login user while uWSGI writes as `uwsgi`), this can fail with `PermissionError` deleting old media files — the production uWSGI vassal template sets `umask = 002` so new uploads stay group-writable, but pre-existing files/dirs created before that setting was added may still need `chmod -R g+w` on `MEDIA_ROOT` once.
 
 ### `authuser`
 
