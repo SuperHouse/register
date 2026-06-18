@@ -3,7 +3,10 @@
 from django import forms
 
 from device.models import Design
-from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import (
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
+    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+)
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -190,6 +193,61 @@ class PartCategoryForm(forms.ModelForm):
         if exclude_pk:
             excluded = _get_descendant_pks(list(PartCategory.objects.all()), exclude_pk) | {exclude_pk}
             self.fields['parent'].queryset = PartCategory.objects.exclude(pk__in=excluded)
+
+
+class BomLibrarySettingForm(forms.ModelForm):
+    class Meta:
+        model = BomLibrarySetting
+        fields = ['library', 'ignore_device', 'ignore_package', 'ignore_value']
+        widgets = {
+            'library': forms.TextInput(attrs={'class': 'form-control'}),
+            'ignore_device': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'ignore_package': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'ignore_value': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class BomExclusionRuleForm(forms.ModelForm):
+    class Meta:
+        model = BomExclusionRule
+        fields = ['library', 'device', 'package', 'value']
+        widgets = {
+            'library': forms.TextInput(attrs={'class': 'form-control'}),
+            'device': forms.TextInput(attrs={'class': 'form-control'}),
+            'package': forms.TextInput(attrs={'class': 'form-control'}),
+            'value': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (cleaned_data.get('library') or cleaned_data.get('device')
+                or cleaned_data.get('package') or cleaned_data.get('value')):
+            raise forms.ValidationError('At least one of Library, Device, Package, or Value must be set.')
+        return cleaned_data
+
+
+class BomEquivalenceRuleForm(forms.ModelForm):
+    class Meta:
+        model = BomEquivalenceRule
+        fields = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']
+        widgets = {
+            'library': forms.TextInput(attrs={'class': 'form-control'}),
+            'from_device': forms.TextInput(attrs={'class': 'form-control'}),
+            'to_device': forms.TextInput(attrs={'class': 'form-control'}),
+            'from_package': forms.TextInput(attrs={'class': 'form-control'}),
+            'to_package': forms.TextInput(attrs={'class': 'form-control'}),
+            'from_value': forms.TextInput(attrs={'class': 'form-control'}),
+            'to_value': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (cleaned_data.get('library') or cleaned_data.get('from_device')
+                or cleaned_data.get('from_package') or cleaned_data.get('from_value')):
+            raise forms.ValidationError('At least one of Library, From Device, From Package, or From Value must be set.')
+        if not (cleaned_data.get('to_device') or cleaned_data.get('to_package') or cleaned_data.get('to_value')):
+            raise forms.ValidationError('At least one of To Device, To Package, or To Value must be set.')
+        return cleaned_data
 
 
 class BatchProductionStageUpdateForm(forms.ModelForm):

@@ -170,6 +170,83 @@ class PartCategory(models.Model):
         return self.name
 
 
+class BomLibrarySetting(models.Model):
+    """Per-Fusion-library behaviour applied when importing parts from a BOM CSV."""
+    library = models.CharField(max_length=200, unique=True, help_text='Fusion Electronics library name')
+    ignore_device = models.BooleanField(
+        default=False,
+        help_text="When importing parts from this library, ignore the 'device' field: it is not used to "
+                   "detect duplicates and is not stored on the part.",
+    )
+    ignore_package = models.BooleanField(
+        default=False,
+        help_text="When importing parts from this library, ignore the 'package' field: it is not used to "
+                   "detect duplicates and is not stored on the part.",
+    )
+    ignore_value = models.BooleanField(
+        default=False,
+        help_text="When importing parts from this library, ignore the 'value' field: it is not used to "
+                   "detect duplicates and is not stored on the part.",
+    )
+
+    class Meta:
+        ordering = ['library']
+
+    def __str__(self):
+        return self.library
+
+
+class BomExclusionRule(models.Model):
+    """A rule that causes matching rows in a BOM CSV import to be skipped entirely.
+
+    Each of library/device/package/value may be left blank to match any value for that field;
+    a row is excluded only if it matches every non-blank field on the rule.
+    """
+    library = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any library')
+    device = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any device')
+    package = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any package')
+    value = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any value')
+
+    class Meta:
+        ordering = ['library', 'device', 'package', 'value']
+
+    def __str__(self):
+        parts = [
+            f'library={self.library or "(any)"}',
+            f'device={self.device or "(any)"}',
+            f'package={self.package or "(any)"}',
+            f'value={self.value or "(any)"}',
+        ]
+        return ', '.join(parts)
+
+
+class BomEquivalenceRule(models.Model):
+    """A rule that remaps a (device, package, value) triple to a different one during BOM import.
+
+    library/from_device/from_package/from_value may be left blank to match any value for that field;
+    a row matches only if it matches every non-blank "from" field on the rule.
+    """
+    library = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any library')
+    from_device = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any device')
+    to_device = models.CharField(max_length=200, blank=True, help_text='Leave blank to leave the device unchanged')
+    from_package = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any package')
+    to_package = models.CharField(max_length=100, blank=True, help_text='Leave blank to leave the package unchanged')
+    from_value = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any value')
+    to_value = models.CharField(max_length=100, blank=True, help_text='Leave blank to leave the value unchanged')
+
+    class Meta:
+        ordering = ['library', 'from_device', 'from_package', 'from_value']
+
+    def __str__(self):
+        from_parts = f'{self.from_device or "(any)"} {self.from_package or "(any)"} {self.from_value or "(any)"}'
+        to_parts = (
+            f'{self.to_device or self.from_device or "(any)"} '
+            f'{self.to_package or self.from_package or "(any)"} '
+            f'{self.to_value or self.from_value or "(any)"}'
+        )
+        return f'{from_parts} → {to_parts}'
+
+
 class BatchProductionStage(models.Model):
     """A production stage on a Batch, snapshotted from a ProductionStage at the time it was added."""
     NOT_STARTED = 'NOT_STARTED'

@@ -2,7 +2,10 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import (
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
+    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+)
 
 
 class PartSourceInline(admin.TabularInline):
@@ -66,3 +69,21 @@ class BatchAdmin(admin.ModelAdmin):
     list_display = ['design', 'reference', 'quantity', 'created_dt']
     search_fields = ['reference', 'design__name', 'design__sku']
     inlines = [BatchProductionStageInline]
+
+
+@admin.register(BomLibrarySetting)
+class BomLibrarySettingAdmin(admin.ModelAdmin):
+    list_display = ['library', 'ignore_device', 'ignore_package', 'ignore_value']
+    search_fields = ['library']
+
+
+@admin.register(BomExclusionRule)
+class BomExclusionRuleAdmin(admin.ModelAdmin):
+    list_display = ['library', 'device', 'package']
+    search_fields = ['library', 'device', 'package']
+
+
+@admin.register(BomEquivalenceRule)
+class BomEquivalenceRuleAdmin(admin.ModelAdmin):
+    list_display = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']
+    search_fields = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']

@@ -1,0 +1,224 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Part Import Filters - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Part Import Filters
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        These filters are applied, in order, when importing parts from a BOM CSV: a row is first checked against
+        the Exclusion Rules; if not excluded, the Equivalence Rules are applied to remap its Device, Package,
+        and/or Value; finally, the Library Settings determine whether the Device, Package, and/or Value fields
+        are ignored for that row's library.
+    </p>
+
+    <h2 class="h5 mt-4">1. Exclusion Rules</h2>
+    <p class="text-body-secondary">
+        Rows that match every non-blank field (Library, Device, Package, Value) on a rule are skipped entirely
+        and never created as parts. Leave a field blank to match any value for that field.
+    </p>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th>Library</th>
+                        <th>Device</th>
+                        <th>Package</th>
+                        <th>Value</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exclusion_rule in exclusion_rules %}
+                        <tr>
+                            <td>{{ exclusion_rule.library|default:"(any)" }}</td>
+                            <td>{{ exclusion_rule.device|default:"(any)" }}</td>
+                            <td>{{ exclusion_rule.package|default:"(any)" }}</td>
+                            <td>{{ exclusion_rule.value|default:"(any)" }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'erp:bom_exclusion_rule_edit' exclusion_rule.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'erp:bom_exclusion_rule_delete' exclusion_rule.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5"><i>There are no exclusion rules yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'erp:bom_exclusion_rule_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td>{{ exclusion_form.library }}</td>
+                            <td>{{ exclusion_form.device }}</td>
+                            <td>{{ exclusion_form.package }}</td>
+                            <td>{{ exclusion_form.value }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% if exclusion_form.non_field_errors %}
+                        <tr>
+                            <td colspan="5"><div class="text-danger small">{{ exclusion_form.non_field_errors }}</div></td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2 class="h5">2. Equivalence Rules</h2>
+    <p class="text-body-secondary">
+        Rows that match every non-blank "From" field on a rule have their Device, Package, and/or Value replaced
+        with the rule's "To" values before being checked for duplicates and imported. Leave a "From" field blank
+        to match any value for that field; leave a "To" field blank to leave it unchanged.
+    </p>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th rowspan="2" class="align-middle">Library</th>
+                        <th colspan="2" class="text-center border-start">Device</th>
+                        <th colspan="2" class="text-center border-start">Package</th>
+                        <th colspan="2" class="text-center border-start">Value</th>
+                        <th rowspan="2" style="width: 90px;"></th>
+                    </tr>
+                    <tr class="highlight">
+                        <th class="border-start">From</th>
+                        <th>To</th>
+                        <th class="border-start">From</th>
+                        <th>To</th>
+                        <th class="border-start">From</th>
+                        <th>To</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for equivalence_rule in equivalence_rules %}
+                        <tr>
+                            <td>{{ equivalence_rule.library|default:"(any)" }}</td>
+                            <td class="border-start">{{ equivalence_rule.from_device|default:"(any)" }}</td>
+                            <td>{{ equivalence_rule.to_device|default:"(unchanged)" }}</td>
+                            <td class="border-start">{{ equivalence_rule.from_package|default:"(any)" }}</td>
+                            <td>{{ equivalence_rule.to_package|default:"(unchanged)" }}</td>
+                            <td class="border-start">{{ equivalence_rule.from_value|default:"(any)" }}</td>
+                            <td>{{ equivalence_rule.to_value|default:"(unchanged)" }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'erp:bom_equivalence_rule_edit' equivalence_rule.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'erp:bom_equivalence_rule_delete' equivalence_rule.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="8"><i>There are no equivalence rules yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'erp:bom_equivalence_rule_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td>{{ equivalence_form.library }}</td>
+                            <td class="border-start">{{ equivalence_form.from_device }}</td>
+                            <td>{{ equivalence_form.to_device }}</td>
+                            <td class="border-start">{{ equivalence_form.from_package }}</td>
+                            <td>{{ equivalence_form.to_package }}</td>
+                            <td class="border-start">{{ equivalence_form.from_value }}</td>
+                            <td>{{ equivalence_form.to_value }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% if equivalence_form.non_field_errors %}
+                        <tr>
+                            <td colspan="8"><div class="text-danger small">{{ equivalence_form.non_field_errors }}</div></td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2 class="h5">3. Library Settings</h2>
+    <p class="text-body-secondary">
+        Per-library behaviour applied last. When "Ignore Device", "Ignore Package", or "Ignore Value" is checked,
+        the corresponding field is ignored entirely for parts from that library: it is not used to detect
+        duplicates and is not stored on the part.
+    </p>
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th>Library</th>
+                        <th style="width: 110px;">Ignore Device</th>
+                        <th style="width: 110px;">Ignore Package</th>
+                        <th style="width: 110px;">Ignore Value</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for library_setting in library_settings %}
+                        <tr>
+                            <td>{{ library_setting.library }}</td>
+                            <td>{% if library_setting.ignore_device %}<i class="bi-check-lg"></i>{% endif %}</td>
+                            <td>{% if library_setting.ignore_package %}<i class="bi-check-lg"></i>{% endif %}</td>
+                            <td>{% if library_setting.ignore_value %}<i class="bi-check-lg"></i>{% endif %}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'erp:bom_library_setting_edit' library_setting.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'erp:bom_library_setting_delete' library_setting.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5"><i>There are no library settings yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'erp:bom_library_setting_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td>
+                                {{ library_form.library }}
+                                {% if library_form.library.errors %}<div class="text-danger small">{{ library_form.library.errors }}</div>{% endif %}
+                            </td>
+                            <td>{{ library_form.ignore_device }}</td>
+                            <td>{{ library_form.ignore_package }}</td>
+                            <td>{{ library_form.ignore_value }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock content %}

@@ -19,6 +19,9 @@ from .forms import (
     BatchForm,
     BatchProductionStageAddForm,
     BatchProductionStageUpdateForm,
+    BomEquivalenceRuleForm,
+    BomExclusionRuleForm,
+    BomLibrarySettingForm,
     LocationForm,
     PartAssetForm,
     PartCategoryForm,
@@ -29,7 +32,10 @@ from .forms import (
     ProductionStageTemplateStepForm,
 )
 from device.models import DesignAsset
-from .models import Batch, BatchProductionStage, Location, Part, PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep
+from .models import (
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
+    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+)
 
 
 def _apply_template_to_batch(batch, template):
@@ -372,6 +378,34 @@ def part_list(request):
     return render(request, 'erp/part_list.html', ctx)
 
 
+def _bom_field_matches(rule_value, row_value):
+    """A blank rule field matches anything; otherwise compare case-insensitively."""
+    return not rule_value or rule_value.strip().lower() == row_value.strip().lower()
+
+
+def _bom_row_is_excluded(exclusion_rules, library, device, package, value):
+    return any(
+        _bom_field_matches(rule.library, library)
+        and _bom_field_matches(rule.device, device)
+        and _bom_field_matches(rule.package, package)
+        and _bom_field_matches(rule.value, value)
+        for rule in exclusion_rules
+    )
+
+
+def _bom_apply_equivalence(equivalence_rules, library, device, package, value):
+    """Return (device, package, value) after applying the first matching equivalence rule, if any."""
+    for rule in equivalence_rules:
+        if (
+            _bom_field_matches(rule.library, library)
+            and _bom_field_matches(rule.from_device, device)
+            and _bom_field_matches(rule.from_package, package)
+            and _bom_field_matches(rule.from_value, value)
+        ):
+            return rule.to_device or device, rule.to_package or package, rule.to_value or value
+    return device, package, value
+
+
 @staff_member_required
 def part_import_bom(request):
     if request.method != 'POST':
@@ -386,14 +420,36 @@ def part_import_bom(request):
         content = csv_file.read().decode('utf-8-sig')
         reader = csv.DictReader(io.StringIO(content))
 
+        exclusion_rules = list(BomExclusionRule.objects.all())
+        equivalence_rules = list(BomEquivalenceRule.objects.all())
+        library_settings_by_name = {
+            ls.library.lower(): ls for ls in BomLibrarySetting.objects.all()
+        }
+
         added = 0
         skipped = 0
+        excluded = 0
 
         for row in reader:
             device = (row.get('device') or '').strip()
             package = (row.get('package') or '').strip()
             value = (row.get('value') or '').strip()
             library = (row.get('library') or '').strip()
+
+            if _bom_row_is_excluded(exclusion_rules, library, device, package, value):
+                excluded += 1
+                continue
+
+            device, package, value = _bom_apply_equivalence(equivalence_rules, library, device, package, value)
+
+            library_setting = library_settings_by_name.get(library.lower())
+            if library_setting:
+                if library_setting.ignore_device:
+                    device = ''
+                if library_setting.ignore_package:
+                    package = ''
+                if library_setting.ignore_value:
+                    value = ''
 
             if Part.objects.filter(device__iexact=device, package__iexact=package, value__iexact=value).exists():
                 skipped += 1
@@ -406,7 +462,8 @@ def part_import_bom(request):
         messages.success(
             request,
             f'BOM import complete: {added} part{"s" if added != 1 else ""} added, '
-            f'{skipped} duplicate{"s" if skipped != 1 else ""} skipped.',
+            f'{skipped} duplicate{"s" if skipped != 1 else ""} skipped, '
+            f'{excluded} excluded by rule{"s" if excluded != 1 else ""}.',
         )
     except Exception as e:
         messages.warning(request, f'Error reading CSV: {e}')
@@ -1366,6 +1423,165 @@ def part_category_delete(request, part_category_id):
 
     ctx = {'part_category': part_category, 'child_count': child_count}
     return render(request, 'erp/part_category_delete.html', ctx)
+
+
+def _part_import_filter_context(exclusion_form=None, equivalence_form=None, library_form=None):
+    """Shared context for the merged Part Import Filters page.
+
+    Sections are ordered to match the order rules are applied in part_import_bom:
+    exclusion, then equivalence, then library (ignore-value) settings.
+    """
+    return {
+        'exclusion_rules': BomExclusionRule.objects.all(),
+        'exclusion_form': exclusion_form or BomExclusionRuleForm(),
+        'equivalence_rules': BomEquivalenceRule.objects.all(),
+        'equivalence_form': equivalence_form or BomEquivalenceRuleForm(),
+        'library_settings': BomLibrarySetting.objects.all(),
+        'library_form': library_form or BomLibrarySettingForm(),
+    }
+
+
+@staff_member_required
+def part_import_filter_list(request):
+    return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context())
+
+
+@staff_member_required
+def bom_exclusion_rule_add(request):
+    if request.method != 'POST':
+        return redirect('erp:part_import_filter_list')
+
+    form = BomExclusionRuleForm(request.POST)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Exclusion rule added.')
+        return redirect('erp:part_import_filter_list')
+
+    messages.warning(request, 'Please correct the errors below.')
+    return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context(exclusion_form=form))
+
+
+@staff_member_required
+def bom_exclusion_rule_edit(request, exclusion_rule_id):
+    exclusion_rule = get_object_or_404(BomExclusionRule, pk=exclusion_rule_id)
+
+    if request.method == 'POST':
+        form = BomExclusionRuleForm(request.POST, instance=exclusion_rule)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Exclusion rule updated.')
+            return redirect('erp:part_import_filter_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = BomExclusionRuleForm(instance=exclusion_rule)
+
+    ctx = {'form': form, 'exclusion_rule': exclusion_rule}
+    return render(request, 'erp/bom_exclusion_rule_edit.html', ctx)
+
+
+@staff_member_required
+def bom_exclusion_rule_delete(request, exclusion_rule_id):
+    exclusion_rule = get_object_or_404(BomExclusionRule, pk=exclusion_rule_id)
+
+    if request.method == 'POST':
+        exclusion_rule.delete()
+        messages.success(request, 'Exclusion rule deleted.')
+        return redirect('erp:part_import_filter_list')
+
+    ctx = {'exclusion_rule': exclusion_rule}
+    return render(request, 'erp/bom_exclusion_rule_delete.html', ctx)
+
+
+@staff_member_required
+def bom_equivalence_rule_add(request):
+    if request.method != 'POST':
+        return redirect('erp:part_import_filter_list')
+
+    form = BomEquivalenceRuleForm(request.POST)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Equivalence rule added.')
+        return redirect('erp:part_import_filter_list')
+
+    messages.warning(request, 'Please correct the errors below.')
+    return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context(equivalence_form=form))
+
+
+@staff_member_required
+def bom_equivalence_rule_edit(request, equivalence_rule_id):
+    equivalence_rule = get_object_or_404(BomEquivalenceRule, pk=equivalence_rule_id)
+
+    if request.method == 'POST':
+        form = BomEquivalenceRuleForm(request.POST, instance=equivalence_rule)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Equivalence rule updated.')
+            return redirect('erp:part_import_filter_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = BomEquivalenceRuleForm(instance=equivalence_rule)
+
+    ctx = {'form': form, 'equivalence_rule': equivalence_rule}
+    return render(request, 'erp/bom_equivalence_rule_edit.html', ctx)
+
+
+@staff_member_required
+def bom_equivalence_rule_delete(request, equivalence_rule_id):
+    equivalence_rule = get_object_or_404(BomEquivalenceRule, pk=equivalence_rule_id)
+
+    if request.method == 'POST':
+        equivalence_rule.delete()
+        messages.success(request, 'Equivalence rule deleted.')
+        return redirect('erp:part_import_filter_list')
+
+    ctx = {'equivalence_rule': equivalence_rule}
+    return render(request, 'erp/bom_equivalence_rule_delete.html', ctx)
+
+
+@staff_member_required
+def bom_library_setting_add(request):
+    if request.method != 'POST':
+        return redirect('erp:part_import_filter_list')
+
+    form = BomLibrarySettingForm(request.POST)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Library setting added.')
+        return redirect('erp:part_import_filter_list')
+
+    messages.warning(request, 'Please correct the errors below.')
+    return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context(library_form=form))
+
+
+@staff_member_required
+def bom_library_setting_edit(request, library_setting_id):
+    library_setting = get_object_or_404(BomLibrarySetting, pk=library_setting_id)
+
+    if request.method == 'POST':
+        form = BomLibrarySettingForm(request.POST, instance=library_setting)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Library setting updated.')
+            return redirect('erp:part_import_filter_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = BomLibrarySettingForm(instance=library_setting)
+
+    ctx = {'form': form, 'library_setting': library_setting}
+    return render(request, 'erp/bom_library_setting_edit.html', ctx)
+
+
+@staff_member_required
+def bom_library_setting_delete(request, library_setting_id):
+    library_setting = get_object_or_404(BomLibrarySetting, pk=library_setting_id)
+
+    if request.method == 'POST':
+        library_setting.delete()
+        messages.success(request, 'Library setting deleted.')
+        return redirect('erp:part_import_filter_list')
+
+    ctx = {'library_setting': library_setting}
+    return render(request, 'erp/bom_library_setting_delete.html', ctx)
 
 
 @staff_member_required
