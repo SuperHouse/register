@@ -229,9 +229,13 @@ class BomExclusionRuleForm(forms.ModelForm):
 class BomEquivalenceRuleForm(forms.ModelForm):
     class Meta:
         model = BomEquivalenceRule
-        fields = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']
+        fields = [
+            'from_library', 'to_library', 'from_device', 'to_device',
+            'from_package', 'to_package', 'from_value', 'to_value',
+        ]
         widgets = {
-            'library': forms.TextInput(attrs={'class': 'form-control'}),
+            'from_library': forms.TextInput(attrs={'class': 'form-control'}),
+            'to_library': forms.TextInput(attrs={'class': 'form-control'}),
             'from_device': forms.TextInput(attrs={'class': 'form-control'}),
             'to_device': forms.TextInput(attrs={'class': 'form-control'}),
             'from_package': forms.TextInput(attrs={'class': 'form-control'}),
@@ -242,11 +246,12 @@ class BomEquivalenceRuleForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        if not (cleaned_data.get('library') or cleaned_data.get('from_device')
+        if not (cleaned_data.get('from_library') or cleaned_data.get('from_device')
                 or cleaned_data.get('from_package') or cleaned_data.get('from_value')):
-            raise forms.ValidationError('At least one of Library, From Device, From Package, or From Value must be set.')
-        if not (cleaned_data.get('to_device') or cleaned_data.get('to_package') or cleaned_data.get('to_value')):
-            raise forms.ValidationError('At least one of To Device, To Package, or To Value must be set.')
+            raise forms.ValidationError('At least one of From Library, From Device, From Package, or From Value must be set.')
+        if not (cleaned_data.get('to_library') or cleaned_data.get('to_device')
+                or cleaned_data.get('to_package') or cleaned_data.get('to_value')):
+            raise forms.ValidationError('At least one of To Library, To Device, To Package, or To Value must be set.')
         return cleaned_data
 
 

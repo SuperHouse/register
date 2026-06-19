@@ -85,5 +85,11 @@ class BomExclusionRuleAdmin(admin.ModelAdmin):
 
 @admin.register(BomEquivalenceRule)
 class BomEquivalenceRuleAdmin(admin.ModelAdmin):
-    list_display = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']
-    search_fields = ['library', 'from_device', 'to_device', 'from_package', 'to_package', 'from_value', 'to_value']
+    list_display = [
+        'from_library', 'to_library', 'from_device', 'to_device',
+        'from_package', 'to_package', 'from_value', 'to_value',
+    ]
+    search_fields = [
+        'from_library', 'to_library', 'from_device', 'to_device',
+        'from_package', 'to_package', 'from_value', 'to_value',
+    ]

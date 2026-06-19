@@ -1,11 +1,11 @@
 {% extends "device/base-with-sidebar.html" %}
 
 {% block title %}
-    Delete Equivalence Rule - SuperHouse Device Register
+    Delete Transformation Rule - SuperHouse Device Register
 {% endblock title %}
 
 {% block h1 %}
-    Delete Equivalence Rule
+    Delete Transformation Rule
 {% endblock h1 %}
 
 {% block content %}
@@ -13,11 +13,15 @@
         <div class="col-12 col-md-8 col-lg-6">
             <div class="card">
                 <div class="card-body">
-                    <p>Are you sure you want to delete this equivalence rule?</p>
+                    <p>Are you sure you want to delete this transformation rule?</p>
                     <table class="table table-bordered mb-4">
                         <tr>
-                            <th>Library:</th>
-                            <td>{{ equivalence_rule.library|default:"(any)" }}</td>
+                            <th>From Library:</th>
+                            <td>{{ equivalence_rule.from_library|default:"(any)" }}</td>
+                        </tr>
+                        <tr>
+                            <th>To Library:</th>
+                            <td>{{ equivalence_rule.to_library|default:"(unchanged)" }}</td>
                         </tr>
                         <tr>
                             <th>From Device:</th>

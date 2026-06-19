@@ -394,16 +394,21 @@ def _bom_row_is_excluded(exclusion_rules, library, device, package, value):
 
 
 def _bom_apply_equivalence(equivalence_rules, library, device, package, value):
-    """Return (device, package, value) after applying the first matching equivalence rule, if any."""
+    """Return (library, device, package, value) after applying the first matching equivalence rule, if any."""
     for rule in equivalence_rules:
         if (
-            _bom_field_matches(rule.library, library)
+            _bom_field_matches(rule.from_library, library)
             and _bom_field_matches(rule.from_device, device)
             and _bom_field_matches(rule.from_package, package)
             and _bom_field_matches(rule.from_value, value)
         ):
-            return rule.to_device or device, rule.to_package or package, rule.to_value or value
-    return device, package, value
+            return (
+                rule.to_library or library,
+                rule.to_device or device,
+                rule.to_package or package,
+                rule.to_value or value,
+            )
+    return library, device, package, value
 
 
 @staff_member_required
@@ -440,7 +445,7 @@ def part_import_bom(request):
                 excluded += 1
                 continue
 
-            device, package, value = _bom_apply_equivalence(equivalence_rules, library, device, package, value)
+            library, device, package, value = _bom_apply_equivalence(equivalence_rules, library, device, package, value)
 
             library_setting = library_settings_by_name.get(library.lower())
             if library_setting:
@@ -1500,7 +1505,7 @@ def bom_equivalence_rule_add(request):
     form = BomEquivalenceRuleForm(request.POST)
     if form.is_valid():
         form.save()
-        messages.success(request, 'Equivalence rule added.')
+        messages.success(request, 'Transformation rule added.')
         return redirect('erp:part_import_filter_list')
 
     messages.warning(request, 'Please correct the errors below.')
@@ -1515,7 +1520,7 @@ def bom_equivalence_rule_edit(request, equivalence_rule_id):
         form = BomEquivalenceRuleForm(request.POST, instance=equivalence_rule)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Equivalence rule updated.')
+            messages.success(request, 'Transformation rule updated.')
             return redirect('erp:part_import_filter_list')
         messages.warning(request, 'Please correct the errors below.')
     else:
@@ -1531,7 +1536,7 @@ def bom_equivalence_rule_delete(request, equivalence_rule_id):
 
     if request.method == 'POST':
         equivalence_rule.delete()
-        messages.success(request, 'Equivalence rule deleted.')
+        messages.success(request, 'Transformation rule deleted.')
         return redirect('erp:part_import_filter_list')
 
     ctx = {'equivalence_rule': equivalence_rule}

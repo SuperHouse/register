@@ -221,12 +221,13 @@ class BomExclusionRule(models.Model):
 
 
 class BomEquivalenceRule(models.Model):
-    """A rule that remaps a (device, package, value) triple to a different one during BOM import.
+    """A rule that remaps a (library, device, package, value) tuple to a different one during BOM import.
 
-    library/from_device/from_package/from_value may be left blank to match any value for that field;
+    from_library/from_device/from_package/from_value may be left blank to match any value for that field;
     a row matches only if it matches every non-blank "from" field on the rule.
     """
-    library = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any library')
+    from_library = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any library')
+    to_library = models.CharField(max_length=200, blank=True, help_text='Leave blank to leave the library unchanged')
     from_device = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any device')
     to_device = models.CharField(max_length=200, blank=True, help_text='Leave blank to leave the device unchanged')
     from_package = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any package')
@@ -235,11 +236,15 @@ class BomEquivalenceRule(models.Model):
     to_value = models.CharField(max_length=100, blank=True, help_text='Leave blank to leave the value unchanged')
 
     class Meta:
-        ordering = ['library', 'from_device', 'from_package', 'from_value']
+        ordering = ['from_library', 'from_device', 'from_package', 'from_value']
 
     def __str__(self):
-        from_parts = f'{self.from_device or "(any)"} {self.from_package or "(any)"} {self.from_value or "(any)"}'
+        from_parts = (
+            f'{self.from_library or "(any)"} {self.from_device or "(any)"} '
+            f'{self.from_package or "(any)"} {self.from_value or "(any)"}'
+        )
         to_parts = (
+            f'{self.to_library or self.from_library or "(any)"} '
             f'{self.to_device or self.from_device or "(any)"} '
             f'{self.to_package or self.from_package or "(any)"} '
             f'{self.to_value or self.from_value or "(any)"}'
