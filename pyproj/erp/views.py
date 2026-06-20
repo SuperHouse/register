@@ -27,6 +27,7 @@ from .forms import (
     PartCategoryForm,
     PartForm,
     PartSourceForm,
+    PartSubstitutionForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
@@ -34,7 +35,8 @@ from .forms import (
 from device.models import DesignAsset
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    PartAsset, PartCategory, PartSource, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    ProductionStageTemplateStep,
 )
 
 
@@ -494,7 +496,7 @@ def part_add(request):
 
 @staff_member_required
 def part_edit(request, part_id):
-    part = get_object_or_404(Part, pk=part_id)
+    part = get_object_or_404(Part.objects.prefetch_related('substitutions__substitute'), pk=part_id)
 
     if request.method == 'POST':
         form = PartForm(request.POST, request.FILES, instance=part)
@@ -511,6 +513,7 @@ def part_edit(request, part_id):
         'part': part,
         'source_form': PartSourceForm(),
         'asset_form': PartAssetForm(),
+        'substitution_form': PartSubstitutionForm(exclude_pk=part.pk),
     }
     return render(request, 'erp/part_edit.html', ctx)
 
@@ -1353,6 +1356,35 @@ def part_source_delete(request, source_id):
     if request.method == 'POST':
         source.delete()
         messages.success(request, 'Source deleted.')
+
+    return redirect('erp:part_edit', part_id=part_id)
+
+
+@staff_member_required
+def part_substitution_add(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        form = PartSubstitutionForm(request.POST, exclude_pk=part.pk)
+        if form.is_valid():
+            substitution = form.save(commit=False)
+            substitution.part = part
+            substitution.save()
+            messages.success(request, 'Substitution added.')
+        else:
+            messages.warning(request, 'Please correct the errors below.')
+
+    return redirect('erp:part_edit', part_id=part.pk)
+
+
+@staff_member_required
+def part_substitution_delete(request, substitution_id):
+    substitution = get_object_or_404(PartSubstitution, pk=substitution_id)
+    part_id = substitution.part_id
+
+    if request.method == 'POST':
+        substitution.delete()
+        messages.success(request, 'Substitution deleted.')
 
     return redirect('erp:part_edit', part_id=part_id)
 

@@ -5,7 +5,8 @@ from django import forms
 from device.models import Design
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    PartAsset, PartCategory, PartSource, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    ProductionStageTemplateStep,
 )
 
 
@@ -162,6 +163,23 @@ class PartSourceForm(forms.ModelForm):
             'packaging': forms.TextInput(attrs={'class': 'form-control'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
         }
+
+
+class PartSubstitutionForm(forms.ModelForm):
+    class Meta:
+        model = PartSubstitution
+        fields = ['substitute']
+        widgets = {
+            'substitute': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
+
+    def __init__(self, *args, exclude_pk=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Part.objects.all()
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        self.fields['substitute'].queryset = qs
+        self.fields['substitute'].empty_label = '— select a part —'
 
 
 class PartAssetForm(forms.ModelForm):

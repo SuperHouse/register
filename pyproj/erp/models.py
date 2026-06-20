@@ -107,6 +107,19 @@ class Part(models.Model):
         return self.name
 
 
+class PartSubstitution(models.Model):
+    """A part that can be used as a possible substitution for another part."""
+    part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='substitutions')
+    substitute = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='substitute_for')
+
+    class Meta:
+        unique_together = [('part', 'substitute')]
+        ordering = ['substitute__name']
+
+    def __str__(self):
+        return f'{self.substitute} can substitute {self.part}'
+
+
 class PartSource(models.Model):
     """A supplier or purchase source for a Part."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='sources')

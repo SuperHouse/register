@@ -23,6 +23,8 @@ urlpatterns = [
     path('parts/source/fetch-element14/', views.part_source_fetch_element14, name='part_source_fetch_element14'),
     path('parts/source/digikey-connect/', views.digikey_connect, name='digikey_connect'),
     path('parts/source/digikey-callback/', views.digikey_callback, name='digikey_callback'),
+    path('parts/<int:part_id>/add-substitution/', views.part_substitution_add, name='part_substitution_add'),
+    path('parts/substitution/<int:substitution_id>/delete/', views.part_substitution_delete, name='part_substitution_delete'),
 
     path('settings/', views.settings_index, name='settings_index'),
     path('settings/production-stages/', views.production_stage_list, name='production_stage_list'),

@@ -211,6 +211,62 @@
             </div>
         </div>
 
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Possible Substitutions</strong>
+            </div>
+            <div class="card-body">
+                {% if part.substitutions.all %}
+                    <table class="table table-sm align-middle mb-4">
+                        <thead>
+                            <tr class="highlight">
+                                <th>Part</th>
+                                <th>Value</th>
+                                <th>Package</th>
+                                <th style="width: 50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in part.substitutions.all %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'erp:part_edit' sub.substitute.pk %}">{{ sub.substitute.name }}</a>
+                                    </td>
+                                    <td class="text-body-secondary">{{ sub.substitute.value }}</td>
+                                    <td class="text-body-secondary">{{ sub.substitute.package }}</td>
+                                    <td>
+                                        <form method="post" action="{% url 'erp:part_substitution_delete' sub.pk %}"
+                                              onsubmit="return confirm('Remove this substitution?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                <i class="cil-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p class="text-body-secondary fst-italic">No substitutions recorded.</p>
+                {% endif %}
+
+                <form method="post" action="{% url 'erp:part_substitution_add' part.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-10">
+                            {{ substitution_form.substitute }}
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button type="submit" class="btn btn-outline-primary w-100">
+                                <i class="cil-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <div class="card">
             <div class="card-header">
                 <strong>Attachments</strong>
