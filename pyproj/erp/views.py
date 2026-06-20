@@ -35,8 +35,8 @@ from .forms import (
 from device.models import DesignAsset
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, PartSubstitution, ProductionStage, ProductionStageTemplate,
-    ProductionStageTemplateStep,
+    PartAsset, PartCategory, PartPriceBreak, PartSource, PartSubstitution, ProductionStage,
+    ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -496,7 +496,10 @@ def part_add(request):
 
 @staff_member_required
 def part_edit(request, part_id):
-    part = get_object_or_404(Part.objects.prefetch_related('substitutions__substitute'), pk=part_id)
+    part = get_object_or_404(
+        Part.objects.prefetch_related('substitutions__substitute', 'sources__price_breaks'),
+        pk=part_id,
+    )
 
     if request.method == 'POST':
         form = PartForm(request.POST, request.FILES, instance=part)
@@ -648,6 +651,17 @@ def _lcsc_search(sku):
     if product is None:
         return None
 
+    price_breaks = []
+    for item in (product.get('productPriceList') or []):
+        qty = item.get('ladder')
+        price = item.get('discountPrice')
+        if qty is not None and price is not None:
+            price_breaks.append({
+                'quantity': qty,
+                'price': price,
+                'currency': item.get('currencySymbol') or 'USD',
+            })
+
     return {
         'product_code': product.get('productCode', ''),
         'product_model': product.get('productModel') or '',
@@ -655,7 +669,23 @@ def _lcsc_search(sku):
         'stock_number': product.get('stockNumber') or 0,
         'product_intro_en': product.get('productIntroEn') or '',
         'product_images': product.get('productImages') or [],
+        'price_breaks': price_breaks,
     }
+
+
+def _save_price_breaks(source, price_breaks):
+    """Replace all price breaks for a source with the supplied list."""
+    source.price_breaks.all().delete()
+    for pb in price_breaks:
+        qty = pb.get('quantity')
+        price = pb.get('price')
+        if qty and price is not None:
+            PartPriceBreak.objects.create(
+                source=source,
+                quantity=qty,
+                price=price,
+                currency=pb.get('currency') or 'USD',
+            )
 
 
 def _digikey_base_url():
@@ -778,7 +808,7 @@ def part_source_fetch_lcsc(request):
 
         source_saved = False
         if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
-            PartSource.objects.create(
+            source = PartSource.objects.create(
                 part=part,
                 supplier_name='LCSC',
                 supplier_sku=p['product_code'],
@@ -787,6 +817,7 @@ def part_source_fetch_lcsc(request):
                 url=f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
                 stock=p['stock_number'],
             )
+            _save_price_breaks(source, p['price_breaks'])
             source_saved = True
 
         return JsonResponse({
@@ -1200,6 +1231,7 @@ def part_source_refresh(request, source_id):
             if p['product_images']:
                 image_remote_url = p['product_images'][0]
             image_filename_prefix = f'lcsc_{p["product_code"]}'
+            _save_price_breaks(source, p['price_breaks'])
 
         elif 'digikey' in supplier:
             client_id, access_token = _get_digikey_access_token()

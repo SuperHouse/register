@@ -107,6 +107,21 @@ class Part(models.Model):
         return self.name
 
 
+class PartPriceBreak(models.Model):
+    """A quantity-based price break for a PartSource (e.g. qty 1 @ $0.50, qty 10 @ $0.45)."""
+    source = models.ForeignKey('PartSource', on_delete=models.CASCADE, related_name='price_breaks')
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=6)
+    currency = models.CharField(max_length=10, default='USD')
+
+    class Meta:
+        ordering = ['quantity']
+        unique_together = [('source', 'quantity')]
+
+    def __str__(self):
+        return f'{self.source}: qty {self.quantity} @ {self.currency} {self.price}'
+
+
 class PartSubstitution(models.Model):
     """A part that can be used as a possible substitution for another part."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='substitutions')

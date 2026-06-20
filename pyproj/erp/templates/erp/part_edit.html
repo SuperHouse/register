@@ -107,6 +107,7 @@
                                 <th>Manufacturer SKU</th>
                                 <th>Packaging</th>
                                 <th>Stock</th>
+                                <th>Price</th>
                                 <th>URL</th>
                                 <th style="width: 80px;"></th>
                             </tr>
@@ -120,6 +121,23 @@
                                     <td class="text-body-secondary">{{ source.packaging }}</td>
                                     <td class="text-body-secondary">
                                         {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
+                                    </td>
+                                    <td class="text-body-secondary text-nowrap">
+                                        {% with breaks=source.price_breaks.all %}
+                                            {% if breaks %}
+                                                {% with lowest=breaks.0 %}
+                                                    <span data-coreui-toggle="tooltip"
+                                                          data-coreui-html="true"
+                                                          data-coreui-placement="left"
+                                                          data-coreui-title="{% for b in breaks %}{{ b.quantity }}×&nbsp;{{ b.price|floatformat:-4 }}&nbsp;{{ b.currency }}{% if not forloop.last %}<br>{% endif %}{% endfor %}"
+                                                          style="cursor:help;border-bottom:1px dotted currentColor;">
+                                                        {{ lowest.price|floatformat:-4 }} {{ lowest.currency }}
+                                                    </span>
+                                                {% endwith %}
+                                            {% else %}
+                                                <span class="fst-italic">—</span>
+                                            {% endif %}
+                                        {% endwith %}
                                     </td>
                                     <td>
                                         {% if source.url %}
@@ -344,6 +362,11 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Initialise price break tooltips
+        document.querySelectorAll('[data-coreui-toggle="tooltip"]').forEach(function (el) {
+            new coreui.Tooltip(el);
+        });
+
         // Auto-populate Name from filename when a file is selected
         const fileInput = document.querySelector('input[name="file"]');
         const nameInput = document.querySelector('input[name="name"]');
