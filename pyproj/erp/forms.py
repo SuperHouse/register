@@ -12,7 +12,7 @@ from .models import (
 
 class DesignChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f'{obj.client.company_name} {obj.sku}: {obj.name} {obj.hw_version}'
+        return f'{obj.client.company_name} {obj.sku}: {obj.name} v{obj.hw_version}'
 
 
 class ProductionStageForm(forms.ModelForm):

@@ -37,7 +37,7 @@ class Design(models.Model):
         constraints = [models.UniqueConstraint(fields=['sku', 'hw_version'], name='unique_sku_hwversion')]
 
     def __str__(self):
-        return f'{self.sku}: {self.name} {self.hw_version}'
+        return f'{self.sku}: {self.name} v{self.hw_version}'
 
 
 class Device(models.Model):
@@ -49,7 +49,7 @@ class Device(models.Model):
     notes = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return f'{self.design.sku} {self.design.hw_version} (sn: {self.pk})'
+        return f'{self.design.sku} v{self.design.hw_version} (sn: {self.pk})'
 
     @classmethod
     def first_free_serial(self):
