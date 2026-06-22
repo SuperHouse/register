@@ -45,7 +45,15 @@
                             <td>{{ batch.po }}</td>
                             <td>{{ batch.quantity }}</td>
                             <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
-                            <td>{{ batch.production_stages.all|length }} production stage{{ batch.production_stages.all|length|pluralize }}</td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    {% for stage in batch.production_stages.all %}
+                                        <span class="rounded {{ stage.get_status_color_class }}"
+                                              style="width: 14px; height: 14px;"
+                                              title="{{ stage.name }}: {{ stage.get_status_display }}"></span>
+                                    {% endfor %}
+                                </div>
+                            </td>
                             <td>
                                 <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
                                     <i class="cil-trash"></i>

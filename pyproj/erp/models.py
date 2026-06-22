@@ -353,3 +353,13 @@ class BatchProductionStage(models.Model):
         }
 
         return classes.get(self.status, '')
+
+    def get_status_color_class(self):
+        classes = {
+            self.NOT_STARTED: 'bg-secondary',
+            self.IN_PROGRESS: 'bg-info',
+            self.ON_HOLD: 'bg-warning',
+            self.DONE: 'bg-success',
+        }
+
+        return classes.get(self.status, 'bg-secondary')

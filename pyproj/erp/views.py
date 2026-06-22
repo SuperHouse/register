@@ -1742,6 +1742,7 @@ def batch_list(request):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
     batches = Batch.objects.select_related('design__client').prefetch_related(
         Prefetch('design__designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
+        'production_stages',
     )
 
     ctx = {
