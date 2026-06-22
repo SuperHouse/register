@@ -22,7 +22,7 @@
                     <tr class="highlight">
                         <th></th>
                         <th>Design</th>
-                        <th>Reference</th>
+                        <th>Purchase Order</th>
                         <th>Quantity</th>
                         <th>Created</th>
                         <th>Progress</th>
@@ -42,7 +42,7 @@
                                 {% endwith %}
                             </td>
                             <td>{{ batch.design }}</td>
-                            <td>{{ batch.reference }}</td>
+                            <td>{{ batch.po }}</td>
                             <td>{{ batch.quantity }}</td>
                             <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
                             <td>{{ batch.production_stages.all|length }} production stage{{ batch.production_stages.all|length|pluralize }}</td>

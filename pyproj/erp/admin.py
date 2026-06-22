@@ -80,8 +80,8 @@ class BatchProductionStageInline(admin.TabularInline):
 
 @admin.register(Batch)
 class BatchAdmin(admin.ModelAdmin):
-    list_display = ['design', 'reference', 'quantity', 'created_dt']
-    search_fields = ['reference', 'design__name', 'design__sku']
+    list_display = ['design', 'po', 'quantity', 'created_dt']
+    search_fields = ['po', 'design__name', 'design__sku']
     inlines = [BatchProductionStageInline]
 
 

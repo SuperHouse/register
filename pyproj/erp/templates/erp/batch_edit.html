@@ -5,7 +5,7 @@
 {% endblock title %}
 
 {% block h1 %}
-    {% if batch %}Edit Batch{% else %}Add Batch{% endif %}
+    {% if batch %}Production Batch #{{ batch.pk }}{% else %}Add Batch{% endif %}
 {% endblock h1 %}
 
 {% block content %}
@@ -26,16 +26,17 @@
                             {% if form.design.errors %}<div class="text-danger small">{{ form.design.errors }}</div>{% endif %}
                         </div>
 
-                        <div class="mb-3">
-                            <label for="{{ form.reference.id_for_label }}" class="form-label">{{ form.reference.label }}</label>
-                            {{ form.reference }}
-                            {% if form.reference.errors %}<div class="text-danger small">{{ form.reference.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="{{ form.quantity.id_for_label }}" class="form-label">{{ form.quantity.label }}</label>
-                            {{ form.quantity }}
-                            {% if form.quantity.errors %}<div class="text-danger small">{{ form.quantity.errors }}</div>{% endif %}
+                        <div class="row mb-3">
+                            <div class="col-4">
+                                <label for="{{ form.quantity.id_for_label }}" class="form-label">{{ form.quantity.label }}</label>
+                                {{ form.quantity }}
+                                {% if form.quantity.errors %}<div class="text-danger small">{{ form.quantity.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-8">
+                                <label for="{{ form.po.id_for_label }}" class="form-label">{{ form.po.label }}</label>
+                                {{ form.po }}
+                                {% if form.po.errors %}<div class="text-danger small">{{ form.po.errors }}</div>{% endif %}
+                            </div>
                         </div>
 
                         <div class="mb-3">

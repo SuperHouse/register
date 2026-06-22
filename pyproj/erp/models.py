@@ -54,7 +54,7 @@ class ProductionStageTemplateStep(models.Model):
 class Batch(models.Model):
     """A production run of a Design, with an ordered list of production operations to perform."""
     design = models.ForeignKey(Design, on_delete=models.PROTECT, related_name='batches')
-    reference = models.CharField(max_length=50, blank=True)
+    po = models.CharField('Purchase order', max_length=50, blank=True)
     quantity = models.PositiveIntegerField()
     notes = models.TextField(null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
@@ -63,8 +63,8 @@ class Batch(models.Model):
         ordering = ['-created_dt']
 
     def __str__(self):
-        if self.reference:
-            return f'{self.design} ({self.reference})'
+        if self.po:
+            return f'{self.design} ({self.po})'
         return f'{self.design} x{self.quantity}'
 
 

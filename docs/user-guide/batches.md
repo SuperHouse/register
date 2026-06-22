@@ -4,7 +4,7 @@ A Batch tracks a production run of a Design through an ordered checklist of prod
 
 ## Batch list
 
-The Batches page (`/batches/`) lists all production runs, most recent first. Each row shows the design, an optional reference label, and the quantity of boards in the run.
+The Batches page (`/batches/`) lists all production runs, most recent first. Each row shows the design, an optional purchase order number, and the quantity of boards in the run.
 
 ## Creating a batch
 
@@ -12,7 +12,7 @@ Click **Add Batch** or use the **Add New Batch** button on a Design's detail pag
 
 - **Design** — which board type is being produced
 - **Quantity** — how many boards in this run
-- **Reference** — optional label (e.g. a work order number)
+- **Purchase Order** — optional purchase order number
 - **Notes** — optional free-text notes
 
 ## Production stages

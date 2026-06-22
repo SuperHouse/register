@@ -54,9 +54,9 @@ class BatchForm(forms.ModelForm):
 
     class Meta:
         model = Batch
-        fields = ['design', 'reference', 'quantity', 'notes']
+        fields = ['design', 'po', 'quantity', 'notes']
         widgets = {
-            'reference': forms.TextInput(attrs={'class': 'form-control'}),
+            'po': forms.TextInput(attrs={'class': 'form-control'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
