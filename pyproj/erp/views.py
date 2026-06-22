@@ -356,7 +356,7 @@ def location_delete(request, location_id):
 @staff_member_required
 def part_list(request):
     q = request.GET.get('q', '').strip()
-    parts_qs = Part.objects.order_by('name')
+    parts_qs = Part.objects.prefetch_related('sources').order_by('name')
     if q:
         q_filter = Q(name__icontains=q) | Q(value__icontains=q) | Q(package__icontains=q) | Q(device__icontains=q)
         parts_qs = parts_qs.filter(q_filter)

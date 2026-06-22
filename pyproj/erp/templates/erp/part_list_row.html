@@ -9,6 +9,7 @@
     <td>{{ part.value }}</td>
     <td>{{ part.package }}</td>
     <td>{{ part.device }}</td>
+    <td>{{ part.total_stock|default_if_none:"" }}</td>
     <td>
         <a href="{% url 'erp:part_delete' part.pk %}"
            class="btn btn-sm btn-outline-danger"

@@ -106,6 +106,12 @@ class Part(models.Model):
             return f'{self.name} ({self.value})'
         return self.name
 
+    @property
+    def total_stock(self):
+        """Sum of stock across all supplier listings, or None if none have a known stock level."""
+        known = [source.stock for source in self.sources.all() if source.stock is not None]
+        return sum(known) if known else None
+
 
 class PartSubstitution(models.Model):
     """A part that can be used as a possible substitution for another part."""

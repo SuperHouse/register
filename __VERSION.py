@@ -13,4 +13,4 @@ def _branch_suffix():
         pass
     return ''
 
-VERSION = '2026.06.18.1' + _branch_suffix()
+VERSION = '2026.06.22.1' + _branch_suffix()
