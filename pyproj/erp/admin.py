@@ -4,13 +4,27 @@ from django.contrib import admin
 
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage, ProductionStageTemplate,
+    ProductionStageTemplateStep,
 )
+
+
+class PartSourceVariantInline(admin.TabularInline):
+    model = PartSourceVariant
+    extra = 0
 
 
 class PartSourceInline(admin.TabularInline):
     model = PartSource
     extra = 0
+
+
+@admin.register(PartSource)
+class PartSourceAdmin(admin.ModelAdmin):
+    list_display = ['part', 'supplier_name', 'manufacturer_sku', 'stock']
+    list_select_related = ['part']
+    search_fields = ['part__name', 'supplier_name', 'manufacturer_sku']
+    inlines = [PartSourceVariantInline]
 
 
 class PartAssetInline(admin.TabularInline):

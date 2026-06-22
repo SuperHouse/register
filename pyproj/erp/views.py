@@ -35,7 +35,7 @@ from .forms import (
 from device.models import DesignAsset
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartPriceBreak, PartSource, PartSubstitution, ProductionStage,
+    PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant, PartSubstitution, ProductionStage,
     ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
@@ -497,7 +497,7 @@ def part_add(request):
 @staff_member_required
 def part_edit(request, part_id):
     part = get_object_or_404(
-        Part.objects.prefetch_related('substitutions__substitute', 'sources__price_breaks'),
+        Part.objects.prefetch_related('substitutions__substitute', 'sources__variants__price_breaks'),
         pk=part_id,
     )
 
@@ -566,6 +566,27 @@ def part_asset_delete(request, asset_id):
     return redirect('erp:part_edit', part_id=part_id)
 
 
+def _get_or_create_supplier_listing(part, supplier_name, manufacturer_sku, stock):
+    """Find or create the PartSource listing a new variant should be filed under.
+
+    Only merges into an existing listing when manufacturer_sku is non-blank — supplier
+    lookups that fail to report a manufacturer SKU would otherwise all match each other
+    on the empty string and wrongly merge unrelated listings (and their stock).
+    """
+    if manufacturer_sku:
+        listing = PartSource.objects.filter(
+            part=part, supplier_name__iexact=supplier_name, manufacturer_sku__iexact=manufacturer_sku,
+        ).first()
+        if listing:
+            listing.stock = stock
+            listing.save(update_fields=['stock'])
+            return listing
+
+    return PartSource.objects.create(
+        part=part, supplier_name=supplier_name, manufacturer_sku=manufacturer_sku, stock=stock,
+    )
+
+
 @staff_member_required
 def part_source_add(request, part_id):
     part = get_object_or_404(Part, pk=part_id)
@@ -573,9 +594,14 @@ def part_source_add(request, part_id):
     if request.method == 'POST':
         form = PartSourceForm(request.POST)
         if form.is_valid():
-            source = form.save(commit=False)
-            source.part = part
-            source.save()
+            data = form.cleaned_data
+            listing = _get_or_create_supplier_listing(
+                part, data['supplier_name'], data['manufacturer_sku'], data['stock'],
+            )
+            PartSourceVariant.objects.create(
+                source=listing, supplier_sku=data['supplier_sku'], packaging=data['packaging'], url=data['url'],
+                moq=data['moq'],
+            )
             messages.success(request, 'Source added.')
         else:
             messages.warning(request, 'Please correct the errors below.')
@@ -656,11 +682,9 @@ def _lcsc_search(sku):
         qty = item.get('ladder')
         price = item.get('discountPrice')
         if qty is not None and price is not None:
-            price_breaks.append({
-                'quantity': qty,
-                'price': price,
-                'currency': item.get('currencySymbol') or 'USD',
-            })
+            # LCSC's API only ever returns a "$" symbol, not an ISO code, so the
+            # currency is assumed to be USD here like every other supplier.
+            price_breaks.append({'quantity': qty, 'price': price, 'currency': 'USD'})
 
     return {
         'product_code': product.get('productCode', ''),
@@ -670,18 +694,19 @@ def _lcsc_search(sku):
         'product_intro_en': product.get('productIntroEn') or '',
         'product_images': product.get('productImages') or [],
         'price_breaks': price_breaks,
+        'moq': product.get('minBuyNumber'),
     }
 
 
-def _save_price_breaks(source, price_breaks):
-    """Replace all price breaks for a source with the supplied list."""
-    source.price_breaks.all().delete()
+def _save_price_breaks(variant, price_breaks):
+    """Replace all price breaks for a variant with the supplied list."""
+    variant.price_breaks.all().delete()
     for pb in price_breaks:
         qty = pb.get('quantity')
         price = pb.get('price')
         if qty and price is not None:
             PartPriceBreak.objects.create(
-                source=source,
+                variant=variant,
                 quantity=qty,
                 price=price,
                 currency=pb.get('currency') or 'USD',
@@ -692,6 +717,33 @@ def _digikey_base_url():
     """Return the appropriate DigiKey base URL based on DIGIKEY_CLIENT_SANDBOX."""
     sandbox = os.environ.get('DIGIKEY_CLIENT_SANDBOX', '').lower() in ('true', '1', 'yes')
     return 'https://sandbox-api.digikey.com' if sandbox else 'https://api.digikey.com'
+
+
+def _digikey_price_breaks(variation):
+    """Extract price breaks from a DigiKey ProductVariation's StandardPricing list."""
+    price_breaks = []
+    for tier in (variation.get('StandardPricing') or []):
+        qty = tier.get('BreakQuantity')
+        price = tier.get('UnitPrice')
+        if qty is not None and price is not None:
+            price_breaks.append({'quantity': qty, 'price': price, 'currency': 'USD'})
+    return price_breaks
+
+
+def _propagate_digikey_sibling_data(listing, variations):
+    """Save price breaks and MOQ for every PartSourceVariant under listing found in variations.
+
+    DigiKey's productdetails response includes every packaging variation's pricing and
+    MOQ (not just the one that was looked up) in a single call, so one fetch or refresh
+    can backfill this data for sibling SKUs under the same listing too.
+    """
+    by_digikey_pn = {v.get('DigiKeyProductNumber', '').lower(): v for v in variations}
+    for sibling in listing.variants.all():
+        variation = by_digikey_pn.get(sibling.supplier_sku.lower())
+        if variation is not None:
+            _save_price_breaks(sibling, _digikey_price_breaks(variation))
+            sibling.moq = variation.get('MinimumOrderQuantity')
+            sibling.save(update_fields=['moq'])
 
 
 @staff_member_required
@@ -807,17 +859,16 @@ def part_source_fetch_lcsc(request):
             part.save(update_fields=['description'])
 
         source_saved = False
-        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
-            source = PartSource.objects.create(
-                part=part,
-                supplier_name='LCSC',
+        if part and not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
+            listing = _get_or_create_supplier_listing(part, 'LCSC', p['product_model'], p['stock_number'])
+            variant = PartSourceVariant.objects.create(
+                source=listing,
                 supplier_sku=p['product_code'],
-                manufacturer_sku=p['product_model'],
                 packaging=lcsc_packaging,
                 url=f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
-                stock=p['stock_number'],
+                moq=p['moq'],
             )
-            _save_price_breaks(source, p['price_breaks'])
+            _save_price_breaks(variant, p['price_breaks'])
             source_saved = True
 
         return JsonResponse({
@@ -827,6 +878,7 @@ def part_source_fetch_lcsc(request):
             'packaging': lcsc_packaging,
             'url': f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
             'stock': p['stock_number'],
+            'moq': p['moq'],
             'image_url': image_url,
             'source_saved': source_saved,
         })
@@ -896,6 +948,12 @@ def part_source_fetch_mouser(request):
                 packaging = attr.get('AttributeValue') or ''
                 break
 
+        moq_str = p.get('Min') or ''
+        try:
+            moq = int(moq_str) if moq_str else None
+        except (ValueError, TypeError):
+            moq = None
+
         if part and not part.description and mouser_description:
             part.description = mouser_description
             part.save(update_fields=['description'])
@@ -909,15 +967,10 @@ def part_source_fetch_mouser(request):
             image_url = part.image.url
 
         source_saved = False
-        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
-            PartSource.objects.create(
-                part=part,
-                supplier_name='Mouser',
-                supplier_sku=mouser_pn,
-                manufacturer_sku=manufacturer_pn,
-                packaging=packaging,
-                url=product_url,
-                stock=stock,
+        if part and not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
+            listing = _get_or_create_supplier_listing(part, 'Mouser', manufacturer_pn, stock)
+            PartSourceVariant.objects.create(
+                source=listing, supplier_sku=mouser_pn, packaging=packaging, url=product_url, moq=moq,
             )
             source_saved = True
 
@@ -928,6 +981,7 @@ def part_source_fetch_mouser(request):
             'packaging': packaging,
             'url': product_url,
             'stock': stock,
+            'moq': moq,
             'image_url': image_url,
             'source_saved': source_saved,
         })
@@ -1028,15 +1082,10 @@ def part_source_fetch_element14(request):
             image_url = part.image.url
 
         source_saved = False
-        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
-            PartSource.objects.create(
-                part=part,
-                supplier_name='Element14',
-                supplier_sku=element14_sku,
-                manufacturer_sku=manufacturer_pn,
-                packaging=packaging,
-                url=product_url,
-                stock=stock,
+        if part and not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
+            listing = _get_or_create_supplier_listing(part, 'Element14', manufacturer_pn, stock)
+            PartSourceVariant.objects.create(
+                source=listing, supplier_sku=element14_sku, packaging=packaging, url=product_url,
             )
             source_saved = True
 
@@ -1175,17 +1224,21 @@ def part_source_fetch_digikey(request):
             part.save(update_fields=['description'])
 
         source_saved = False
-        if part and not part.sources.filter(supplier_sku__iexact=sku).exists():
-            PartSource.objects.create(
-                part=part,
-                supplier_name='DigiKey',
-                supplier_sku=digi_key_pn,
-                manufacturer_sku=manufacturer_pn,
-                packaging=dk_packaging,
-                url=product_url,
-                stock=stock,
-            )
-            source_saved = True
+        listing = None
+        if part:
+            if not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
+                listing = _get_or_create_supplier_listing(part, 'DigiKey', manufacturer_pn, stock)
+                PartSourceVariant.objects.create(
+                    source=listing, supplier_sku=digi_key_pn, packaging=dk_packaging, url=product_url,
+                )
+                source_saved = True
+            else:
+                listing = PartSource.objects.filter(
+                    part=part, supplier_name__iexact='DigiKey', manufacturer_sku__iexact=manufacturer_pn,
+                ).first()
+
+            if listing:
+                _propagate_digikey_sibling_data(listing, variations)
 
         return JsonResponse({
             'ok': True,
@@ -1204,20 +1257,22 @@ def part_source_fetch_digikey(request):
 
 
 @staff_member_required
-def part_source_refresh(request, source_id):
+def part_source_refresh(request, variant_id):
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
-    source = get_object_or_404(PartSource, pk=source_id)
-    part = source.part
-    sku = source.supplier_sku
-    supplier = source.supplier_name.lower()
+    variant = get_object_or_404(PartSourceVariant, pk=variant_id)
+    listing = variant.source
+    part = listing.part
+    sku = variant.supplier_sku
+    supplier = listing.supplier_name.lower()
 
     try:
         import requests as http_requests
         from django.core.files.base import ContentFile
 
         image_remote_url = None
+        moq = None
 
         if supplier == 'lcsc':
             p = _lcsc_search(sku)
@@ -1227,11 +1282,12 @@ def part_source_refresh(request, source_id):
             packaging = p['product_arrange']
             url = f'https://www.lcsc.com/product-detail/{p["product_code"]}.html'
             stock = p['stock_number']
+            moq = p['moq']
             supplier_description = p['product_intro_en']
             if p['product_images']:
                 image_remote_url = p['product_images'][0]
             image_filename_prefix = f'lcsc_{p["product_code"]}'
-            _save_price_breaks(source, p['price_breaks'])
+            _save_price_breaks(variant, p['price_breaks'])
 
         elif 'digikey' in supplier:
             client_id, access_token = _get_digikey_access_token()
@@ -1268,6 +1324,7 @@ def part_source_refresh(request, source_id):
                     packaging = v.get('PackageType', {}).get('Name', '')
                     break
             supplier_description = (product.get('Description') or {}).get('DetailedDescription', '')
+            _propagate_digikey_sibling_data(listing, variations)
 
         elif supplier == 'mouser':
             import requests as http_requests
@@ -1301,6 +1358,11 @@ def part_source_refresh(request, source_id):
                 if 'packag' in (attr.get('AttributeName') or '').lower():
                     packaging = attr.get('AttributeValue') or ''
                     break
+            moq_str = p.get('Min') or ''
+            try:
+                moq = int(moq_str) if moq_str else None
+            except (ValueError, TypeError):
+                moq = None
             supplier_description = p.get('Description') or ''
             image_remote_url = p.get('ImagePath') or ''
             image_filename_prefix = f'mouser_{sku.replace("/", "_")}'
@@ -1354,13 +1416,19 @@ def part_source_refresh(request, source_id):
             image_filename_prefix = f'element14_{sku}'
 
         else:
-            return JsonResponse({'ok': False, 'error': f'No API integration for supplier "{source.supplier_name}"'})
+            return JsonResponse({'ok': False, 'error': f'No API integration for supplier "{listing.supplier_name}"'})
 
-        source.manufacturer_sku = manufacturer_sku
-        source.packaging = packaging
-        source.url = url
-        source.stock = stock
-        source.save()
+        listing.manufacturer_sku = manufacturer_sku
+        listing.stock = stock
+        listing.save(update_fields=['manufacturer_sku', 'stock'])
+
+        variant.packaging = packaging
+        variant.url = url
+        update_fields = ['packaging', 'url']
+        if moq is not None:
+            variant.moq = moq
+            update_fields.append('moq')
+        variant.save(update_fields=update_fields)
 
         if not part.description and supplier_description:
             part.description = supplier_description
@@ -1387,6 +1455,22 @@ def part_source_delete(request, source_id):
 
     if request.method == 'POST':
         source.delete()
+        messages.success(request, 'Source deleted.')
+
+    return redirect('erp:part_edit', part_id=part_id)
+
+
+@staff_member_required
+def part_source_variant_delete(request, variant_id):
+    variant = get_object_or_404(PartSourceVariant, pk=variant_id)
+    listing = variant.source
+    part_id = listing.part_id
+
+    if request.method == 'POST':
+        variant.delete()
+        # Don't leave a listing with no orderable SKUs behind.
+        if not listing.variants.exists():
+            listing.delete()
         messages.success(request, 'Source deleted.')
 
     return redirect('erp:part_edit', part_id=part_id)

@@ -107,21 +107,6 @@ class Part(models.Model):
         return self.name
 
 
-class PartPriceBreak(models.Model):
-    """A quantity-based price break for a PartSource (e.g. qty 1 @ $0.50, qty 10 @ $0.45)."""
-    source = models.ForeignKey('PartSource', on_delete=models.CASCADE, related_name='price_breaks')
-    quantity = models.PositiveIntegerField()
-    price = models.DecimalField(max_digits=12, decimal_places=6)
-    currency = models.CharField(max_length=10, default='USD')
-
-    class Meta:
-        ordering = ['quantity']
-        unique_together = [('source', 'quantity')]
-
-    def __str__(self):
-        return f'{self.source}: qty {self.quantity} @ {self.currency} {self.price}'
-
-
 class PartSubstitution(models.Model):
     """A part that can be used as a possible substitution for another part."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='substitutions')
@@ -136,13 +121,16 @@ class PartSubstitution(models.Model):
 
 
 class PartSource(models.Model):
-    """A supplier or purchase source for a Part."""
+    """A supplier's listing for a Part: one manufacturer SKU as stocked by one supplier.
+
+    Stock is held here rather than on PartSourceVariant because suppliers such as
+    DigiKey sell the same physical inventory pool under several packaging-specific SKUs
+    (e.g. cut tape vs. tape & reel) that all report the same stock level but different
+    pricing — those become separate PartSourceVariant rows under one PartSource.
+    """
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='sources')
     supplier_name = models.CharField(max_length=200)
-    supplier_sku = models.CharField(max_length=200, blank=True)
-    url = models.URLField(blank=True)
     manufacturer_sku = models.CharField(max_length=200, blank=True)
-    packaging = models.CharField(max_length=100, blank=True)
     stock = models.PositiveIntegerField(null=True, blank=True, help_text='Leave blank if stock level is unknown')
 
     class Meta:
@@ -150,6 +138,54 @@ class PartSource(models.Model):
 
     def __str__(self):
         return f'{self.part}: {self.supplier_name}'
+
+
+class PartSourceVariant(models.Model):
+    """A specific orderable SKU/packaging option under a PartSource listing."""
+    source = models.ForeignKey(PartSource, on_delete=models.CASCADE, related_name='variants')
+    supplier_sku = models.CharField(max_length=200, blank=True)
+    packaging = models.CharField(max_length=100, blank=True)
+    url = models.URLField(blank=True)
+    moq = models.PositiveIntegerField(null=True, blank=True, help_text='Minimum order quantity; leave blank if unknown')
+
+    class Meta:
+        ordering = ['supplier_sku']
+
+    def __str__(self):
+        return f'{self.source}: {self.supplier_sku}'
+
+
+class PartPriceBreak(models.Model):
+    """A quantity-based price break for a PartSourceVariant (e.g. qty 1 @ $0.50, qty 10 @ $0.45)."""
+
+    # Most supplier APIs don't report a currency code at all, so it's stored as an
+    # assumption (defaulting to USD) rather than something read from the API response.
+    # This maps the stored ISO code to a display symbol; suppliers that report a real
+    # currency should still store the ISO code here, not the symbol.
+    CURRENCY_SYMBOLS = {
+        'USD': '$',
+        'AUD': '$',
+        'EUR': '€',
+        'GBP': '£',
+        'JPY': '¥',
+        'CNY': '¥',
+    }
+
+    variant = models.ForeignKey(PartSourceVariant, on_delete=models.CASCADE, related_name='price_breaks')
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=6)
+    currency = models.CharField(max_length=10, default='USD')
+
+    class Meta:
+        ordering = ['quantity']
+        unique_together = [('variant', 'quantity')]
+
+    def __str__(self):
+        return f'{self.variant}: qty {self.quantity} @ {self.currency} {self.price}'
+
+    @property
+    def symbol(self):
+        return self.CURRENCY_SYMBOLS.get(self.currency, '')
 
 
 class PartAsset(models.Model):

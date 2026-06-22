@@ -5,7 +5,7 @@ from django import forms
 from device.models import Design
 from .models import (
     Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
     ProductionStageTemplateStep,
 )
 
@@ -151,18 +151,31 @@ class PartForm(forms.ModelForm):
         self.fields['category'].empty_label = '(uncategorised)'
 
 
-class PartSourceForm(forms.ModelForm):
-    class Meta:
-        model = PartSource
-        fields = ['supplier_name', 'supplier_sku', 'url', 'manufacturer_sku', 'packaging', 'stock']
-        widgets = {
-            'supplier_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'supplier_sku': forms.TextInput(attrs={'class': 'form-control'}),
-            'url': forms.URLInput(attrs={'class': 'form-control'}),
-            'manufacturer_sku': forms.TextInput(attrs={'class': 'form-control'}),
-            'packaging': forms.TextInput(attrs={'class': 'form-control'}),
-            'stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-        }
+class PartSourceForm(forms.Form):
+    """Spans both PartSource (listing) and PartSourceVariant (variant) tiers.
+
+    The view get-or-creates the listing by (part, supplier_name, manufacturer_sku) and
+    always creates a new variant for the supplier_sku/packaging/url, so adding a second
+    SKU for a manufacturer_sku that's already on file groups it under the same listing
+    (and shares its stock) instead of creating a duplicate listing.
+    """
+    supplier_name = forms.CharField(max_length=200, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    supplier_sku = forms.CharField(
+        max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    url = forms.URLField(required=False, widget=forms.URLInput(attrs={'class': 'form-control'}))
+    manufacturer_sku = forms.CharField(
+        max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    packaging = forms.CharField(
+        max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    moq = forms.IntegerField(
+        required=False, min_value=0, widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+    )
+    stock = forms.IntegerField(
+        required=False, min_value=0, widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+    )
 
 
 class PartSubstitutionForm(forms.ModelForm):

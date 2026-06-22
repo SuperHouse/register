@@ -103,67 +103,104 @@
                         <thead>
                             <tr class="highlight">
                                 <th>Supplier</th>
-                                <th>Supplier SKU</th>
                                 <th>Manufacturer SKU</th>
-                                <th>Packaging</th>
                                 <th>Stock</th>
+                                <th>Supplier SKU</th>
+                                <th>Packaging</th>
+                                <th>MOQ</th>
                                 <th>Price</th>
-                                <th>URL</th>
-                                <th style="width: 80px;"></th>
+                                <th style="width: 100px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for source in part.sources.all %}
-                                <tr>
-                                    <td>{{ source.supplier_name }}</td>
-                                    <td class="text-body-secondary">{{ source.supplier_sku }}</td>
-                                    <td class="text-body-secondary">{{ source.manufacturer_sku }}</td>
-                                    <td class="text-body-secondary">{{ source.packaging }}</td>
-                                    <td class="text-body-secondary">
-                                        {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
-                                    </td>
-                                    <td class="text-body-secondary text-nowrap">
-                                        {% with breaks=source.price_breaks.all %}
-                                            {% if breaks %}
-                                                {% with lowest=breaks.0 %}
-                                                    <span data-coreui-toggle="tooltip"
-                                                          data-coreui-html="true"
-                                                          data-coreui-placement="left"
-                                                          data-coreui-title="{% for b in breaks %}{{ b.quantity }}×&nbsp;{{ b.price|floatformat:-4 }}&nbsp;{{ b.currency }}{% if not forloop.last %}<br>{% endif %}{% endfor %}"
-                                                          style="cursor:help;border-bottom:1px dotted currentColor;">
-                                                        {{ lowest.price|floatformat:-4 }} {{ lowest.currency }}
-                                                    </span>
-                                                {% endwith %}
+                                {% with variants=source.variants.all %}
+                                    {% for variant in variants %}
+                                        <tr>
+                                            {% if forloop.first %}
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}>{{ source.supplier_name }}</td>
+                                                <td class="text-body-secondary" {% if not forloop.last %}style="border-bottom: none;"{% endif %}>{{ source.manufacturer_sku }}</td>
+                                                <td class="text-body-secondary" {% if not forloop.last %}style="border-bottom: none;"{% endif %}>
+                                                    {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
+                                                </td>
                                             {% else %}
-                                                <span class="fst-italic">—</span>
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
                                             {% endif %}
-                                        {% endwith %}
-                                    </td>
-                                    <td>
-                                        {% if source.url %}
-                                            <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer" class="text-truncate d-inline-block" style="max-width: 200px;">
-                                                {{ source.url }}
-                                            </a>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="d-flex gap-1">
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary source-refresh-btn"
-                                                    data-refresh-url="{% url 'erp:part_source_refresh' source.pk %}"
-                                                    title="Refresh from {{ source.supplier_name }}">
-                                                <i class="bi bi-arrow-clockwise"></i>
-                                            </button>
-                                            <form method="post" action="{% url 'erp:part_source_delete' source.pk %}"
-                                                  onsubmit="return confirm('Delete this source?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
-                                                    <i class="cil-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                </tr>
+                                            <td class="text-body-secondary">
+                                                {% if variant.url %}
+                                                    <a href="{{ variant.url }}" target="_blank" rel="noopener noreferrer">{{ variant.supplier_sku }}</a>
+                                                {% else %}
+                                                    {{ variant.supplier_sku }}
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-body-secondary">{{ variant.packaging }}</td>
+                                            <td class="text-body-secondary">{{ variant.moq|default:"" }}</td>
+                                            <td class="text-body-secondary text-nowrap">
+                                                {% with breaks=variant.price_breaks.all %}
+                                                    {% if breaks %}
+                                                        {% with lowest=breaks.0 %}
+                                                            <span data-coreui-toggle="tooltip"
+                                                                  data-coreui-html="true"
+                                                                  data-coreui-placement="left"
+                                                                  data-coreui-title="{% for b in breaks %}{{ b.quantity }}×&nbsp;{{ b.symbol }}{{ b.price|floatformat:-4 }}&nbsp;{{ b.currency }}{% if not forloop.last %}<br>{% endif %}{% endfor %}"
+                                                                  style="cursor:help;border-bottom:1px dotted currentColor;">
+                                                                {{ lowest.symbol }}{{ lowest.price|floatformat:-4 }} {{ lowest.currency }}
+                                                            </span>
+                                                        {% endwith %}
+                                                    {% else %}
+                                                        <span class="fst-italic">—</span>
+                                                    {% endif %}
+                                                {% endwith %}
+                                            </td>
+                                            <td>
+                                                <div class="d-flex gap-1">
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary source-refresh-btn"
+                                                            data-refresh-url="{% url 'erp:part_source_refresh' variant.pk %}"
+                                                            title="Refresh from {{ source.supplier_name }}">
+                                                        <i class="bi bi-arrow-clockwise"></i>
+                                                    </button>
+                                                    <form method="post" action="{% url 'erp:part_source_variant_delete' variant.pk %}"
+                                                          onsubmit="return confirm('Delete this SKU?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete this SKU">
+                                                            <i class="cil-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                    {% if forloop.first and variants|length > 1 %}
+                                                        <form method="post" action="{% url 'erp:part_source_delete' source.pk %}"
+                                                              onsubmit="return confirm('Delete this listing and all {{ variants|length }} SKUs under it?');">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete entire {{ source.supplier_name }} listing (all SKUs)">
+                                                                <i class="cil-layers"></i>
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td>{{ source.supplier_name }}</td>
+                                            <td class="text-body-secondary">{{ source.manufacturer_sku }}</td>
+                                            <td class="text-body-secondary">
+                                                {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
+                                            </td>
+                                            <td colspan="4" class="text-body-secondary fst-italic">No SKUs recorded</td>
+                                            <td>
+                                                <form method="post" action="{% url 'erp:part_source_delete' source.pk %}"
+                                                      onsubmit="return confirm('Delete this listing?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                                        <i class="cil-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endwith %}
                             {% endfor %}
                         </tbody>
                     </table>
@@ -199,7 +236,7 @@
                         </div>
                     </div>
                     <div class="row g-2 align-items-end">
-                        <div class="col-12 col-md-3">
+                        <div class="col-12 col-md-2">
                             <label class="form-label form-label-sm">Supplier Name</label>
                             {{ source_form.supplier_name }}
                         </div>
@@ -210,6 +247,10 @@
                         <div class="col-12 col-md-2">
                             <label class="form-label form-label-sm">Packaging</label>
                             {{ source_form.packaging }}
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label form-label-sm">MOQ</label>
+                            {{ source_form.moq }}
                         </div>
                         <div class="col-6 col-md-1">
                             <label class="form-label form-label-sm">Stock</label>
@@ -224,6 +265,10 @@
                                 <i class="cil-plus"></i> Add Source
                             </button>
                         </div>
+                    </div>
+                    <div class="form-text">
+                        A Manufacturer SKU matching an existing listing for the same supplier is filed under it as
+                        another orderable SKU, sharing that listing's stock figure.
                     </div>
                 </form>
             </div>
@@ -407,6 +452,7 @@
                         form.querySelector('[name="supplier_name"]').value = data.supplier_name;
                         form.querySelector('[name="manufacturer_sku"]').value = data.manufacturer_sku;
                         form.querySelector('[name="packaging"]').value = data.packaging ?? '';
+                        form.querySelector('[name="moq"]').value = data.moq ?? '';
                         form.querySelector('[name="url"]').value = data.url;
                         form.querySelector('[name="stock"]').value = data.stock ?? '';
                     }
