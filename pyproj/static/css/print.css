@@ -1,0 +1,94 @@
+/* Shared stylesheet for printable document pages (device/base-print.html). */
+
+@page {
+    size: A4;
+    margin: 15mm;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 11pt;
+    color: #000;
+    background: #fff;
+    margin: 0;
+}
+
+.print-toolbar {
+    padding: 12px 16px;
+    background: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+}
+
+.print-toolbar button {
+    font-size: 14px;
+    padding: 6px 16px;
+    cursor: pointer;
+}
+
+.print-document {
+    max-width: 190mm;
+    margin: 16px auto;
+    padding: 0 8mm;
+}
+
+.print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 2px solid #000;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+}
+
+.print-header h1 {
+    font-size: 18pt;
+    margin: 0;
+}
+
+.print-header-date {
+    color: #444;
+    margin-top: 4px;
+}
+
+.print-header-logo {
+    max-height: 60px;
+    max-width: 160px;
+}
+
+table.print-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+}
+
+table.print-table th,
+table.print-table td {
+    border: 1px solid #999;
+    padding: 4px 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.print-table th {
+    background: #eee;
+}
+
+table.print-fields th {
+    width: 160px;
+    background: #f5f5f5;
+}
+
+h2.print-section-heading {
+    font-size: 13pt;
+    margin: 20px 0 8px;
+}
+
+@media print {
+    .no-print {
+        display: none !important;
+    }
+
+    .print-document {
+        margin: 0 auto;
+    }
+}

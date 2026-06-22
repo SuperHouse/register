@@ -56,6 +56,11 @@
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'erp:batch_list' %}" class="btn btn-secondary">Back to Batches</a>
+                            {% if batch %}
+                                <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-outline-secondary ms-auto" title="Print">
+                                    <i class="cil-print"></i> Print
+                                </a>
+                            {% endif %}
                         </div>
                     </form>
                 </div>

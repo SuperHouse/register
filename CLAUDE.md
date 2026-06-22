@@ -288,6 +288,15 @@ The dashboard (`/`) displays summary statistics (client/design/device counts) an
 
 Access control: Users see only data for their associated clients (if non-staff). Staff see all data.
 
+## Printable Pages
+
+Pages that need a clean, A4-friendly printout (e.g. handing a Batch's details to production staff) follow a shared pattern rather than adding `@media print` rules to the interactive page:
+
+- **[device/base-print.html](pyproj/device/templates/device/base-print.html)** — minimal HTML shell (no sidebar, nav, or app chrome) that print page templates extend. Loads [static/css/print.css](pyproj/static/css/print.css) and renders a `.no-print` toolbar with a *Print* button (`window.print()`) above the `{% block content %}`.
+- **[static/css/print.css](pyproj/static/css/print.css)** — shared stylesheet: sets `@page { size: A4; margin: 15mm; }`, a `.print-document` wrapper, `.print-header` (title + date row with a bottom rule), `table.print-table`/`table.print-fields` (bordered field/data tables), and `.no-print` (hidden via `@media print`) for the toolbar.
+- Each printable page gets its own minimal template (e.g. [erp/batch_print.html](pyproj/erp/templates/erp/batch_print.html)) extending `device/base-print.html`, plus a dedicated view/URL (e.g. `batch_print` at `/batches/<id>/print/`) rather than reusing the detail page's view/template — this keeps the print layout free to diverge from the interactive UI (buttons, status icons, sidebar) without fighting it via CSS overrides.
+- The source page links to the print page with a print icon button (`<i class="cil-print"></i>`) opening in a new tab (`target="_blank"`) — see the Print button on [erp/batch_edit.html](pyproj/erp/templates/erp/batch_edit.html).
+
 ## Version Number
 
 `settings.VERSION` holds the current app version string. It is set in [`__VERSION.py`](__VERSION.py) at the repo root (format `YYYY.MM.DD.N`). At import time it reads `.git/HEAD` and automatically appends the current branch name as a suffix (e.g. `2026.06.09.1-refactor-modules`); the suffix is omitted on `main` and when no `.git` directory exists (e.g. a non-git production deployment). The version is injected into all templates as `app_version` via `device.context_processor.version_processor` and displayed in the bottom of the left sidebar as a link to the project source repository on GitHub, satisfying the AGPL network-use disclosure requirement.
