@@ -15,6 +15,15 @@ register/
 │   ├── pcba/           # Placeholder app; pcba.designs holds a WIP redesign of Design/DesignAsset (not yet in use)
 │   ├── device/         # Main app: all PCB/device logic, API endpoints, views
 │   └── manage.py
+├── docs/               # MkDocs source — end-user and admin documentation
+│   ├── index.md
+│   ├── user-guide/     # Dashboard, Boards, Designs, Organisations, Parts, Batches
+│   ├── admin/          # Setup, deployment, configuration, supplier APIs, data export/import
+│   └── api/            # REST API reference
+├── .github/
+│   └── workflows/
+│       └── docs.yml    # GitHub Actions: builds and deploys docs to GitHub Pages on push to main
+├── mkdocs.yml          # MkDocs configuration (Material theme, nav structure)
 ├── API.md              # Full REST API documentation
 ├── BARCODES.md         # Planning notes for barcode scheme (future ERP/stock extension)
 ├── BARCODE-analysis.MD # Analysis of BARCODES.md ideas with industry best-practice recommendations
@@ -46,6 +55,21 @@ python manage.py runserver
 cd pyproj
 pytest
 ```
+
+## Documentation
+
+End-user and admin documentation lives in `docs/` and is built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). The published site is at `https://superhouse.github.io/register/`.
+
+**Build locally:**
+```bash
+pip install mkdocs-material
+mkdocs serve          # live-reload preview at http://127.0.0.1:8000
+mkdocs build --strict # one-off build to site/
+```
+
+**Deployment:** `.github/workflows/docs.yml` builds and deploys to GitHub Pages automatically on every push to `main` (and can be triggered manually from the Actions tab). The Pages source in the repo settings must be set to **GitHub Actions**.
+
+The `site/` build output is gitignored. `docs/` source is the only thing committed.
 
 ## Data Model
 

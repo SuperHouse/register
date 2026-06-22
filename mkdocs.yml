@@ -1,0 +1,51 @@
+site_name: Testomatic PCB Assembly Register
+site_url: https://superhouse.github.io/register/
+repo_url: https://github.com/SuperHouse/register
+repo_name: SuperHouse/register
+copyright: Copyright &copy; 2026 SuperHouse Automation Pty Ltd
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - Overview: user-guide/index.md
+    - Dashboard: user-guide/dashboard.md
+    - Boards: user-guide/boards.md
+    - Designs: user-guide/designs.md
+    - Organisations: user-guide/organisations.md
+    - Parts Library: user-guide/parts.md
+    - Production Batches: user-guide/batches.md
+  - Administration:
+    - Overview: admin/index.md
+    - Development Setup: admin/setup.md
+    - Production Deployment: admin/deployment.md
+    - Configuration Reference: admin/configuration.md
+    - Supplier API Setup: admin/supplier-apis.md
+    - Data Export & Import: admin/data.md
+  - API Reference: api/reference.md
+
+plugins:
+  - search
