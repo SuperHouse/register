@@ -293,9 +293,18 @@ Access control: Users see only data for their associated clients (if non-staff).
 Pages that need a clean, A4-friendly printout (e.g. handing a Batch's details to production staff) follow a shared pattern rather than adding `@media print` rules to the interactive page:
 
 - **[device/base-print.html](pyproj/device/templates/device/base-print.html)** — minimal HTML shell (no sidebar, nav, or app chrome) that print page templates extend. Loads [static/css/print.css](pyproj/static/css/print.css) and renders a `.no-print` toolbar with a *Print* button (`window.print()`) above the `{% block content %}`.
-- **[static/css/print.css](pyproj/static/css/print.css)** — shared stylesheet: sets `@page { size: A4; margin: 15mm; }`, a `.print-document` wrapper, `.print-header` (title + date row with a bottom rule), `table.print-table`/`table.print-fields` (bordered field/data tables), and `.no-print` (hidden via `@media print`) for the toolbar.
+- **[static/css/print.css](pyproj/static/css/print.css)** — shared stylesheet: sets `@page { size: A4; margin: 15mm; }`, a `.print-document` wrapper, `.print-header` (heading + date on the left, logo + QR code on the right, with a bottom rule), `table.print-table`/`table.print-fields` (bordered field/data tables), and `.no-print` (hidden via `@media print`) for the toolbar.
 - Each printable page gets its own minimal template (e.g. [erp/batch_print.html](pyproj/erp/templates/erp/batch_print.html)) extending `device/base-print.html`, plus a dedicated view/URL (e.g. `batch_print` at `/batches/<id>/print/`) rather than reusing the detail page's view/template — this keeps the print layout free to diverge from the interactive UI (buttons, status icons, sidebar) without fighting it via CSS overrides.
 - The source page links to the print page with a print icon button (`<i class="cil-print"></i>`) opening in a new tab (`target="_blank"`) — see the Print button on [erp/batch_edit.html](pyproj/erp/templates/erp/batch_edit.html).
+- Printable pages include a QR code (see below) of the *originating* page's URL (not the `/print/` URL), so a printed copy can be scanned to jump straight back to the live record — the print view builds this with `request.build_absolute_uri(reverse(...))` to the normal detail view, not `request.path`.
+
+## QR Codes
+
+`qrcode` (PyPI, uses Pillow — already a dependency) generates QR codes **server-side**, not via a JS library, so the generated `<img>` is plain HTML by the time a page is printed or exported to PDF — no dependency on a browser finishing a canvas render before `window.print()` fires, and it works in non-browser contexts too (future PDF export, label-printing management commands).
+
+- **[device/qr.py](pyproj/device/qr.py)** — `generate_qr_data_uri(value, *, box_size=8, border=2)`: renders any string (a URL or other value) to a QR code PNG and returns it as a `data:image/png;base64,...` URI, ready to drop straight into an `<img src="...">` with no extra view, endpoint, or static file.
+- **[device/templatetags/qr_tags.py](pyproj/device/templatetags/qr_tags.py)** — `{% load qr_tags %}` then `{{ value|qr_code }}` wraps `generate_qr_data_uri()` as a template filter; returns `''` for a falsy value.
+- First use: the Batch print page (see Printable Pages above) renders a QR code of the batch's own detail-page URL in the header.
 
 ## Version Number
 
@@ -318,6 +327,7 @@ This project is licensed under the **GNU Affero General Public License v3 or lat
 - **fusionextractor >=1.2.0** — extracts BOM, board, schematic, and PCB render images from Autodesk Fusion Electronics `.f3z` files
 - **zipfile-zstd** — zstd codec support for `zipfile`; required to read zstd-compressed entries inside `.f3z` nested archives (e.g. the PCB 3D View thumbnail)
 - **requests** — used directly (not via any supplier Python library) for DigiKey OAuth token exchange, token refresh, and v4 API calls, for Mouser REST API calls, and for LCSC's unofficial JSON API (`_lcsc_search()` in `erp/views.py` — the `lcsc` PyPI package was dropped because it requires Python >=3.13, which the production/test uWSGI deployment doesn't support)
+- **qrcode** — generates QR codes server-side (see QR Codes above), using Pillow as its image backend
 
 ## Frontend Libraries (CDN)
 

@@ -1,5 +1,6 @@
 {% extends "device/base-print.html" %}
 {% load static %}
+{% load qr_tags %}
 
 {% block title %}
     Batch #{{ batch.pk }} - SuperHouse Device Register
@@ -12,7 +13,13 @@
                 <h1>Production Batch #{{ batch.pk }}</h1>
                 <div class="print-header-date">{{ batch.created_dt|date:"j-M-Y" }}</div>
             </div>
-            <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse" class="print-header-logo">
+            <div class="print-header-brand">
+                <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse" class="print-header-logo">
+                <div class="print-header-qr">
+                    <img src="{{ batch_url|qr_code }}" alt="QR code linking to this batch online">
+                    <div class="print-header-qr-caption">Scan to view online</div>
+                </div>
+            </div>
         </div>
 
         <table class="print-table print-fields">

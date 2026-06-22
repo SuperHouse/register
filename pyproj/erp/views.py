@@ -1819,7 +1819,8 @@ def batch_edit(request, batch_id):
 @staff_member_required
 def batch_print(request, batch_id):
     batch = get_object_or_404(Batch.objects.select_related('design__client'), pk=batch_id)
-    ctx = {'batch': batch}
+    batch_url = request.build_absolute_uri(reverse('erp:batch_edit', args=[batch.pk]))
+    ctx = {'batch': batch, 'batch_url': batch_url}
     return render(request, 'erp/batch_print.html', ctx)
 
 
