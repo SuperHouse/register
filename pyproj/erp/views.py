@@ -730,6 +730,22 @@ def _digikey_price_breaks(variation):
     return price_breaks
 
 
+def _mouser_price_breaks(p):
+    """Extract price breaks from a Mouser Part's PriceBreaks list.
+
+    Unlike DigiKey/LCSC, Mouser's Price field is a string with a currency
+    symbol prefix (e.g. "$0.3600"), so it needs stripping before storage.
+    """
+    import re
+    price_breaks = []
+    for pb in (p.get('PriceBreaks') or []):
+        qty = pb.get('Quantity')
+        price = re.sub(r'[^\d.]', '', pb.get('Price') or '')
+        if qty is not None and price:
+            price_breaks.append({'quantity': qty, 'price': price, 'currency': pb.get('Currency') or 'USD'})
+    return price_breaks
+
+
 def _propagate_digikey_sibling_data(listing, variations):
     """Save price breaks and MOQ for every PartSourceVariant under listing found in variations.
 
@@ -969,9 +985,10 @@ def part_source_fetch_mouser(request):
         source_saved = False
         if part and not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
             listing = _get_or_create_supplier_listing(part, 'Mouser', manufacturer_pn, stock)
-            PartSourceVariant.objects.create(
+            variant = PartSourceVariant.objects.create(
                 source=listing, supplier_sku=mouser_pn, packaging=packaging, url=product_url, moq=moq,
             )
+            _save_price_breaks(variant, _mouser_price_breaks(p))
             source_saved = True
 
         return JsonResponse({
@@ -1366,6 +1383,7 @@ def part_source_refresh(request, variant_id):
             supplier_description = p.get('Description') or ''
             image_remote_url = p.get('ImagePath') or ''
             image_filename_prefix = f'mouser_{sku.replace("/", "_")}'
+            _save_price_breaks(variant, _mouser_price_breaks(p))
 
         elif 'element14' in supplier or 'farnell' in supplier or 'newark' in supplier:
             api_key = os.environ.get('ELEMENT14_API_KEY', '').strip()
