@@ -1771,6 +1771,28 @@ def batch_list(request):
 
 
 @staff_member_required
+def batch_list_data(request):
+    """JSON snapshot of every batch's production stage statuses, for polling on the Batches list page."""
+    batches = Batch.objects.prefetch_related('production_stages')
+    return JsonResponse({
+        'batches': [
+            {
+                'id': batch.pk,
+                'stages': [
+                    {
+                        'name': stage.name,
+                        'status_display': stage.get_status_display(),
+                        'color_class': stage.get_status_color_class(),
+                    }
+                    for stage in batch.production_stages.all()
+                ],
+            }
+            for batch in batches
+        ],
+    })
+
+
+@staff_member_required
 def batch_add(request):
     if request.method == 'POST':
         form = BatchForm(request.POST)

@@ -59,6 +59,7 @@ urlpatterns = [
     path('settings/production-stage-templates/<int:template_id>/reorder-steps/', views.production_stage_template_step_reorder, name='production_stage_template_step_reorder'),
 
     path('batches/', views.batch_list, name='batch_list'),
+    path('batches/data/', views.batch_list_data, name='batch_list_data'),
     path('batches/add/', views.batch_add, name='batch_add'),
     path('batches/<int:batch_id>/', views.batch_edit, name='batch_edit'),
     path('batches/<int:batch_id>/print/', views.batch_print, name='batch_print'),

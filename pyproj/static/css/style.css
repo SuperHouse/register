@@ -282,3 +282,35 @@ tr.highlight th {
         order: 0;
     }
 }
+
+/* "Display mode": a clean, kiosk-style view with navigation hidden, toggled via
+   enterDisplayMode() in script.js. #display-mode-btn is the id used by every
+   page's Display button. */
+body.display-mode aside#sidebar {
+    display: none !important;
+}
+body.display-mode header.header {
+    display: none !important;
+}
+body.display-mode footer.footer {
+    display: none !important;
+}
+body.display-mode h1.h3 {
+    display: none !important;
+}
+body.display-mode #display-mode-btn {
+    display: none !important;
+}
+/* General-purpose hook for other page-specific elements (e.g. an "Add" button)
+   that should also disappear in display mode. */
+body.display-mode .hide-in-display-mode {
+    display: none !important;
+}
+/* CoreUI sidebar-fixed reserves space via --cui-sidebar-occupy-start; zero it out */
+body.display-mode {
+    --cui-sidebar-occupy-start: 0 !important;
+}
+body.display-mode .body.flex-grow-1 {
+    margin-left: 0 !important;
+    transition: none !important;
+}

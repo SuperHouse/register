@@ -1,3 +1,30 @@
+// Enters "display mode": hides the sidebar, header, footer, page heading, and the
+// triggering button itself, leaving only the page's own content visible (see .display-mode
+// rules in style.css). Exiting requires reloading the page without a ?display=1 marker.
+function enterDisplayMode() {
+    document.body.classList.add('display-mode');
+}
+
+// Reloads the current page, preserving display mode across the reload if it's currently
+// active (via a ?display=1 marker), unlike a plain location.reload(). Pages that need to
+// resync themselves (e.g. polling that detects added/removed rows) should call this instead
+// of location.reload() so a background refresh doesn't silently exit display mode.
+function reloadPreservingDisplayMode() {
+    const url = new URL(window.location.href);
+    if (document.body.classList.contains('display-mode')) {
+        url.searchParams.set('display', '1');
+    } else {
+        url.searchParams.delete('display');
+    }
+    window.location.href = url.toString();
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (new URLSearchParams(window.location.search).get('display') === '1') {
+        enterDisplayMode();
+    }
+});
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {

@@ -20,29 +20,6 @@
         .stat-updated {
             animation: stat-update-glow 1s ease-out;
         }
-        body.display-mode aside#sidebar {
-            display: none !important;
-        }
-        body.display-mode header.header {
-            display: none !important;
-        }
-        body.display-mode footer.footer {
-            display: none !important;
-        }
-        body.display-mode h1.h3 {
-            display: none !important;
-        }
-        body.display-mode #display-mode-btn {
-            display: none !important;
-        }
-        /* CoreUI sidebar-fixed reserves space via --cui-sidebar-occupy-start; zero it out */
-        body.display-mode {
-            --cui-sidebar-occupy-start: 0 !important;
-        }
-        body.display-mode .body.flex-grow-1 {
-            margin-left: 0 !important;
-            transition: none !important;
-        }
     </style>
 {% endblock extra_head %}
 
@@ -114,10 +91,6 @@
     <script>
         let chart = null;
         let lastChartData = null;
-
-        function enterDisplayMode() {
-            document.body.classList.add('display-mode');
-        }
 
         function initChart(labels, data) {
             const ctx = document.getElementById('devicesChart');

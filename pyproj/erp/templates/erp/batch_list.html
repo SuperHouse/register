@@ -9,8 +9,13 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div class="d-flex justify-content-end mb-3">
-        <a href="{% url 'erp:batch_add' %}" class="btn btn-primary">
+    <div class="d-flex justify-content-end gap-2 mb-3">
+        <button id="display-mode-btn" class="btn btn-sm btn-outline-secondary"
+                title="Enter display mode (hides navigation)"
+                onclick="enterDisplayMode()">
+            <i class="cil-fullscreen icon"></i> Display
+        </button>
+        <a href="{% url 'erp:batch_add' %}" class="btn btn-primary hide-in-display-mode">
             <i class="cil-plus"></i> Add Batch
         </a>
     </div>
@@ -20,6 +25,7 @@
             <table class="table table-striped align-middle">
                 <thead>
                     <tr class="highlight">
+                        <th></th>
                         <th></th>
                         <th>Design</th>
                         <th>PO</th>
@@ -31,7 +37,8 @@
                 </thead>
                 <tbody>
                     {% for batch in batches %}
-                        <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                        <tr data-batch-id="{{ batch.pk }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                            <td>#{{ batch.pk }}</td>
                             <td style="width: 70px; padding: 4px 8px;">
                                 {% with batch.design.pcb_top_assets|first as pcb_top %}
                                     {% if pcb_top %}
@@ -46,7 +53,7 @@
                             <td>{{ batch.quantity }}</td>
                             <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
                             <td>
-                                <div class="d-flex gap-1">
+                                <div class="d-flex gap-1 batch-progress">
                                     {% for stage in batch.production_stages.all %}
                                         <span class="rounded {{ stage.get_status_color_class }}"
                                               style="width: 14px; height: 14px;"
@@ -62,7 +69,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="7"><i>There are no batches yet.</i></td>
+                            <td colspan="8"><i>There are no batches yet.</i></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -70,3 +77,52 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_js %}
+    <script>
+        function renderBatchProgress(container, stages) {
+            container.innerHTML = stages.map(stage =>
+                `<span class="rounded ${stage.color_class}" style="width: 14px; height: 14px;" title="${stage.name}: ${stage.status_display}"></span>`
+            ).join('');
+        }
+
+        async function updateBatchList() {
+            try {
+                const response = await fetch('{% url "erp:batch_list_data" %}');
+                if (!response.ok) {
+                    console.error('Failed to fetch batch list data:', response.status);
+                    return;
+                }
+
+                const data = await response.json();
+
+                const renderedIds = Array.from(document.querySelectorAll('tbody tr[data-batch-id]'))
+                    .map(row => row.dataset.batchId);
+                const fetchedIds = data.batches.map(batch => String(batch.id));
+
+                // If batches were added or removed, reload to resync the whole table
+                // rather than reconstructing rows here.
+                const sameBatches = renderedIds.length === fetchedIds.length
+                    && renderedIds.every(id => fetchedIds.includes(id));
+                if (!sameBatches) {
+                    reloadPreservingDisplayMode();
+                    return;
+                }
+
+                data.batches.forEach(batch => {
+                    const row = document.querySelector(`tr[data-batch-id="${batch.id}"]`);
+                    const container = row && row.querySelector('.batch-progress');
+                    if (container) {
+                        renderBatchProgress(container, batch.stages);
+                    }
+                });
+            } catch (error) {
+                console.error('Error updating batch list:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            setInterval(updateBatchList, 30000);
+        });
+    </script>
+{% endblock extra_js %}
