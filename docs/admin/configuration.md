@@ -20,7 +20,8 @@ All configuration is done via `pyproj/.env`. Copy `.env.template` as a starting 
 | `EMAIL_PORT` | SMTP port |
 | `EMAIL_HOST_USER` | SMTP username |
 | `EMAIL_HOST_PASSWORD` | SMTP password |
-| `EMAIL_USE_TLS` | `True` to use TLS |
+| `EMAIL_USE_TLS` | `True` to use TLS (STARTTLS, typically port 587). Default `True`. |
+| `EMAIL_USE_SSL` | `True` to use SSL instead of TLS (typically port 465). Default `False`. Only one of `EMAIL_USE_TLS`/`EMAIL_USE_SSL` should be `True`. |
 
 ## DigiKey API
 

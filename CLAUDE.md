@@ -10,7 +10,7 @@ register/
 │   ├── authuser/       # Custom user model app
 │   ├── conf/           # Django settings, URLs, middleware
 │   ├── api/            # Django Ninja API app: NinjaAPI instance, shared router, auth
-│   ├── crm/            # Org (client/customer) model, organisation views, API endpoint
+│   ├── crm/            # Org (client/customer) model, organisation + user management views, API endpoints
 │   ├── erp/            # ERP app: Settings hub, Production Stages and Production Stage Templates (for future Batch tracking)
 │   ├── pcba/           # Placeholder app; pcba.designs holds a WIP redesign of Design/DesignAsset (not yet in use)
 │   ├── device/         # Main app: all PCB/device logic, API endpoints, views
@@ -77,7 +77,7 @@ The hierarchy is: **Org → Design → Device → TestRecord / DeviceEvent / Dev
 
 | Model | App | Description | Key fields |
 |---|---|---|---|
-| `Org` | `crm` | Organisation/customer | `company_name`, `logo`, `api_key`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier` |
+| `Org` | `crm` | Organisation/customer | `company_name`, `logo`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier` |
 | `Design` | `device` | PCB board type | `sku`, `hw_version` (unique together), `client` (FK → `crm.Org`), `price` |
 | `DesignAsset` | `device` | File attached to a design | `design`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
 | `DeviceAsset` | `device` | File attached to a device | `device`, `file`, `name`, `description`, `asset_type`, `uploaded_dt`, `internal` |
@@ -119,19 +119,24 @@ Holds the shared Django Ninja API plumbing, split out of `device.api`.
 
 - **[app.py](pyproj/api/app.py)** — The `NinjaAPI` instance (`api`), with docs gated behind `@staff_member_required`. Mounted at `/api/v1/` in `conf/urls.py`.
 - **[routes.py](pyproj/api/routes.py)** — The shared `router` (auth via `AuthByApiKey`), added to `api` via `api.add_router("/", router)`. Endpoint modules (e.g. `device/api.py`) import this `router` and decorate functions on it.
-- **[auth.py](pyproj/api/auth.py)** — `AuthByApiKey` (API-key + IP-allowlist auth for the shared router) and `session_or_api_key_auth` (accepts either a Django session or an API key, used for endpoints like `dashboard-stats/`).
+- **[auth.py](pyproj/api/auth.py)** — `AuthByApiKey` (IP-allowlist check, then looks up `authuser.User.objects.filter(api_key=key, is_active=True)` — the auth class used by default on the shared `router`) and `session_or_api_key_auth` (accepts either a Django session or an `X-API-Key` header, resolving to the same `{'auth_type': ..., 'user': <User>}` shape either way; used by endpoints like `dashboard-stats/` that need to support both browser polling and API-key access). API keys are per-`User` (see API Keys below), not per-`Org`.
 
-**Known issue (WIP):** `device/api.py` calls `@router.get('dashboard-stats/', auth=session_or_api_key_auth, ...)` but does not import `session_or_api_key_auth` from `api.auth` — the equivalent function is defined but commented out locally in `device/api.py`. This will raise a `NameError` on import until fixed.
+**Endpoint module registration:** endpoint modules (`device/api.py`, `crm/views/api.py`) only register their routes on the shared `router` when imported, since the `@router.get(...)`/`@router.post(...)` decorators run at import time. `conf/urls.py` imports both modules explicitly (`from device import api as device_api`, `from crm.views import api as crm_api`) purely for that import side effect — removing those imports would silently empty the API of everything except whatever a test happens to import directly.
 
 ### `crm`
 
-Organisation (customer/supplier/manufacturer) data.
+Organisation (customer/supplier/manufacturer) data, plus staff user management. `crm.views` is a package (not a single module):
 
-- **[models.py](pyproj/crm/models.py)** — `Org` model (formerly `Client` in `device`). Fields: `company_name`, `logo`, `api_key`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier`.
-- **[views.py](pyproj/crm/views.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` views (all staff-only); this is the module actually wired up in `conf/urls.py`. Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design.
+- **[models.py](pyproj/crm/models.py)** — `Org` model (formerly `Client` in `device`). Fields: `company_name`, `logo`, M2M `users`, `is_client`, `is_manufacturer`, `is_supplier`.
+- **[schema.py](pyproj/crm/schema.py)** — `ClientSchema` (Django Ninja `ModelSchema` over `Org`, fields `id`/`company_name`), used by `views/api.py`'s `get_clients` endpoint.
+- **[forms.py](pyproj/crm/forms.py)** — `UserForm`: a `ModelForm` over `authuser.User` (`email`, `full_name`, `preferred_name`, `is_staff`, `is_active`) plus a manually-declared `orgs` `ModelMultipleChoiceField` (since `Org.users` is declared on `Org`, not `User` — `orgs` is initialised from/saved to the reverse `user.org_set` M2M accessor in `__init__`/`save()`). Deliberately excludes `is_superuser` (admin-only) and password (new users get a "set your password" email instead — see API Keys / onboarding below).
+- **[views/organisations.py](pyproj/crm/views/organisations.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` (all staff-only); this is what `conf/urls.py` wires up for the `organisation_*` URL names. Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design. Member users in the detail page's Users row link to their `user_edit` page (see below).
+- **[views/users.py](pyproj/crm/views/users.py)** — staff-only user management: `user_list` (searchable over `full_name`/`email`, paginated, same shape as `organisation_list`), `user_add` / `user_edit` (share one template, `device/templates/device/user_edit.html` — org membership, staff/active flags, and the user's API key with a Regenerate button), `user_regenerate_key` (POST-only, calls `User.regenerate_api_key()`). `user_add` creates the account with `set_unusable_password()` then sends a "set your password" email via Django's `PasswordResetForm`, reusing the same templates/from-address as `authuser.views.SuperHousePasswordResetView` (see API Keys below) so onboarding emails look identical to a self-service password reset.
+- **[views/api.py](pyproj/crm/views/api.py)** — `get_clients` (`GET /api/v1/clients/`), decorated onto the shared `router` imported from `api.routes`.
+- **[views/\_\_init\_\_.py](pyproj/crm/views/__init__.py)** — re-exports the view functions from `organisations.py` and `users.py` by name, so `conf/urls.py`'s `from crm import views as crm_views` keeps working unchanged regardless of which submodule a view actually lives in.
 - **[admin.py](pyproj/crm/admin.py)** — Registers `Org` with the Django admin.
 - **[context_processor.py](pyproj/crm/context_processor.py)** — `get_client_logo_processor`: injects `client_logo` and `client_name` into all templates for non-staff users.
-- **`views/` directory (WIP, currently unused/broken)** — `crm/views/api.py`, `crm/views/schema.py`, and `crm/views/__init__..py` (note the double dot — not a valid `__init__.py`) are leftovers from an in-progress attempt to split `crm/views.py` into a package. Because `__init__..py` isn't a real package init, `crm.views` still resolves to `crm/views.py` above. These files reference modules that don't exist (`device.views.forms`, `device.views.router`, `views.schema`) and should either be finished or removed.
+- Sidebar: staff users see a "Users" link (`user_list`) directly below "Organisations".
 
 ### `erp`
 
@@ -218,7 +223,7 @@ All PCB business logic lives here.
 
 - **[models.py](pyproj/device/models.py)** — All device models, plus the still-current `Design`/`DesignAsset` (see `pcba` above for their planned eventual replacements). `get_dt_as_string()` suppresses time display when stored with the sentinel `witching_hour` (3:14:15 AM local time), used for date-only imports.
 - **[views.py](pyproj/device/views.py)** — Django views. Non-staff users only see data belonging to their associated `Org`(s). List pages (Boards, Designs) use server-side filtering (not client-side) so filtering works correctly with pagination. Designs list is paginated. Device asset views (`device_asset_add`, `device_asset_edit`, `device_asset_delete`) mirror the design asset views.
-- **[api.py](pyproj/device/api.py)** — Device/design/test-record API endpoints, decorated onto the shared `router` imported from `api.routes`. See the `api` app above for the router/auth setup, and the known `session_or_api_key_auth` issue.
+- **[api.py](pyproj/device/api.py)** — Device/design/test-record API endpoints, decorated onto the shared `router` imported from `api.routes`. See the `api` app above for the router/auth setup. `add_device_image` checks access via org membership (`device.design.client.users.filter(pk=request.auth.pk).exists()`) rather than a single-org equality check, since a user can belong to more than one `Org`.
 - **[schemas.py](pyproj/device/schemas.py)** — Pydantic schemas for the device API endpoints.
 - **[admin.py](pyproj/device/admin.py)** — Django admin config at `/office/`.
 - **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`. Note: design and organisation URLs are in `conf/urls.py`, not here.
@@ -229,9 +234,10 @@ All PCB business logic lives here.
 
 ### `authuser`
 
-Custom user model using **email as username** instead of a username field. Users have `full_name`, `preferred_name`, and `avatar_type` (initials or Gravatar).
+Custom user model using **email as username** instead of a username field. Users have `full_name`, `preferred_name`, `avatar_type` (initials or Gravatar), and `api_key` (see API Keys below).
 
-- **[models.py](pyproj/authuser/models.py)** — `User` extends `AbstractBaseUser`. Get it via `from django.contrib.auth import get_user_model`.
+- **[models.py](pyproj/authuser/models.py)** — `User` extends `AbstractBaseUser`. Get it via `from django.contrib.auth import get_user_model`. `api_key` is a unique, nullable `CharField`; `regenerate_api_key()` sets it to `secrets.token_urlsafe(32)`, saves, and returns the new key — the single place both the self-service and staff-side regenerate actions call, so key generation logic isn't duplicated.
+- **[views.py](pyproj/authuser/views.py)** / **[urls.py](pyproj/authuser/urls.py)** — alongside the existing `user_settings` page (`/accounts/settings/`), `user_settings_regenerate_key` (`/accounts/settings/regenerate-key/`, POST-only) lets a user regenerate their own API key from their settings page. Named distinctly from `crm.views.users.user_regenerate_key` (the staff-side equivalent) since neither app namespaces its URLs.
 
 ### `conf`
 
@@ -246,13 +252,13 @@ Django project configuration.
 
 Base URL: `/api/v1/` — implemented with [Django Ninja](https://django-ninja.dev/).
 
-**Authentication:** `X-API-Key: <key>` header OR Django session cookies. Keys are stored on `Org` objects. API key requests are restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
+**Authentication:** `X-API-Key: <key>` header OR Django session cookies. Keys are stored per-`User` (`authuser.User.api_key`), not per-`Org` — see API Keys below. API key requests are restricted by IP (localhost always allowed; configure `API_ALLOW_IPV4_SUBNET` for other subnets).
 
 Key endpoints:
 
 | Method | URL | Description | Auth |
 |---|---|---|---|
-| GET | `/api/v1/clients/` | List all clients (currently **not registered** — only exists in the broken `crm/views/api.py`, see `crm` app notes) | API key |
+| GET | `/api/v1/clients/` | List all clients | API key |
 | GET | `/api/v1/designs/` | List designs (filter with `?client_pk=`) | API key |
 | POST | `/api/v1/device/add/` | Create or update a device | API key |
 | GET | `/api/v1/device/{pk}/` | Get device details | API key |
@@ -270,8 +276,16 @@ Full documentation in [API.md](API.md).
 - **Non-staff users** only see `Org`, `Design`, and `Device` objects associated with their user account via the `Org.users` M2M relationship.
 - Internal `DeviceEvent` records (`internal=True`) are hidden from non-staff users.
 - All views require login (enforced by `login_required` middleware).
-- **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling).
+- **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist, resolved to a `User` (see API Keys below); inactive users' keys stop working immediately. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling) and scopes results to that user's orgs unless they're staff.
 - Internal `DesignAsset` and `DeviceAsset` records (`internal=True`) are hidden from non-staff users.
+
+## API Keys
+
+API keys are per-`User` (`authuser.User.api_key`), not per-`Org` as in earlier versions of this app — a key authenticates as a specific user and is scoped to that user's orgs (or all orgs, if they're staff), rather than a single fixed org. Keys are **display + regenerate only**, never free text: `User.regenerate_api_key()` is the only way a key gets a value, so neither staff nor users can set a weak or guessable key by hand.
+
+- **Self-service**: the user's own settings page (`/accounts/settings/`, `authuser.views.user_settings`) shows their current key and a "Regenerate" button.
+- **Staff, on behalf of another user**: the Users management page (`/users/<id>/`, `crm.views.users.user_edit`) shows the same thing for any user.
+- **Onboarding**: staff-created users (`crm.views.users.user_add`) get an unusable password and an emailed "set your password" link (reusing `authuser.views.SuperHousePasswordResetView`'s templates/from-address) rather than a key being set up front — they'd regenerate their own key from settings once they're logged in, if they need API access.
 
 ## Configuration / Environment
 
@@ -284,7 +298,8 @@ Environment variables are loaded from `pyproj/.env` (see `.env.template`):
 | `DEMO_MODE` | `True` hides sensitive data in the UI |
 | `API_ALLOW_IPV4_SUBNET` | Additional IPv4 CIDR block allowed to use the API (e.g. `10.0.0.0/24`) |
 | `ENABLE_GRAVATAR` | `True` to allow Gravatar avatars |
-| `EMAIL_HOST` / `EMAIL_PORT` / etc. | SMTP settings for password reset emails |
+| `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` | SMTP settings for password reset and onboarding emails |
+| `EMAIL_USE_TLS` / `EMAIL_USE_SSL` | `True`/`False` to select TLS vs SSL for the SMTP connection (default TLS on, SSL off). Must use these exact Django setting names — `EMAIL_TLS`/`EMAIL_SSL` are not real settings and are silently ignored. |
 | `DIGIKEY_CLIENT_ID` | DigiKey OAuth2 client ID (from developer.digikey.com) |
 | `DIGIKEY_CLIENT_SECRET` | DigiKey OAuth2 client secret |
 | `DIGIKEY_STORAGE_PATH` | Absolute path to directory where the DigiKey OAuth token is stored (e.g. `pyproj/.digikey`) |
