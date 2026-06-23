@@ -47,3 +47,15 @@ def test_goodauth_passes(create_users_and_user_data):
     api_client = TestClientWithAuth(router, data['api-key'])
     response = api_client.get('get_clients')
     assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_inactive_user_auth_fails(create_users_and_user_data):
+    data = create_users_and_user_data
+    user1 = data['user1']
+    user1.is_active = False
+    user1.save()
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_clients')
+    assert response.status_code == 401

@@ -34,15 +34,11 @@
                             <th>Users:</th>
                             <td>
                                 {% for user in client.users.all %}
-                                    {{ user.full_name|default:user.email }}{% if not forloop.last %}, {% endif %}
+                                    <a href="{% url 'user_edit' user.pk %}">{{ user.full_name|default:user.email }}</a>{% if not forloop.last %}, {% endif %}
                                 {% empty %}
                                     <i>No users</i>
                                 {% endfor %}
                             </td>
-                        </tr>
-                        <tr>
-                            <th>API Key:</th>
-                            <td>{{ client.api_key|default:"<i>Not set</i>" }}</td>
                         </tr>
                         <tr>
                             <th>Boards:</th>

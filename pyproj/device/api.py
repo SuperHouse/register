@@ -123,22 +123,16 @@ def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema],
     The image datetime can be extracted from the filename if it matches the pattern:
     id-YYYY-MM-DD_h-m-s (e.g., "123-2024-01-15_14-30-45")
     """
-    # Get the API key from the authenticated request
-    api_key = request.auth
-    if not api_key:
+    # Get the authenticated user from the API key
+    user = request.auth
+    if not user:
         return 403, {'message': 'Authentication required'}
-    
-    # Get the client associated with this API key
-    try:
-        client = Org.objects.get(api_key=api_key)
-    except Org.DoesNotExist:
-        return 403, {'message': 'Invalid API key'}
-    
+
     # Get the device
     device = get_object_or_404(Device, pk=device_pk)
-    
-    # Verify that the device's design's client matches the API key's client
-    if device.design.client != client:
+
+    # Verify that the API key's user belongs to the org that owns the device's design
+    if not device.design.client.users.filter(pk=user.pk).exists():
         return 403, {'message': 'API key does not have access to this device'}
     
     # Extract datetime from filename if it matches the pattern
@@ -198,24 +192,16 @@ def get_dashboard_stats(request):
         # This shouldn't happen due to auth, but be explicit
         return 401, {'message': 'Unauthorized'}
 
-    # Determine access level based on auth type
-    if auth_info['auth_type'] == 'session':
-        user = auth_info['user']
-        clients = Org.objects.all()
-        designs = Design.objects.all()
-        devices = Device.objects.all()
+    # Both session and API-key auth resolve to a user; scope to their orgs unless staff
+    user = auth_info['user']
+    clients = Org.objects.all()
+    designs = Design.objects.all()
+    devices = Device.objects.all()
 
-        if not user.is_staff:
-            clients = clients.filter(users=user)
-            designs = designs.filter(client__in=clients)
-            devices = devices.filter(design__client__in=clients)
-
-    else:  # api_key auth
-        api_key = auth_info['key']
-        client = Org.objects.get(api_key=api_key)
-        clients = Org.objects.filter(pk=client.pk)
-        designs = Design.objects.filter(client=client)
-        devices = Device.objects.filter(design__client=client)
+    if not user.is_staff:
+        clients = clients.filter(users=user)
+        designs = designs.filter(client__in=clients)
+        devices = devices.filter(design__client__in=clients)
 
     # Calculate devices created per month
     devices_by_month = (

@@ -1,6 +1,6 @@
+from api.routes import router
 from crm.models import Org
-from views.schema import ClientSchema
-from device.views import router
+from crm.schema import ClientSchema
 
 
 @router.get('clients/', response=list[ClientSchema])

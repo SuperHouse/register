@@ -23,6 +23,8 @@ from django.views.generic.base import RedirectView
 from django.views.static import serve
 
 from api.app import api
+from device import api as device_api  # noqa: F401 — registers device endpoints on the shared router
+from crm.views import api as crm_api  # noqa: F401 — registers crm endpoints on the shared router
 from crm import views as crm_views
 from device import views as device_views
 
@@ -38,6 +40,10 @@ urlpatterns = [
     path('organisation/', crm_views.organisation_list, name='organisation_list'),
     path('organisation/<int:client_id>/', crm_views.organisation_detail, name='organisation_detail'),
     path('organisation/<int:client_id>/edit/', crm_views.organisation_edit, name='organisation_edit'),
+    path('users/', crm_views.user_list, name='user_list'),
+    path('users/add/', crm_views.user_add, name='user_add'),
+    path('users/<int:user_id>/', crm_views.user_edit, name='user_edit'),
+    path('users/<int:user_id>/regenerate-key/', crm_views.user_regenerate_key, name='user_regenerate_key'),
     path('', include('erp.urls')),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),

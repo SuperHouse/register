@@ -385,3 +385,49 @@ def test_add_image_to_test_record(create_some_test_records):
 
     # Remove the saved image file from storage
     new_ti.image.delete()
+
+
+def test_add_device_image(create_users_and_user_data):
+    def generate_tinypic():
+        f = io.BytesIO()
+        img = Image.new('RGB', (10, 10), 'white')
+        img.save(f, format='png')
+        f.name = 'test.png'
+        f.seek(0)
+
+        return f
+
+    data = create_users_and_user_data
+
+    u1d = data['user1_device']
+    u2d = data['user2_device']
+    user2 = data['user2']
+    user2.api_key = 'api-key-for-testing-2'
+    user2.save()
+
+    user1_client = TestClientWithAuth(router, data['api-key'])
+    user2_client = TestClientWithAuth(router, user2.api_key)
+
+    # A user can add an image to a device belonging to their own org
+    uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
+    response = user1_client.post(
+        'add_device_image', kwargs={'device_pk': u1d.pk}, data={'notes': 'Nominal'}, FILES={'file': uploaded_file}
+    )
+    assert response.status_code == 200
+    assert u1d.deviceimage_set.count() == 1
+
+    # A user can't add an image to a device belonging to a different org
+    uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
+    response = user2_client.post(
+        'add_device_image', kwargs={'device_pk': u1d.pk}, data={'notes': 'Nominal'}, FILES={'file': uploaded_file}
+    )
+    assert response.status_code == 403
+    assert u1d.deviceimage_set.count() == 1
+
+    # A user can add an image to a device belonging to their own org (sanity check on user2/device2)
+    uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
+    response = user2_client.post(
+        'add_device_image', kwargs={'device_pk': u2d.pk}, data={'notes': 'Nominal'}, FILES={'file': uploaded_file}
+    )
+    assert response.status_code == 200
+    assert u2d.deviceimage_set.count() == 1

@@ -107,6 +107,23 @@
                     </form>
                 </div>
             </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">API Key</h5>
+                    <p>
+                        {% if user.api_key %}
+                            <code>{{ user.api_key }}</code>
+                        {% else %}
+                            <i>Not set</i>
+                        {% endif %}
+                    </p>
+                    <form method="post" action="{% url 'user_settings_regenerate_key' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-secondary">Regenerate Key</button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock content %}

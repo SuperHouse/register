@@ -12,10 +12,11 @@ from crm.models import Org
 # Helper: Create two users, and some corresponding client, design and device data
 @pytest.fixture
 def create_users_and_user_data(django_user_model):
-    client1 = Org(company_name='Client One', api_key='api-key-for-testing-1')
+    client1 = Org(company_name='Client One')
     client1.save()
     user1 = django_user_model.objects.create_user(email='user1@example.com', password='pass1')
     user1.client = client1
+    user1.api_key = 'api-key-for-testing-1'
     user1.save()
     client1.users.add(user1)
     design1 = Design(client=client1, sku='C1A', name='Client One Design One', hw_version='1.0')
@@ -41,7 +42,7 @@ def create_users_and_user_data(django_user_model):
         'user1_device': device1,
         'user2': user2,
         'user2_device': device2,
-        'api-key': client1.api_key,
+        'api-key': user1.api_key,
     }
 
     return results

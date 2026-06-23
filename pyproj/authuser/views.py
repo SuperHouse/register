@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 from django.contrib.auth.views import (
     PasswordResetCompleteView,
     PasswordResetConfirmView,
@@ -50,3 +51,12 @@ def user_settings(request):
     return render(request, 'authuser/user_settings.html', {
         'form': form,
     })
+
+
+@login_required
+@require_POST
+def user_settings_regenerate_key(request):
+    request.user.regenerate_api_key()
+    messages.success(request, 'Your API key has been regenerated.')
+
+    return redirect('user_settings')
