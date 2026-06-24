@@ -22,21 +22,20 @@
             {% if pcb_top_asset or pcb_bottom_asset %}
                 <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
                     {% if pcb_top_asset %}
-                        <img src="{{ pcb_top_asset.file.url }}"
+                        <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
                              alt="PCB Top View"
                              class="rounded"
                              style="max-width: 400px; width: 100%;">
                     {% endif %}
                     {% if pcb_bottom_asset %}
-                        <img src="{{ pcb_bottom_asset.file.url }}"
+                        <img src="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}"
                              alt="PCB Bottom View"
                              class="rounded"
                              style="max-width: 400px; width: 100%;">
                     {% endif %}
                     {% if user.is_staff and pcb_top_asset and pcb_bottom_asset %}
                         <form method="post"
-                              action="{% url 'design_swap_pcb_images' design.pk %}"
-                              onsubmit="return confirm('Swap the PCB Top View and PCB Bottom View images?');">
+                              action="{% url 'design_swap_pcb_images' design.pk %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-sm btn-outline-secondary" title="Swap top/bottom images">
                                 <i class="bi bi-arrow-left-right"></i> Swap
