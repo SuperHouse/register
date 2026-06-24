@@ -81,6 +81,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'erp' and url_name|slice:":5" == "part_" and url_name|slice:":6" != "part_c" and url_name != "part_import_filter_list" %}active{% endif %}"
+                           href="{% url 'erp:part_list' %}">
+                            <i class="nav-icon cil-puzzle"></i>
+                            Parts
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if url_name == 'organisation_list' or url_name == 'organisation_detail' or url_name == 'organisation_edit' %}active{% endif %}"
                            href="{% url 'organisation_list' %}">
                             <i class="nav-icon cil-building"></i>
@@ -92,13 +99,6 @@
                            href="{% url 'user_list' %}">
                             <i class="nav-icon cil-people"></i>
                             Users
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if app_name == 'erp' and url_name|slice:":5" == "part_" and url_name|slice:":6" != "part_c" and url_name != "part_import_filter_list" %}active{% endif %}"
-                           href="{% url 'erp:part_list' %}">
-                            <i class="nav-icon cil-puzzle"></i>
-                            Parts
                         </a>
                     </li>
                     <li class="nav-item">
