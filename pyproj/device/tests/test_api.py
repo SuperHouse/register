@@ -11,6 +11,7 @@ from ninja.testing import TestClient
 from device.tests.test_clients_only_see_own_data import (
     create_users_and_user_data,
     create_some_test_records,
+    staff_api_key,
 )
 
 from device.api import router
@@ -53,13 +54,30 @@ class TestClientWithAuth(TestClient):
         return url.replace(cls.api_root, '')
 
 
-def test_list_clients(create_users_and_user_data):
+def test_list_clients_scoped_to_own_org(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1c = data['user1'].client
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_clients')
+    assert response.status_code == 200
+
+    expected_json = [
+        {'id': u1c.pk, 'company_name': u1c.company_name},
+    ]
+    actual_json = response.json()
+
+    assert actual_json == expected_json
+
+
+def test_list_clients_staff_sees_all(create_users_and_user_data, staff_api_key):
     data = create_users_and_user_data
 
     u1c = data['user1'].client
     u2c = data['user2'].client
 
-    api_client = TestClientWithAuth(router, data['api-key'])
+    api_client = TestClientWithAuth(router, staff_api_key)
     response = api_client.get('get_clients')
     assert response.status_code == 200
 
@@ -72,7 +90,32 @@ def test_list_clients(create_users_and_user_data):
     assert actual_json == expected_json
 
 
-def test_list_all_designs(create_users_and_user_data):
+def test_list_designs_scoped_to_own_org(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1c = data['user1'].client
+    u1design = data['user1_device'].design
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_designs')
+    assert response.status_code == 200
+
+    expected_json = [
+        {
+            'client': {'id': u1c.pk, 'company_name': u1c.company_name},
+            'id': u1design.pk,
+            'sku': u1design.sku,
+            'name': u1design.name,
+            'hw_version': u1design.hw_version,
+            'description': None,
+        },
+    ]
+    actual_json = response.json()
+
+    assert actual_json == expected_json
+
+
+def test_list_all_designs_staff_sees_all(create_users_and_user_data, staff_api_key):
     data = create_users_and_user_data
 
     u1c = data['user1'].client
@@ -80,7 +123,7 @@ def test_list_all_designs(create_users_and_user_data):
     u1design = data['user1_device'].design
     u2design = data['user2_device'].design
 
-    api_client = TestClientWithAuth(router, data['api-key'])
+    api_client = TestClientWithAuth(router, staff_api_key)
     response = api_client.get('get_designs')
     assert response.status_code == 200
 
@@ -107,23 +150,23 @@ def test_list_all_designs(create_users_and_user_data):
     assert actual_json == expected_json
 
 
-def test_list_designs_for_client(create_users_and_user_data):
+def test_list_designs_for_own_client(create_users_and_user_data):
     data = create_users_and_user_data
 
-    u2c = data['user2'].client
-    u2design = data['user2_device'].design
+    u1c = data['user1'].client
+    u1design = data['user1_device'].design
 
     api_client = TestClientWithAuth(router, data['api-key'])
-    response = api_client.get('get_designs', params={'client_pk': str(u2c.pk)})
+    response = api_client.get('get_designs', params={'client_pk': str(u1c.pk)})
     assert response.status_code == 200
 
     expected_json = [
         {
-            'client': {'id': u2c.pk, 'company_name': u2c.company_name},
-            'id': u2design.pk,
-            'sku': u2design.sku,
-            'name': u2design.name,
-            'hw_version': u2design.hw_version,
+            'client': {'id': u1c.pk, 'company_name': u1c.company_name},
+            'id': u1design.pk,
+            'sku': u1design.sku,
+            'name': u1design.name,
+            'hw_version': u1design.hw_version,
             'description': None,
         },
     ]
@@ -132,22 +175,44 @@ def test_list_designs_for_client(create_users_and_user_data):
     assert actual_json == expected_json
 
 
+def test_list_designs_for_other_clients_org_is_empty(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u2c = data['user2'].client
+
+    # user1's key can't see user2's org's designs even when explicitly asking for them
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_designs', params={'client_pk': str(u2c.pk)})
+    assert response.status_code == 200
+    assert response.json() == []
+
+
 def test_get_existing_device(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1d = data['user1_device']
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+    response = api_client.get('get_existing_device', kwargs={'device_pk': u1d.pk})
+    assert response.status_code == 200
+
+    expected_json = {
+        'design_pk': u1d.design.pk,
+        'creation_dt': dt_as_utc_in_json(u1d.creation_dt),
+    }
+    actual_json = response.json()
+
+    assert actual_json == expected_json
+
+
+def test_get_existing_device_other_org_fails(create_users_and_user_data):
     data = create_users_and_user_data
 
     u2d = data['user2_device']
 
     api_client = TestClientWithAuth(router, data['api-key'])
     response = api_client.get('get_existing_device', kwargs={'device_pk': u2d.pk})
-    assert response.status_code == 200
-
-    expected_json = {
-        'design_pk': u2d.design.pk,
-        'creation_dt': dt_as_utc_in_json(u2d.creation_dt),
-    }
-    actual_json = response.json()
-
-    assert actual_json == expected_json
+    assert response.status_code == 403
 
 
 def test_get_nonexistent_device_fails(create_users_and_user_data):
@@ -165,15 +230,14 @@ def test_get_nonexistent_device_fails(create_users_and_user_data):
 def test_add_or_update_device(create_users_and_user_data):
     data = create_users_and_user_data
 
-    u2d = data['user2_device']
-    u1design = data['user1_device'].design
+    u1d = data['user1_device']
 
     api_client = TestClientWithAuth(router, data['api-key'])
 
     # Test that we get a 400 for an existing device,
     # but with a design that doesn't exist
     data = {
-        'pk': u2d.pk,
+        'pk': u1d.pk,
         'design_pk': 999,
     }
     response = api_client.post('add_or_update_device', json=data)
@@ -182,48 +246,76 @@ def test_add_or_update_device(create_users_and_user_data):
     # For a device that already exists, test that the creation date changes
     # if the creation date is not provided (because it's set to now)
     data = {
-        'pk': u2d.pk,
-        'design_pk': u2d.design.pk,
+        'pk': u1d.pk,
+        'design_pk': u1d.design.pk,
     }
     response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert new_u2d.creation_dt != u2d.creation_dt
-
-    # For a device that already exists, test that we can
-    # change the design
-    data = {
-        'pk': u2d.pk,
-        'design_pk': u1design.pk,
-    }
-    response = api_client.post('add_or_update_device', json=data)
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert new_u2d.design.pk == u1design.pk
+    new_u1d = Device.objects.get(pk=u1d.pk)
+    assert new_u1d.creation_dt != u1d.creation_dt
 
     # For a device that already exists, test that we can
     # set the creation date
-    day_after = u2d.creation_dt + datetime.timedelta(days=1)
+    day_after = u1d.creation_dt + datetime.timedelta(days=1)
     data = {
-        'pk': u2d.pk,
-        'design_pk': u2d.design.pk,
+        'pk': u1d.pk,
+        'design_pk': u1d.design.pk,
         'creation_dt': dt_as_utc_in_json(day_after),
     }
     response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert new_u2d.creation_dt == day_after
+    new_u1d = Device.objects.get(pk=u1d.pk)
+    assert new_u1d.creation_dt == day_after
 
     # For a device that doesn't exist, test that we can create it
-    new_pk = u2d.first_free_serial()
+    new_pk = u1d.first_free_serial()
     data = {
         'pk': new_pk,
-        'design_pk': u2d.design.pk,
+        'design_pk': u1d.design.pk,
     }
     response = api_client.post('add_or_update_device', json=data)
     assert response.status_code == 201
 
-    new_u2d = Device.objects.get(pk=new_pk)
-    assert new_u2d.design.pk == u2d.design.pk
+    new_u1d = Device.objects.get(pk=new_pk)
+    assert new_u1d.design.pk == u1d.design.pk
+
+
+def test_add_or_update_device_other_orgs_design_fails(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1d = data['user1_device']
+    u2design = data['user2_device'].design
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+
+    # user1's key can't create a new device under user2's design
+    new_pk = u1d.first_free_serial()
+    data = {
+        'pk': new_pk,
+        'design_pk': u2design.pk,
+    }
+    response = api_client.post('add_or_update_device', json=data)
+    assert response.status_code == 403
+    assert not Device.objects.filter(pk=new_pk).exists()
+
+
+def test_add_or_update_device_other_orgs_device_fails(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1d = data['user1_device']
+    u2d = data['user2_device']
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+
+    # user1's key can't update user2's existing device, even to one of user1's own designs
+    data = {
+        'pk': u2d.pk,
+        'design_pk': u1d.design.pk,
+    }
+    response = api_client.post('add_or_update_device', json=data)
+    assert response.status_code == 403
+    unchanged_u2d = Device.objects.get(pk=u2d.pk)
+    assert unchanged_u2d.design.pk == u2d.design.pk
 
 
 def test_program_device(create_users_and_user_data):
@@ -232,7 +324,7 @@ def test_program_device(create_users_and_user_data):
 
     data = create_users_and_user_data
 
-    u2d = data['user2_device']
+    u1d = data['user1_device']
 
     api_client = TestClientWithAuth(router, data['api-key'])
 
@@ -246,53 +338,65 @@ def test_program_device(create_users_and_user_data):
     assert response.status_code == 404
 
     # Test that an existing device has no software version
-    assert u2d.latest_sw_version() is None
+    assert u1d.latest_sw_version() is None
 
     # Test that we can add a software version to the device
-    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u1d.pk}, json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert new_u2d.latest_sw_version() == sw_version_a
+    new_u1d = Device.objects.get(pk=u1d.pk)
+    assert new_u1d.latest_sw_version() == sw_version_a
 
     # Test that we can add another software version to the device
     data = {
         'sw_version': sw_version_b,
     }
-    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u1d.pk}, json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert new_u2d.latest_sw_version() == sw_version_b
+    new_u1d = Device.objects.get(pk=u1d.pk)
+    assert new_u1d.latest_sw_version() == sw_version_b
 
     # The device should now have two versions
-    assert new_u2d.deviceevent_set.filter(event_type='SW_VERSION').count() == 2
-    assert new_u2d.deviceevent_set.get(event_type='SW_VERSION', description=sw_version_a)
-    assert new_u2d.deviceevent_set.get(event_type='SW_VERSION', description=sw_version_b)
+    assert new_u1d.deviceevent_set.filter(event_type='SW_VERSION').count() == 2
+    assert new_u1d.deviceevent_set.get(event_type='SW_VERSION', description=sw_version_a)
+    assert new_u1d.deviceevent_set.get(event_type='SW_VERSION', description=sw_version_b)
 
     # Test that adding an existing software version to the device creates a dupe.
     data = {
         'sw_version': sw_version_a,
     }
-    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json=data)
+    response = api_client.post('post_device_program', kwargs={'device_pk': u1d.pk}, json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
+    new_u1d = Device.objects.get(pk=u1d.pk)
     # The device should now have three versions
-    sw_versions = new_u2d.deviceevent_set.filter(event_type='SW_VERSION')
+    sw_versions = new_u1d.deviceevent_set.filter(event_type='SW_VERSION')
     assert sw_versions.count() == 3
     # First and last sw versions should be the same (1.2.3a)
     assert sw_versions.first().description == sw_version_a
     assert sw_versions.last().description == sw_version_a
 
 
-def test_add_test_record(create_users_and_user_data):
+def test_program_device_other_org_fails(create_users_and_user_data):
     data = create_users_and_user_data
 
     u2d = data['user2_device']
 
     api_client = TestClientWithAuth(router, data['api-key'])
 
+    response = api_client.post('post_device_program', kwargs={'device_pk': u2d.pk}, json={'sw_version': '1.0'})
+    assert response.status_code == 403
+    assert u2d.deviceevent_set.filter(event_type='SW_VERSION').count() == 0
+
+
+def test_add_test_record(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u1d = data['user1_device']
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+
     # Test that a non-existent device returns 404
     new_pk = Device.first_free_serial()
-    day_after = u2d.creation_dt + datetime.timedelta(days=1)
+    day_after = u1d.creation_dt + datetime.timedelta(days=1)
 
     data = {
         'result': 'PASS',
@@ -304,27 +408,44 @@ def test_add_test_record(create_users_and_user_data):
     assert response.status_code == 404
 
     # Test that an existing device has no test records
-    assert u2d.testrecord_set.count() == 0
+    assert u1d.testrecord_set.count() == 0
 
     # Test that an invalid test type causes a fault
     data['result'] = 'SILLY'
-    response = api_client.post('add_test_record', kwargs={'device_pk': u2d.pk}, json=data)
+    response = api_client.post('add_test_record', kwargs={'device_pk': u1d.pk}, json=data)
     assert response.status_code == 422
-    assert u2d.testrecord_set.count() == 0
+    assert u1d.testrecord_set.count() == 0
 
     # Test that we can add a test record to the device
     data['result'] = 'PASS'
-    response = api_client.post('add_test_record', kwargs={'device_pk': u2d.pk}, json=data)
+    response = api_client.post('add_test_record', kwargs={'device_pk': u1d.pk}, json=data)
     assert response.status_code == 200
-    new_u2d = Device.objects.get(pk=u2d.pk)
-    assert u2d.testrecord_set.count() == 1
-    new_tr = new_u2d.testrecord_set.first()
+    new_u1d = Device.objects.get(pk=u1d.pk)
+    assert u1d.testrecord_set.count() == 1
+    new_tr = new_u1d.testrecord_set.first()
     expected_json = {
         'pk': new_tr.pk,
     }
     actual_json = response.json()
     assert actual_json == expected_json
     assert new_tr.result == data['result'] and new_tr.test_dt == day_after and new_tr.notes == data['notes']
+
+
+def test_add_test_record_other_org_fails(create_users_and_user_data):
+    data = create_users_and_user_data
+
+    u2d = data['user2_device']
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+
+    data = {
+        'result': 'PASS',
+        'test_dt': dt_as_utc_in_json(u2d.creation_dt),
+        'notes': 'Results nominal',
+    }
+    response = api_client.post('add_test_record', kwargs={'device_pk': u2d.pk}, json=data)
+    assert response.status_code == 403
+    assert u2d.testrecord_set.count() == 0
 
 
 def test_add_image_to_test_record(create_some_test_records):
@@ -339,7 +460,7 @@ def test_add_image_to_test_record(create_some_test_records):
 
     data = create_some_test_records
 
-    u2tr = data['user2_test_record1']
+    u1tr = data['user1_test_record1']
 
     api_client = TestClientWithAuth(router, data['api-key'])
 
@@ -357,16 +478,16 @@ def test_add_image_to_test_record(create_some_test_records):
     assert response.status_code == 404
 
     # Test that an existing test record has no test images
-    assert u2tr.testimage_set.count() == 0
+    assert u1tr.testimage_set.count() == 0
 
     # Test that we can add a test image to the test record
     response = api_client.post(
-        'add_test_image', kwargs={'testrecord_pk': u2tr.pk}, data=data, FILES={'file': uploaded_file}
+        'add_test_image', kwargs={'testrecord_pk': u1tr.pk}, data=data, FILES={'file': uploaded_file}
     )
     assert response.status_code == 200
 
     # Did the test record acquire an image?
-    ti_set = u2tr.testimage_set.all()
+    ti_set = u1tr.testimage_set.all()
     assert ti_set.count() == 1
     new_ti = ti_set.first()
 
@@ -387,6 +508,30 @@ def test_add_image_to_test_record(create_some_test_records):
     new_ti.image.delete()
 
 
+def test_add_image_to_test_record_other_org_fails(create_some_test_records):
+    def generate_tinypic():
+        f = io.BytesIO()
+        img = Image.new('RGB', (10, 10), 'white')
+        img.save(f, format='png')
+        f.name = 'test.png'
+        f.seek(0)
+
+        return f
+
+    data = create_some_test_records
+
+    u2tr = data['user2_test_record1']
+
+    api_client = TestClientWithAuth(router, data['api-key'])
+
+    uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
+    response = api_client.post(
+        'add_test_image', kwargs={'testrecord_pk': u2tr.pk}, data={}, FILES={'file': uploaded_file}
+    )
+    assert response.status_code == 403
+    assert u2tr.testimage_set.count() == 0
+
+
 def test_add_device_image(create_users_and_user_data):
     def generate_tinypic():
         f = io.BytesIO()
@@ -401,12 +546,9 @@ def test_add_device_image(create_users_and_user_data):
 
     u1d = data['user1_device']
     u2d = data['user2_device']
-    user2 = data['user2']
-    user2.api_key = 'api-key-for-testing-2'
-    user2.save()
 
     user1_client = TestClientWithAuth(router, data['api-key'])
-    user2_client = TestClientWithAuth(router, user2.api_key)
+    user2_client = TestClientWithAuth(router, data['api-key-2'])
 
     # A user can add an image to a device belonging to their own org
     uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
@@ -427,6 +569,30 @@ def test_add_device_image(create_users_and_user_data):
     # A user can add an image to a device belonging to their own org (sanity check on user2/device2)
     uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
     response = user2_client.post(
+        'add_device_image', kwargs={'device_pk': u2d.pk}, data={'notes': 'Nominal'}, FILES={'file': uploaded_file}
+    )
+    assert response.status_code == 200
+    assert u2d.deviceimage_set.count() == 1
+
+
+def test_add_device_image_staff_can_access_any_org(create_users_and_user_data, staff_api_key):
+    def generate_tinypic():
+        f = io.BytesIO()
+        img = Image.new('RGB', (10, 10), 'white')
+        img.save(f, format='png')
+        f.name = 'test.png'
+        f.seek(0)
+
+        return f
+
+    data = create_users_and_user_data
+
+    u2d = data['user2_device']
+
+    staff_client = TestClientWithAuth(router, staff_api_key)
+
+    uploaded_file = SimpleUploadedFile('test.png', generate_tinypic().read(), content_type='image/png')
+    response = staff_client.post(
         'add_device_image', kwargs={'device_pk': u2d.pk}, data={'notes': 'Nominal'}, FILES={'file': uploaded_file}
     )
     assert response.status_code == 200

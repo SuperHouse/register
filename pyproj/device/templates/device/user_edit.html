@@ -75,6 +75,13 @@
                         <p>
                             {% if user_obj.api_key %}
                                 <code>{{ user_obj.api_key }}</code>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary py-0"
+                                        title="Copy to clipboard"
+                                        data-copy-text="{{ user_obj.api_key }}"
+                                        onclick="copyToClipboard(this)">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
                             {% else %}
                                 <i>Not set</i>
                             {% endif %}

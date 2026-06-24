@@ -37,7 +37,7 @@ Requests from other IP addresses will be rejected, even with a valid API key.
 
 ### Getting an API Key
 
-API keys are associated with `Client` objects in the system. Contact your administrator to obtain an API key for your client account.
+API keys are associated with individual user accounts, not `Client`/organisation objects. A key authenticates as that user and is scoped to whichever organisation(s) they belong to (or all organisations, if they're a staff user). You can generate or regenerate your own key from your account settings page, or ask a staff member to do it for you from the Users management page. Contact your administrator if you don't have access to either.
 
 ## Interactive API Documentation
 
@@ -90,7 +90,7 @@ GET /api/v1/test-endpoint/
 GET /api/v1/clients/
 ```
 
-**Description:** Retrieve a list of all clients in the system.
+**Description:** Retrieve a list of clients. Staff API keys see every client; non-staff keys only see the client(s) the authenticated user belongs to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -116,7 +116,7 @@ GET /api/v1/clients/
 GET /api/v1/designs/?client_pk={client_id}
 ```
 
-**Description:** Retrieve a list of all designs. Optionally filter by client ID.
+**Description:** Retrieve a list of designs. Staff API keys see designs for every client; non-staff keys only see designs belonging to the client(s) the authenticated user belongs to. Optionally filter further by client ID — passing a `client_pk` your key doesn't have access to returns an empty list rather than an error.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -157,7 +157,7 @@ curl -H "X-API-Key: your-key" https://example.com/api/v1/designs/?client_pk=1
 POST /api/v1/device/add/
 ```
 
-**Description:** Create a new device or update an existing device. If a device with the given primary key already exists, it will be updated; otherwise, a new device will be created.
+**Description:** Create a new device or update an existing device. If a device with the given primary key already exists, it will be updated; otherwise, a new device will be created. The design (and, when updating, the existing device) must belong to a client your API key has access to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -181,6 +181,7 @@ POST /api/v1/device/add/
 - `200`: Device was updated successfully
 - `201`: Device was created successfully
 - `400`: Invalid request (e.g., design not found)
+- `403`: API key does not have access to the design or (when updating) the existing device
 
 **Response (200/201):**
 ```json
@@ -193,6 +194,13 @@ POST /api/v1/device/add/
 ```json
 {
   "message": "Design not found"
+}
+```
+
+**Response (403):**
+```json
+{
+  "message": "API key does not have access to this design"
 }
 ```
 
@@ -210,7 +218,7 @@ curl -X POST \
 GET /api/v1/device/{device_pk}/
 ```
 
-**Description:** Retrieve information about an existing device.
+**Description:** Retrieve information about an existing device. The device must belong to a client your API key has access to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -228,6 +236,7 @@ GET /api/v1/device/{device_pk}/
 
 **Response Codes:**
 - `200`: Success
+- `403`: API key does not have access to this device
 - `404`: Device not found
 
 **Example:**
@@ -240,7 +249,7 @@ curl -H "X-API-Key: your-key" https://example.com/api/v1/device/12345/
 POST /api/v1/device/{device_pk}/program/
 ```
 
-**Description:** Record a software version programming event for a device.
+**Description:** Record a software version programming event for a device. The device must belong to a client your API key has access to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -268,6 +277,7 @@ POST /api/v1/device/{device_pk}/program/
 
 **Response Codes:**
 - `200`: Success
+- `403`: API key does not have access to this device
 - `404`: Device not found
 
 **Example:**
@@ -284,7 +294,7 @@ curl -X POST \
 POST /api/v1/device/{device_pk}/add-tr/
 ```
 
-**Description:** Add a test record for a device.
+**Description:** Add a test record for a device. The device must belong to a client your API key has access to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -324,6 +334,7 @@ POST /api/v1/device/{device_pk}/add-tr/
 **Response Codes:**
 - `200`: Test record created successfully
 - `400`: Invalid request (e.g., invalid result value)
+- `403`: API key does not have access to this device
 - `404`: Device not found
 
 **Example:**
@@ -342,7 +353,7 @@ curl -X POST \
 POST /api/v1/device/{testrecord_pk}/add-image/
 ```
 
-**Description:** Upload an image associated with a test record.
+**Description:** Upload an image associated with a test record. The test record's device must belong to a client your API key has access to.
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -363,6 +374,7 @@ POST /api/v1/device/{testrecord_pk}/add-image/
 
 **Response Codes:**
 - `200`: Image uploaded successfully
+- `403`: API key does not have access to this device
 - `404`: Test record not found
 
 **Example:**
@@ -382,7 +394,7 @@ curl -X POST \
 POST /api/v1/device/{device_pk}/add-device-image/
 ```
 
-**Description:** Upload an image directly associated with a device. This endpoint requires that the API key belongs to the client associated with the device's design. The image datetime can be automatically extracted from the filename if it matches the pattern `id-YYYY-MM-DD_h-m-s` (e.g., `123-2024-01-15_14-30-45`).
+**Description:** Upload an image directly associated with a device. This endpoint requires that the API key belongs to the client associated with the device's design (staff keys can access any device). The image datetime can be automatically extracted from the filename if it matches the pattern `id-YYYY-MM-DD_h-m-s` (e.g., `123-2024-01-15_14-30-45`).
 
 **Headers:**
 - `X-API-Key`: Your API key (required)
@@ -433,7 +445,7 @@ curl -X POST \
 
 **Note:** 
 - This endpoint uses `multipart/form-data` content type, not `application/json`. The file must be sent as form data.
-- The API key must belong to the client associated with the device's design. If the API key belongs to a different client, the request will be rejected with a 403 error.
+- The API key must belong to the client associated with the device's design, unless it's a staff key. If a non-staff API key belongs to a different client, the request will be rejected with a 403 error.
 - If the filename matches the pattern `id-YYYY-MM-DD_h-m-s`, the datetime will be extracted and used as the image timestamp. Otherwise, the current timestamp will be used.
 
 ## Error Handling
@@ -443,8 +455,8 @@ The API uses standard HTTP status codes:
 - `200 OK`: Request successful
 - `201 Created`: Resource created successfully
 - `400 Bad Request`: Invalid request data
-- `401 Unauthorized`: Missing or invalid API key
-- `403 Forbidden`: IP address not allowed
+- `401 Unauthorized`: Missing or invalid API key, or request not from an allowed IP address
+- `403 Forbidden`: Your API key doesn't have access to the requested client/design/device
 - `404 Not Found`: Resource not found
 - `500 Internal Server Error`: Server error
 

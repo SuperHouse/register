@@ -132,10 +132,9 @@ Organisation (customer/supplier/manufacturer) data, plus staff user management. 
 - **[forms.py](pyproj/crm/forms.py)** — `UserForm`: a `ModelForm` over `authuser.User` (`email`, `full_name`, `preferred_name`, `is_staff`, `is_active`) plus a manually-declared `orgs` `ModelMultipleChoiceField` (since `Org.users` is declared on `Org`, not `User` — `orgs` is initialised from/saved to the reverse `user.org_set` M2M accessor in `__init__`/`save()`). Deliberately excludes `is_superuser` (admin-only) and password (new users get a "set your password" email instead — see API Keys / onboarding below).
 - **[views/organisations.py](pyproj/crm/views/organisations.py)** — `organisation_list`, `organisation_detail`, `organisation_edit` (all staff-only); this is what `conf/urls.py` wires up for the `organisation_*` URL names. Templates live in `device/templates/device/` for now. The Designs table on the organisation detail page mirrors the Designs page layout (PCB top-view thumbnail column, same headers, no Organisation column) and includes the same live filter (`q` param, server-side, via `initServerFilter`), shown only when the org has at least one design. Member users in the detail page's Users row link to their `user_edit` page (see below).
 - **[views/users.py](pyproj/crm/views/users.py)** — staff-only user management: `user_list` (searchable over `full_name`/`email`, paginated, same shape as `organisation_list`), `user_add` / `user_edit` (share one template, `device/templates/device/user_edit.html` — org membership, staff/active flags, and the user's API key with a Regenerate button), `user_regenerate_key` (POST-only, calls `User.regenerate_api_key()`). `user_add` creates the account with `set_unusable_password()` then sends a "set your password" email via Django's `PasswordResetForm`, reusing the same templates/from-address as `authuser.views.SuperHousePasswordResetView` (see API Keys below) so onboarding emails look identical to a self-service password reset.
-- **[views/api.py](pyproj/crm/views/api.py)** — `get_clients` (`GET /api/v1/clients/`), decorated onto the shared `router` imported from `api.routes`.
+- **[views/api.py](pyproj/crm/views/api.py)** — `get_clients` (`GET /api/v1/clients/`), decorated onto the shared `router` imported from `api.routes`; returns every `Org` for staff callers, otherwise only the orgs the calling user belongs to.
 - **[views/\_\_init\_\_.py](pyproj/crm/views/__init__.py)** — re-exports the view functions from `organisations.py` and `users.py` by name, so `conf/urls.py`'s `from crm import views as crm_views` keeps working unchanged regardless of which submodule a view actually lives in.
 - **[admin.py](pyproj/crm/admin.py)** — Registers `Org` with the Django admin.
-- **[context_processor.py](pyproj/crm/context_processor.py)** — `get_client_logo_processor`: injects `client_logo` and `client_name` into all templates for non-staff users.
 - Sidebar: staff users see a "Users" link (`user_list`) directly below "Organisations".
 
 ### `erp`
@@ -258,17 +257,19 @@ Key endpoints:
 
 | Method | URL | Description | Auth |
 |---|---|---|---|
-| GET | `/api/v1/clients/` | List all clients | API key |
-| GET | `/api/v1/designs/` | List designs (filter with `?client_pk=`) | API key |
-| POST | `/api/v1/device/add/` | Create or update a device | API key |
-| GET | `/api/v1/device/{pk}/` | Get device details | API key |
-| POST | `/api/v1/device/{pk}/program/` | Record firmware version | API key |
-| POST | `/api/v1/device/{pk}/add-tr/` | Add test record | API key |
-| POST | `/api/v1/device/{tr_pk}/add-image/` | Upload test image (multipart) | API key |
-| POST | `/api/v1/device/{pk}/add-device-image/` | Upload device image (multipart, client must own device) | API key |
+| GET | `/api/v1/clients/` | List clients (scoped to the caller's orgs unless staff) | API key |
+| GET | `/api/v1/designs/` | List designs (scoped to the caller's orgs unless staff; filter further with `?client_pk=`) | API key |
+| POST | `/api/v1/device/add/` | Create or update a device (design, and existing device if updating, must belong to a caller's org unless staff) | API key |
+| GET | `/api/v1/device/{pk}/` | Get device details (device must belong to a caller's org unless staff) | API key |
+| POST | `/api/v1/device/{pk}/program/` | Record firmware version (device must belong to a caller's org unless staff) | API key |
+| POST | `/api/v1/device/{pk}/add-tr/` | Add test record (device must belong to a caller's org unless staff) | API key |
+| POST | `/api/v1/device/{tr_pk}/add-image/` | Upload test image (multipart; the test record's device must belong to a caller's org unless staff) | API key |
+| POST | `/api/v1/device/{pk}/add-device-image/` | Upload device image (multipart, device must belong to a caller's org unless staff) | API key |
 | GET | `/api/v1/dashboard-stats/` | Dashboard statistics (client/design/device counts + chart data) | Session or API key |
 
 Full documentation in [API.md](API.md).
+
+**Org-scoping helpers:** `device/api.py` has two small helpers, `_user_can_access_design(user, design)` (`user.is_staff or design.client.users.filter(pk=user.pk).exists()`) and `_user_can_access_device(user, device)` (delegates to the design check via `device.design`), used by every device/design/test-record endpoint above except `get_clients`/`get_designs` (which filter querysets directly instead, since they return lists rather than a single object) to return `403, {'message': ...}` when the calling user's org membership doesn't cover the target. Added because API keys are now self-service per-user (see API Keys below) rather than admin-issued per-org, so any ordinary user can mint a key — these checks stop one org's key from reading or writing another org's devices/designs.
 
 ## Access Control
 
@@ -276,7 +277,7 @@ Full documentation in [API.md](API.md).
 - **Non-staff users** only see `Org`, `Design`, and `Device` objects associated with their user account via the `Org.users` M2M relationship.
 - Internal `DeviceEvent` records (`internal=True`) are hidden from non-staff users.
 - All views require login (enforced by `login_required` middleware).
-- **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist, resolved to a `User` (see API Keys below); inactive users' keys stop working immediately. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling) and scopes results to that user's orgs unless they're staff.
+- **API endpoints:** Traditional API endpoints require `X-API-Key` header + IP allowlist, resolved to a `User` (see API Keys below); inactive users' keys stop working immediately. Every endpoint that reads or writes a specific client/design/device scopes to the caller's orgs unless they're staff (see org-scoping helpers above), returning `403` if the target is outside the caller's orgs. The dashboard stats endpoint (`/api/v1/dashboard-stats/`) accepts either API key auth or Django session cookies (for browser-based polling) and scopes results to that user's orgs unless they're staff.
 - Internal `DesignAsset` and `DeviceAsset` records (`internal=True`) are hidden from non-staff users.
 
 ## API Keys

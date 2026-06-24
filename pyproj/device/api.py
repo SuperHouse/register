@@ -28,6 +28,16 @@ from .schemas import (
 )
 
 
+def _user_can_access_design(user, design):
+    """Whether an API user is allowed to read/write data under the given design's org."""
+    return user.is_staff or design.client.users.filter(pk=user.pk).exists()
+
+
+def _user_can_access_device(user, device):
+    """Whether an API user is allowed to read/write data on the given device."""
+    return _user_can_access_design(user, device.design)
+
+
 @router.get('test-endpoint-noauth/', auth=None, response=Message)
 def endpoint_test_noauth(request):
     return {'message': 'Success.'}
@@ -41,13 +51,15 @@ def endpoint_test_withauth(request):
 @router.get('designs/', response=list[DesignSchema])
 def get_designs(request, client_pk: int = None):
     ret = Design.objects.order_by("sku", "-hw_version").all()
+    if not request.auth.is_staff:
+        ret = ret.filter(client__in=Org.objects.filter(users=request.auth))
     if client_pk:
         ret = ret.filter(client__pk=client_pk)
 
     return ret
 
 
-@router.post('device/add/', response={200: Message, 201: Message, 400: Message})
+@router.post('device/add/', response={200: Message, 201: Message, 400: Message, 403: Message})
 def add_or_update_device(request, data: DeviceCreateSchema):
     # Whether the device already exists or not, the design has to be valid
     try:
@@ -55,10 +67,15 @@ def add_or_update_device(request, data: DeviceCreateSchema):
     except Design.DoesNotExist:
         return 400, {'message': 'Design not found'}
 
+    if not _user_can_access_design(request.auth, design):
+        return 403, {'message': 'API key does not have access to this design'}
+
     creation_dt = data.creation_dt or timezone.now()
 
     try:
         device = Device.objects.get(pk=data.pk)
+        if not _user_can_access_device(request.auth, device):
+            return 403, {'message': 'API key does not have access to this device'}
         # Device exists, so update the design and creation date
         device.design = design
         device.creation_dt = creation_dt
@@ -72,9 +89,12 @@ def add_or_update_device(request, data: DeviceCreateSchema):
         return 201, {'message': 'Created'}
 
 
-@router.get('device/{device_pk}/', response=ExistingDeviceResponseSchema)
+@router.get('device/{device_pk}/', response={200: ExistingDeviceResponseSchema, 403: Message})
 def get_existing_device(request, device_pk: str):
     device = get_object_or_404(Device, pk=device_pk)
+    if not _user_can_access_device(request.auth, device):
+        return 403, {'message': 'API key does not have access to this device'}
+
     ret = {
         'design_pk': device.design.pk,
         'creation_dt': device.creation_dt,
@@ -83,33 +103,42 @@ def get_existing_device(request, device_pk: str):
     return ret
 
 
-@router.post('device/{device_pk}/program/', response=Message)
+@router.post('device/{device_pk}/program/', response={200: Message, 403: Message})
 def post_device_program(request, device_pk: str, data: DeviceProgramSchema):
     device = get_object_or_404(Device, pk=device_pk)
+    if not _user_can_access_device(request.auth, device):
+        return 403, {'message': 'API key does not have access to this device'}
+
     new_de = DeviceEvent(device=device, event_type='SW_VERSION', description=data.sw_version)
     new_de.save()
 
     return {'message': 'Ok'}
 
 
-@router.post('device/{device_pk}/add-tr/', response={200: TestRecordResponseSchema, 400: Message})
+@router.post('device/{device_pk}/add-tr/', response={200: TestRecordResponseSchema, 400: Message, 403: Message})
 def add_test_record(request, device_pk: str, data: TestRecordSchema):
     if data.result not in [r[0] for r in TestRecord.RESULT_CHOICES]:
         return 400, {'message': 'Invalid value for result'}
     device = get_object_or_404(Device, pk=device_pk)
+    if not _user_can_access_device(request.auth, device):
+        return 403, {'message': 'API key does not have access to this device'}
+
     new_tr = TestRecord(device=device, **data.__dict__)
     new_tr.save()
 
     return {'pk': new_tr.pk}
 
 
-@router.post('device/{testrecord_pk}/add-image/', response=TestImageResponseSchema)
+@router.post('device/{testrecord_pk}/add-image/', response={200: TestImageResponseSchema, 403: Message})
 def add_test_image(request, testrecord_pk: str, file: File[UploadedFile]):
     # Note if we ever need to pass in data (which we don't at present):  It has to
     # be done as a form, because the content type is multipart/form-data instead
     # of application/json.  Leaving this here for that future time:
     # def add_test_image(request, testrecord_pk: str, data: Form[TestImageSchema], file: File[UploadedFile]):
     tr = get_object_or_404(TestRecord, pk=testrecord_pk)
+    if not _user_can_access_device(request.auth, tr.device):
+        return 403, {'message': 'API key does not have access to this device'}
+
     ti = TestImage(test_record=tr, image=file)
     ti.save()
 
@@ -123,16 +152,10 @@ def add_device_image(request, device_pk: str, data: Form[DeviceImageFormSchema],
     The image datetime can be extracted from the filename if it matches the pattern:
     id-YYYY-MM-DD_h-m-s (e.g., "123-2024-01-15_14-30-45")
     """
-    # Get the authenticated user from the API key
     user = request.auth
-    if not user:
-        return 403, {'message': 'Authentication required'}
-
-    # Get the device
     device = get_object_or_404(Device, pk=device_pk)
 
-    # Verify that the API key's user belongs to the org that owns the device's design
-    if not device.design.client.users.filter(pk=user.pk).exists():
+    if not _user_can_access_device(user, device):
         return 403, {'message': 'API key does not have access to this device'}
     
     # Extract datetime from filename if it matches the pattern

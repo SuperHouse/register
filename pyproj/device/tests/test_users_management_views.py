@@ -39,8 +39,9 @@ def test_staff_can_use_user_management_views(django_user_model, create_users_and
     response = client.get(reverse('user_edit', args=[other_user.pk]))
     assert response.status_code == 200
 
-    assert other_user.api_key is None
+    old_api_key = other_user.api_key
     response = client.post(reverse('user_regenerate_key', args=[other_user.pk]))
     assert response.status_code == 302
     other_user.refresh_from_db()
     assert other_user.api_key is not None
+    assert other_user.api_key != old_api_key

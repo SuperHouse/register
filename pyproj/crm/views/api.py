@@ -5,4 +5,7 @@ from crm.schema import ClientSchema
 
 @router.get('clients/', response=list[ClientSchema])
 def get_clients(request):
-    return Org.objects.all()
+    if request.auth.is_staff:
+        return Org.objects.all()
+
+    return Org.objects.filter(users=request.auth)

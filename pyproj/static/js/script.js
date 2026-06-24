@@ -25,6 +25,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+// Copies the text in btn's data-copy-text attribute to the clipboard, then briefly
+// swaps the button's icon to a checkmark as feedback before reverting it.
+function copyToClipboard(btn) {
+    navigator.clipboard.writeText(btn.dataset.copyText).then(function () {
+        const icon = btn.querySelector('i');
+        const originalClass = icon.className;
+        icon.className = 'bi bi-check-lg';
+        setTimeout(function () {
+            icon.className = originalClass;
+        }, 1500);
+    });
+}
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
