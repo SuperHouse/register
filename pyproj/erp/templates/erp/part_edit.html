@@ -159,7 +159,7 @@
                                                     <button type="button"
                                                             class="btn btn-sm btn-outline-secondary source-refresh-btn"
                                                             data-refresh-url="{% url 'erp:part_source_refresh' variant.pk %}"
-                                                            title="Refresh from {{ source.supplier_name }}">
+                                                            title="Refresh from {{ source.supplier_name }} (last refreshed: {% if variant.last_refreshed %}{{ variant.last_refreshed|date:'j-M-Y H:i:s' }}{% else %}never{% endif %})">
                                                         <i class="bi bi-arrow-clockwise"></i>
                                                     </button>
                                                     <form method="post" action="{% url 'erp:part_source_variant_delete' variant.pk %}"

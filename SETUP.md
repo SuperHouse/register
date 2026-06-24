@@ -23,6 +23,21 @@ The Emperor process itself is managed by systemd:
 sudo systemctl restart uwsgi-emperor
 ```
 
+### Scheduled Part Source Refresh
+
+Supplier pricing/stock for Parts (`erp.PartSourceVariant`) is kept up to date by the
+`refresh_part_sources` management command, which is not run automatically by the
+app itself — add an hourly crontab entry for it on each production host:
+
+```bash
+0 * * * * cd /path/to/register/pyproj && /path/to/register/pyproj/venv/bin/python manage.py refresh_part_sources >> /var/log/register/refresh_part_sources.log 2>&1
+```
+
+Each run only refreshes a bounded, oldest-first slice of variants (roughly
+1/24th of the total) so a day's worth of supplier API calls is spread across 24
+runs rather than firing all at once. See `python manage.py refresh_part_sources --help`
+for the `--max-per-run` and `--dry-run` options.
+
 ## Linux Local Setup (dev)
 
 Todo
