@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import os
 import tempfile
 from pathlib import Path
 
@@ -294,6 +295,44 @@ def design_asset_delete(request, asset_id):
     }
 
     return render(request, 'device/design_asset_delete.html', ctx)
+
+
+@staff_member_required
+def design_swap_pcb_images(request, design_id):
+    """Swap the files of the PCB Top View and PCB Bottom View assets.
+
+    FusionExtractor occasionally extracts the top/bottom renders the wrong way
+    round. Swapping the files on disk (rather than the DesignAsset rows) means
+    each asset keeps its own pk/name/description and nothing else needs to
+    change its references to them.
+    """
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        top_asset = DesignAsset.objects.filter(design=design, asset_type=DesignAsset.PCB_TOP).first()
+        bottom_asset = DesignAsset.objects.filter(design=design, asset_type=DesignAsset.PCB_BOTTOM).first()
+
+        if not top_asset or not bottom_asset:
+            messages.warning(request, 'Both a PCB Top View and PCB Bottom View must be uploaded before they can be swapped.')
+        else:
+            top_path = Path(top_asset.file.path)
+            bottom_path = Path(bottom_asset.file.path)
+            temp_path = top_path.with_name(f'.swap-{top_path.name}')
+
+            top_path.rename(temp_path)
+            bottom_path.rename(top_path)
+            temp_path.rename(bottom_path)
+
+            # Renaming preserves each file's original mtime, which would
+            # otherwise let a cache keyed on Last-Modified serve stale content
+            # from the swapped-in file's old path.
+            now = timezone.now().timestamp()
+            os.utime(top_path, (now, now))
+            os.utime(bottom_path, (now, now))
+
+            messages.success(request, 'PCB Top View and PCB Bottom View images swapped.')
+
+    return redirect('design_detail', design_id=design.pk)
 
 
 def inc_demo(request):
