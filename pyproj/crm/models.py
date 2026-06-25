@@ -6,7 +6,6 @@ class Org(models.Model):
     company_name = models.CharField(max_length=255)
     logo = models.ImageField(upload_to='clients/', null=True, blank=True)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL)
-    api_key = models.CharField(max_length=50, null=True, blank=True)
 
     is_client = models.BooleanField(default=True)
     is_manufacturer = models.BooleanField(default=False)

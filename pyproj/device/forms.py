@@ -30,21 +30,18 @@ class DateTimeLocalInput(forms.DateTimeInput):
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Org
-        fields = ['company_name', 'logo', 'users', 'api_key']
+        fields = ['company_name', 'logo', 'users']
         widgets = {
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),
             'logo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'users': forms.SelectMultiple(attrs={'class': 'form-control', 'size': '10'}),
-            'api_key': forms.TextInput(attrs={'class': 'form-control'}),
         }
         labels = {
             'company_name': 'Company Name',
             'logo': 'Logo',
             'users': 'Users',
-            'api_key': 'API Key',
         }
         help_texts = {
-            'api_key': 'API key for authentication',
             'users': 'Hold Ctrl (Cmd on Mac) to select multiple users',
         }
 

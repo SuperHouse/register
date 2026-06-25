@@ -1,3 +1,5 @@
+import secrets
+
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 from django.utils import timezone
@@ -66,6 +68,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
     is_superuser = models.BooleanField(default=False)
 
+    api_key = models.CharField(max_length=64, unique=True, null=True, blank=True)
+
     last_login = models.DateTimeField(blank=True, null=True)
     date_joined = models.DateTimeField(default=timezone.now)
 
@@ -81,3 +85,8 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self):
         return self.preferred_name or self.full_name or self.email.split("@")[0]
+
+    def regenerate_api_key(self):
+        self.api_key = secrets.token_urlsafe(32)
+        self.save(update_fields=['api_key'])
+        return self.api_key

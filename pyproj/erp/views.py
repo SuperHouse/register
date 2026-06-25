@@ -883,6 +883,7 @@ def part_source_fetch_lcsc(request):
                 packaging=lcsc_packaging,
                 url=f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
                 moq=p['moq'],
+                last_refreshed=timezone.now(),
             )
             _save_price_breaks(variant, p['price_breaks'])
             source_saved = True
@@ -987,6 +988,7 @@ def part_source_fetch_mouser(request):
             listing = _get_or_create_supplier_listing(part, 'Mouser', manufacturer_pn, stock)
             variant = PartSourceVariant.objects.create(
                 source=listing, supplier_sku=mouser_pn, packaging=packaging, url=product_url, moq=moq,
+                last_refreshed=timezone.now(),
             )
             _save_price_breaks(variant, _mouser_price_breaks(p))
             source_saved = True
@@ -1103,6 +1105,7 @@ def part_source_fetch_element14(request):
             listing = _get_or_create_supplier_listing(part, 'Element14', manufacturer_pn, stock)
             PartSourceVariant.objects.create(
                 source=listing, supplier_sku=element14_sku, packaging=packaging, url=product_url,
+                last_refreshed=timezone.now(),
             )
             source_saved = True
 
@@ -1247,6 +1250,7 @@ def part_source_fetch_digikey(request):
                 listing = _get_or_create_supplier_listing(part, 'DigiKey', manufacturer_pn, stock)
                 PartSourceVariant.objects.create(
                     source=listing, supplier_sku=digi_key_pn, packaging=dk_packaging, url=product_url,
+                    last_refreshed=timezone.now(),
                 )
                 source_saved = True
             else:
@@ -1273,12 +1277,12 @@ def part_source_fetch_digikey(request):
         return JsonResponse({'ok': False, 'error': f'Lookup failed: {e}'})
 
 
-@staff_member_required
-def part_source_refresh(request, variant_id):
-    if request.method != 'POST':
-        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+def _refresh_variant(variant):
+    """Re-fetch pricing/stock/MOQ for one PartSourceVariant from its supplier's API.
 
-    variant = get_object_or_404(PartSourceVariant, pk=variant_id)
+    Shared by the manual refresh view and the scheduled refresh_part_sources
+    management command. Returns {'ok': True} or {'ok': False, 'error': '...'}.
+    """
     listing = variant.source
     part = listing.part
     sku = variant.supplier_sku
@@ -1294,7 +1298,7 @@ def part_source_refresh(request, variant_id):
         if supplier == 'lcsc':
             p = _lcsc_search(sku)
             if p is None:
-                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on LCSC'})
+                return {'ok': False, 'error': f'No product found for "{sku}" on LCSC'}
             manufacturer_sku = p['product_model']
             packaging = p['product_arrange']
             url = f'https://www.lcsc.com/product-detail/{p["product_code"]}.html'
@@ -1323,9 +1327,9 @@ def part_source_refresh(request, variant_id):
                     detail = body.get('ErrorMessage') or body.get('error_description') or body.get('message') or str(body)
                 except Exception:
                     detail = resp.text[:300]
-                return JsonResponse({'ok': False, 'error': f'DigiKey API {resp.status_code}: {detail}'})
+                return {'ok': False, 'error': f'DigiKey API {resp.status_code}: {detail}'}
             if resp.status_code == 404:
-                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on DigiKey'})
+                return {'ok': False, 'error': f'No product found for "{sku}" on DigiKey'}
             resp.raise_for_status()
             product = resp.json().get('Product') or resp.json()
             manufacturer_sku = product.get('ManufacturerProductNumber') or ''
@@ -1347,7 +1351,7 @@ def part_source_refresh(request, variant_id):
             import requests as http_requests
             api_key = os.environ.get('MOUSER_API_KEY', '').strip()
             if not api_key:
-                return JsonResponse({'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'})
+                return {'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'}
             resp = http_requests.post(
                 f'https://api.mouser.com/api/v1/search/partnumber?apiKey={api_key}',
                 json={'SearchByPartRequest': {'mouserPartNumber': sku, 'partSearchOptions': ''}},
@@ -1358,10 +1362,10 @@ def part_source_refresh(request, variant_id):
             result = resp.json()
             errors = result.get('Errors', [])
             if errors:
-                return JsonResponse({'ok': False, 'error': f'Mouser API error: {errors[0]}'})
+                return {'ok': False, 'error': f'Mouser API error: {errors[0]}'}
             parts = result.get('SearchResults', {}).get('Parts', [])
             if not parts:
-                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Mouser'})
+                return {'ok': False, 'error': f'No product found for "{sku}" on Mouser'}
             p = next((x for x in parts if x.get('MouserPartNumber', '').lower() == sku.lower()), parts[0])
             manufacturer_sku = p.get('ManufacturerPartNumber') or ''
             url = p.get('ProductDetailUrl') or ''
@@ -1389,7 +1393,7 @@ def part_source_refresh(request, variant_id):
             api_key = os.environ.get('ELEMENT14_API_KEY', '').strip()
             store_id = os.environ.get('ELEMENT14_STORE_ID', 'au.element14.com').strip()
             if not api_key:
-                return JsonResponse({'ok': False, 'error': 'ELEMENT14_API_KEY is not configured in .env.'})
+                return {'ok': False, 'error': 'ELEMENT14_API_KEY is not configured in .env.'}
             resp = http_requests.get(
                 'https://api.element14.com/catalog/products',
                 params={
@@ -1407,7 +1411,7 @@ def part_source_refresh(request, variant_id):
             result = resp.json()
             products = result.get('keywordSearchReturn', {}).get('products', [])
             if not products:
-                return JsonResponse({'ok': False, 'error': f'No product found for "{sku}" on Element14'})
+                return {'ok': False, 'error': f'No product found for "{sku}" on Element14'}
             p = products[0]
             mfr_pns = p.get('manufacturerPartNumberList') or []
             manufacturer_sku = str(mfr_pns[0]) if isinstance(mfr_pns, list) and mfr_pns else ''
@@ -1434,7 +1438,7 @@ def part_source_refresh(request, variant_id):
             image_filename_prefix = f'element14_{sku}'
 
         else:
-            return JsonResponse({'ok': False, 'error': f'No API integration for supplier "{listing.supplier_name}"'})
+            return {'ok': False, 'error': f'No API integration for supplier "{listing.supplier_name}"'}
 
         listing.manufacturer_sku = manufacturer_sku
         listing.stock = stock
@@ -1458,12 +1462,25 @@ def part_source_refresh(request, variant_id):
             ext = os.path.splitext(image_remote_url)[1] or '.jpg'
             part.image.save(f'{image_filename_prefix}{ext}', ContentFile(img_resp.content), save=True)
 
-        return JsonResponse({'ok': True})
+        return {'ok': True}
 
     except RuntimeError as e:
-        return JsonResponse({'ok': False, 'error': str(e)})
+        return {'ok': False, 'error': str(e)}
     except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'Refresh failed: {e}'})
+        return {'ok': False, 'error': f'Refresh failed: {e}'}
+
+
+@staff_member_required
+def part_source_refresh(request, variant_id):
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    variant = get_object_or_404(PartSourceVariant, pk=variant_id)
+    result = _refresh_variant(variant)
+    variant.last_refreshed = timezone.now()
+    variant.save(update_fields=['last_refreshed'])
+
+    return JsonResponse(result)
 
 
 @staff_member_required
@@ -1879,6 +1896,32 @@ def batch_delete(request, batch_id):
     }
 
     return render(request, 'erp/batch_delete.html', ctx)
+
+
+@staff_member_required
+def batch_duplicate(request, batch_id):
+    batch = get_object_or_404(Batch, pk=batch_id)
+
+    if request.method != 'POST':
+        return redirect('erp:batch_edit', batch_id=batch.pk)
+
+    new_batch = Batch.objects.create(
+        design=batch.design,
+        po=batch.po,
+        quantity=batch.quantity,
+    )
+
+    for stage in batch.production_stages.all():
+        BatchProductionStage.objects.create(
+            batch=new_batch,
+            name=stage.name,
+            color=stage.color,
+            order=stage.order,
+            status=BatchProductionStage.NOT_STARTED,
+        )
+
+    messages.success(request, 'Batch duplicated.')
+    return redirect('erp:batch_list')
 
 
 @staff_member_required

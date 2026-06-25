@@ -32,7 +32,7 @@
                         <th>Qty</th>
                         <th>Created</th>
                         <th>Progress</th>
-                        <th style="width: 60px;"></th>
+                        <th style="width: 90px;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,7 +61,13 @@
                                     {% endfor %}
                                 </div>
                             </td>
-                            <td>
+                            <td class="text-nowrap">
+                                <form method="post" action="{% url 'erp:batch_duplicate' batch.pk %}" class="d-inline" onclick="event.stopPropagation();">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate">
+                                        <i class="cil-copy"></i>
+                                    </button>
+                                </form>
                                 <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
                                     <i class="cil-trash"></i>
                                 </a>

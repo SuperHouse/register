@@ -3,6 +3,8 @@ import ipaddress
 from django.conf import settings
 from ninja.security import APIKeyHeader
 
+from authuser.models import User
+
 
 def session_or_api_key_auth(request):
     """Auth that accepts either Django session auth or API key auth."""
@@ -31,8 +33,10 @@ def session_or_api_key_auth(request):
             if allowed_ipv4_network and ip_addr in allowed_ipv4_network:
                 allow = True
 
-            if allow and Org.objects.filter(api_key=api_key).exists():
-                return {'auth_type': 'api_key', 'key': api_key}
+            if allow:
+                user = User.objects.filter(api_key=api_key, is_active=True).first()
+                if user:
+                    return {'auth_type': 'api_key', 'user': user}
         except ValueError:
             pass
 
@@ -65,8 +69,9 @@ class AuthByApiKey(APIKeyHeader):
             allow = True
 
         if not allow:
-            return
+            return None
 
-        # TOOD: fine-grained access
-        # if key and Org.objects.filter(api_key=key).exists():
-        #     return key
+        if not key:
+            return None
+
+        return User.objects.filter(api_key=key, is_active=True).first()

@@ -19,4 +19,5 @@ for i, pattern in enumerate(auth_patterns.url_patterns):
 urlpatterns = [
     auth_patterns,
     path('settings/', views.user_settings, name='user_settings'),
+    path('settings/regenerate-key/', views.user_settings_regenerate_key, name='user_settings_regenerate_key'),
 ]

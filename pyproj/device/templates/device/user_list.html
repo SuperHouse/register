@@ -1,0 +1,107 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Users - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Users
+{% endblock h1 %}
+
+{% block content %}
+    <div class="d-flex justify-content-between mb-3">
+        <div class="input-group" style="max-width: 400px;">
+            <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
+            <input type="text" id="list-search" class="form-control" placeholder="Filter users..."
+                   value="{{ q }}">
+            <button class="btn btn-outline-secondary" type="button" id="list-search-clear"
+                    {% if not q %}style="display:none;"{% endif %} title="Clear filter">
+                <i class="cil-x icon"></i>
+            </button>
+        </div>
+        <a href="{% url 'user_add' %}" class="btn btn-primary">Add User</a>
+    </div>
+
+    <div id="users-results">
+        <div class="card">
+            <div class="card-body">
+                {% if users %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr class="highlight">
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Staff</th>
+                                    <th>Active</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user_row in users %}
+                                    <tr style="cursor: pointer;" onclick="window.location='{% url 'user_edit' user_row.pk %}'">
+                                        <td>{{ user_row.full_name|default:"—" }}</td>
+                                        <td>{{ user_row.email }}</td>
+                                        <td>{% if user_row.is_staff %}<i class="cil-check-circle text-success"></i>{% endif %}</td>
+                                        <td>{% if user_row.is_active %}<i class="cil-check-circle text-success"></i>{% else %}<i class="cil-x-circle text-danger"></i>{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if page_obj.has_other_pages %}
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center mt-3">
+                                {% if page_obj.has_previous %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page=1">&laquo; First</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">Previous</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">&laquo; First</span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Previous</span>
+                                    </li>
+                                {% endif %}
+
+                                <li class="page-item active">
+                                    <span class="page-link">
+                                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                                    </span>
+                                </li>
+
+                                {% if page_obj.has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">Next</a>
+                                    </li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="?{% if q %}q={{ q|urlencode }}&{% endif %}page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Next</span>
+                                    </li>
+                                    <li class="page-item disabled">
+                                        <span class="page-link">Last &raquo;</span>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    {% endif %}
+                {% else %}
+                    <p class="text-muted">
+                        {% if q %}No users match "{{ q }}".{% else %}No users found.{% endif %}
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    <script>initServerFilter('users-results');</script>
+{% endblock extra_js %}

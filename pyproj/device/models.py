@@ -206,6 +206,19 @@ class DesignAsset(models.Model):
     def filename(self):
         return os.path.basename(self.file.name)
 
+    @property
+    def file_version(self):
+        """Returns the file's mtime as an int, for use as a cache-busting query string value.
+
+        Swapping PCB top/bottom images (see design_swap_pcb_images) changes a
+        file's content without changing its name, so the URL alone isn't
+        enough to bust a browser's image cache.
+        """
+        try:
+            return int(os.path.getmtime(self.file.path))
+        except (OSError, ValueError):
+            return ''
+
     def get_icon_color(self):
         """Returns an inline color style value for this asset type, or empty string for default."""
         colors = {

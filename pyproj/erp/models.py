@@ -153,6 +153,9 @@ class PartSourceVariant(models.Model):
     packaging = models.CharField(max_length=100, blank=True)
     url = models.URLField(blank=True)
     moq = models.PositiveIntegerField(null=True, blank=True, help_text='Minimum order quantity; leave blank if unknown')
+    last_refreshed = models.DateTimeField(
+        null=True, blank=True, help_text='When pricing/stock was last fetched from the supplier API'
+    )
 
     class Meta:
         ordering = ['supplier_sku']

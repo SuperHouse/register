@@ -12,10 +12,11 @@ from crm.models import Org
 # Helper: Create two users, and some corresponding client, design and device data
 @pytest.fixture
 def create_users_and_user_data(django_user_model):
-    client1 = Org(company_name='Client One', api_key='api-key-for-testing-1')
+    client1 = Org(company_name='Client One')
     client1.save()
     user1 = django_user_model.objects.create_user(email='user1@example.com', password='pass1')
     user1.client = client1
+    user1.api_key = 'api-key-for-testing-1'
     user1.save()
     client1.users.add(user1)
     design1 = Design(client=client1, sku='C1A', name='Client One Design One', hw_version='1.0')
@@ -28,6 +29,7 @@ def create_users_and_user_data(django_user_model):
     client2.save()
     user2 = django_user_model.objects.create_user(email='user2@example.com', password='pass2')
     user2.client = client2
+    user2.api_key = 'api-key-for-testing-2'
     user2.save()
     client2.users.add(user2)
     design2 = Design(client=client2, sku='C2A', name='Client Two Design One', hw_version='1.0')
@@ -41,10 +43,22 @@ def create_users_and_user_data(django_user_model):
         'user1_device': device1,
         'user2': user2,
         'user2_device': device2,
-        'api-key': client1.api_key,
+        'api-key': user1.api_key,
+        'api-key-2': user2.api_key,
     }
 
     return results
+
+
+# Helper: Create a staff user with their own API key (for tests that need to
+# show staff API access is unscoped, unlike ordinary org-member access)
+@pytest.fixture
+def staff_api_key(django_user_model):
+    staff = django_user_model.objects.create_user(email='staff@example.com', password='staffy', is_staff=True)
+    staff.api_key = 'api-key-for-testing-staff'
+    staff.save()
+
+    return staff.api_key
 
 
 # The 'device:device_detail' view should return 200 when pointed at a

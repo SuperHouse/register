@@ -47,7 +47,7 @@
                                             <td style="width: 70px; padding: 4px 8px;">
                                                 {% with design.pcb_top_assets|first as pcb_top %}
                                                     {% if pcb_top %}
-                                                        <img src="{{ pcb_top.file.url }}"
+                                                        <img src="{{ pcb_top.file.url }}?v={{ pcb_top.file_version }}"
                                                              alt="PCB Top View"
                                                              style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
                                                     {% endif %}

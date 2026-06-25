@@ -87,7 +87,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'crm.context_processor.get_client_logo_processor',
                 'device.context_processor.background_processor',  # Variables for customising the background
                 'device.context_processor.demo_processor',  # Variables for the demo level
                 'device.context_processor.version_processor',  # App version number
@@ -254,8 +253,8 @@ EMAIL_HOST = os.environ.get('EMAIL_HOST')
 EMAIL_PORT = os.environ.get('EMAIL_PORT')
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-EMAIL_TLS = True
-EMAIL_SSL = False
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") in (True, 'True', 'true', '1')
+EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "False") in (True, 'True', 'true', '1')
 
 try:
     from .local_settings import *

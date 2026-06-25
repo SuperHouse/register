@@ -64,6 +64,7 @@ urlpatterns = [
     path('batches/<int:batch_id>/', views.batch_edit, name='batch_edit'),
     path('batches/<int:batch_id>/print/', views.batch_print, name='batch_print'),
     path('batches/<int:batch_id>/delete/', views.batch_delete, name='batch_delete'),
+    path('batches/<int:batch_id>/duplicate/', views.batch_duplicate, name='batch_duplicate'),
     path('batches/<int:batch_id>/apply-template/', views.batch_apply_template, name='batch_apply_template'),
     path('batches/<int:batch_id>/add-production-stage/', views.batch_production_stage_add, name='batch_production_stage_add'),
     path('batches/production-stage/<int:batch_production_stage_id>/update/', views.batch_production_stage_update, name='batch_production_stage_update'),
