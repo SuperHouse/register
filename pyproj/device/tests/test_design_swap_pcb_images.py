@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.core.files.base import ContentFile
 from django.urls import reverse
 import pytest
@@ -58,6 +60,27 @@ def test_swap_pcb_images_requires_staff(client, django_user_model, design_with_t
 
     top_asset.refresh_from_db()
     assert top_asset.file.read() == b'top-bytes'
+
+
+@pytest.mark.django_db
+def test_swap_pcb_images_survives_unowned_files(client, django_user_model, design_with_top_and_bottom_assets):
+    """Files restored/extracted as another OS user can be renamed (needs only
+    directory write access) but not have an explicit mtime set via os.utime
+    (needs file ownership) - the swap should still succeed in that case."""
+    design, top_asset, bottom_asset = design_with_top_and_bottom_assets
+
+    staff = django_user_model.objects.create_user(email='staff3@example.com', password='staffy', is_staff=True)
+    client.force_login(staff)
+
+    with patch('device.views.os.utime', side_effect=PermissionError):
+        response = client.post(reverse('design_swap_pcb_images', args=[design.pk]))
+    assert response.status_code == 302
+
+    top_asset.refresh_from_db()
+    bottom_asset.refresh_from_db()
+    assert top_asset.file.read() == b'bottom-bytes'
+    bottom_asset.file.seek(0)
+    assert bottom_asset.file.read() == b'top-bytes'
 
 
 @pytest.mark.django_db

@@ -325,10 +325,17 @@ def design_swap_pcb_images(request, design_id):
 
             # Renaming preserves each file's original mtime, which would
             # otherwise let a cache keyed on Last-Modified serve stale content
-            # from the swapped-in file's old path.
+            # from the swapped-in file's old path. Setting an explicit mtime
+            # (unlike the renames above) requires owning the file, not just
+            # having group write access, so this is skipped rather than
+            # left to crash the request for assets owned by another user
+            # (e.g. restored from a backup or extracted via a script).
             now = timezone.now().timestamp()
-            os.utime(top_path, (now, now))
-            os.utime(bottom_path, (now, now))
+            try:
+                os.utime(top_path, (now, now))
+                os.utime(bottom_path, (now, now))
+            except PermissionError:
+                pass
 
             messages.success(request, 'PCB Top View and PCB Bottom View images swapped.')
 
