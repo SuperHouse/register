@@ -1899,6 +1899,32 @@ def batch_delete(request, batch_id):
 
 
 @staff_member_required
+def batch_duplicate(request, batch_id):
+    batch = get_object_or_404(Batch, pk=batch_id)
+
+    if request.method != 'POST':
+        return redirect('erp:batch_edit', batch_id=batch.pk)
+
+    new_batch = Batch.objects.create(
+        design=batch.design,
+        po=batch.po,
+        quantity=batch.quantity,
+    )
+
+    for stage in batch.production_stages.all():
+        BatchProductionStage.objects.create(
+            batch=new_batch,
+            name=stage.name,
+            color=stage.color,
+            order=stage.order,
+            status=BatchProductionStage.NOT_STARTED,
+        )
+
+    messages.success(request, 'Batch duplicated.')
+    return redirect('erp:batch_list')
+
+
+@staff_member_required
 def batch_apply_template(request, batch_id):
     batch = get_object_or_404(Batch, pk=batch_id)
 
