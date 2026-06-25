@@ -38,6 +38,12 @@ Each run only refreshes a bounded, oldest-first slice of variants (roughly
 runs rather than firing all at once. See `python manage.py refresh_part_sources --help`
 for the `--max-per-run` and `--dry-run` options.
 
+> **Note:** `manage.py` reads `.env` fresh on every invocation, but the running uWSGI
+> worker only read it once at startup — so if you change any DigiKey-related `.env`
+> value (see [DigiKey API Integration](README.md#digikey-api-integration) for the
+> failure modes this causes), restart the relevant uWSGI vassal (above) too, or the
+> cron job and the web app will silently disagree about DigiKey config.
+
 ## Linux Local Setup (dev)
 
 Todo

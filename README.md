@@ -80,6 +80,8 @@ DIGIKEY_CLIENT_SANDBOX = False
 
 Set `DIGIKEY_CLIENT_SANDBOX = True` if your DigiKey application only has sandbox (not production) API access. Note that the sandbox catalog contains only a limited set of test parts.
 
+> **Production warning:** `.env` is only read at process startup (`load_dotenv()` in `conf/settings.py`). On a server, the uWSGI worker keeps whatever values it read when it last started, while every `manage.py` invocation (e.g. the `refresh_part_sources` cron job) re-reads the current `.env` file fresh. If you ever edit `DIGIKEY_CLIENT_SANDBOX`, `DIGIKEY_CLIENT_ID`, or `DIGIKEY_CLIENT_SECRET` in production without restarting uWSGI (`sudo touch /etc/uwsgi-emperor/vassals/register.ini`), the two will disagree about which DigiKey API host to use while sharing the *same* `token_storage.json` — the web app keeps working (it's still using the old, matching value), but the management command starts sending a token issued for one API host to the other, failing with errors like `Token refresh failed (500)` or `401: You are not subscribed to this API`. Always restart uWSGI after changing any DigiKey `.env` value.
+
 ### 3. Set up local HTTPS for development
 
 DigiKey requires HTTPS for the OAuth callback, even on localhost. The easiest approach uses `mkcert` to create a locally-trusted certificate and `runserver_plus` (included with `django-extensions`, which is already installed) to serve over HTTPS.

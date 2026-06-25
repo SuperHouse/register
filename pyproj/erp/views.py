@@ -1160,8 +1160,13 @@ def _get_digikey_access_token():
             timeout=15,
         )
         if r.status_code != 200:
+            try:
+                body = r.json()
+                detail = body.get('ErrorMessage') or body.get('error_description') or body.get('error') or str(body)
+            except Exception:
+                detail = r.text[:300]
             raise RuntimeError(
-                f'Token refresh failed ({r.status_code}). '
+                f'Token refresh failed ({r.status_code}): {detail}. '
                 'Re-authorise by visiting /parts/source/digikey-connect/'
             )
         token_data = r.json()
