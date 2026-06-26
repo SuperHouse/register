@@ -32,7 +32,7 @@
                         <th>Qty</th>
                         <th>Created</th>
                         <th>Progress</th>
-                        <th style="width: 120px;"></th>
+                        <th class="hide-in-display-mode" style="width: 120px;"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -61,7 +61,7 @@
                                     {% endfor %}
                                 </div>
                             </td>
-                            <td class="text-nowrap">
+                            <td class="text-nowrap hide-in-display-mode">
                                 <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print" onclick="event.stopPropagation();">
                                     <i class="cil-print"></i>
                                 </a>
