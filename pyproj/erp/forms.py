@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django import forms
+from django.db.models import Q
 
 from device.models import Design
 from .models import (
@@ -46,7 +47,7 @@ class ProductionStageTemplateStepForm(forms.ModelForm):
 
 class BatchForm(forms.ModelForm):
     design = DesignChoiceField(
-        queryset=Design.objects.select_related('client').order_by(
+        queryset=Design.objects.filter(obsolete=False).select_related('client').order_by(
             'client__company_name', 'sku', 'name', 'hw_version'
         ),
         widget=forms.Select(attrs={'class': 'form-select'}),
@@ -60,6 +61,17 @@ class BatchForm(forms.ModelForm):
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # An existing batch may be tied to a design that has since been
+        # marked obsolete; keep it selectable so editing doesn't fail
+        # validation or silently drop the field, without offering other
+        # obsolete designs as new choices.
+        if self.instance.pk and self.instance.design_id:
+            self.fields['design'].queryset = Design.objects.filter(
+                Q(obsolete=False) | Q(pk=self.instance.design_id)
+            ).select_related('client').order_by('client__company_name', 'sku', 'name', 'hw_version')
 
 
 class BatchApplyTemplateForm(forms.Form):

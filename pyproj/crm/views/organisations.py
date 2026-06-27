@@ -38,7 +38,7 @@ def organisation_detail(request, client_id):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
     designs = Design.objects.filter(client=client).prefetch_related(
         Prefetch('designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
-    ).order_by('sku')
+    ).order_by('obsolete', 'sku')
     has_designs = designs.exists()
 
     q = request.GET.get('q', '').strip()

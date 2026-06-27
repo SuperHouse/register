@@ -43,6 +43,13 @@
                                 </thead>
                                 <tbody>
                                     {% for design in designs %}
+                                        {% ifchanged design.obsolete %}
+                                            {% if design.obsolete %}
+                                                <tr class="table-secondary">
+                                                    <td colspan="{% if user.is_staff %}5{% else %}4{% endif %}" class="fw-semibold py-2">Obsolete Designs</td>
+                                                </tr>
+                                            {% endif %}
+                                        {% endifchanged %}
                                         <tr style="cursor: pointer;" onclick="window.location='{% url 'design_detail' design.pk %}'">
                                             <td style="width: 70px; padding: 4px 8px;">
                                                 {% with design.pcb_top_assets|first as pcb_top %}
@@ -57,7 +64,12 @@
                                                 <td>{{ design.client.company_name }}</td>
                                             {% endif %}
                                             <td>{{ design.sku }}</td>
-                                            <td>{{ design.name }}</td>
+                                            <td>
+                                                {{ design.name }}
+                                                {% if design.obsolete %}
+                                                    <span class="badge bg-warning text-dark ms-1">Obsolete</span>
+                                                {% endif %}
+                                            </td>
                                             <td>{{ design.hw_version }}</td>
                                         </tr>
                                     {% endfor %}

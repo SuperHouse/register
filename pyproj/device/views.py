@@ -107,7 +107,7 @@ def design_list(request):
     designs = Design.objects.prefetch_related(
         "client",
         Prefetch('designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
-    ).order_by('client', 'sku').all()
+    ).order_by('obsolete', 'client', 'sku').all()
 
     if not request.user.is_staff:
         designs = designs.filter(client__in=clients)
@@ -338,6 +338,19 @@ def design_swap_pcb_images(request, design_id):
                 pass
 
             messages.success(request, 'PCB Top View and PCB Bottom View images swapped.')
+
+    return redirect('design_detail', design_id=design.pk)
+
+
+@staff_member_required
+def design_toggle_obsolete(request, design_id):
+    """Toggle a design's obsolete flag."""
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        design.obsolete = not design.obsolete
+        design.save()
+        messages.success(request, f'Design marked as {"obsolete" if design.obsolete else "current"}.')
 
     return redirect('design_detail', design_id=design.pk)
 

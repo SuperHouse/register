@@ -38,6 +38,7 @@ urlpatterns = [
     path('design/da/<int:asset_id>/', device_views.design_asset_edit, name='design_asset_edit'),
     path('design/da/<int:asset_id>/delete/', device_views.design_asset_delete, name='design_asset_delete'),
     path('design/<int:design_id>/swap-pcb-images/', device_views.design_swap_pcb_images, name='design_swap_pcb_images'),
+    path('design/<int:design_id>/toggle-obsolete/', device_views.design_toggle_obsolete, name='design_toggle_obsolete'),
     path('organisation/', crm_views.organisation_list, name='organisation_list'),
     path('organisation/<int:client_id>/', crm_views.organisation_detail, name='organisation_detail'),
     path('organisation/<int:client_id>/edit/', crm_views.organisation_edit, name='organisation_edit'),

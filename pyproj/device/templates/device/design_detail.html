@@ -7,6 +7,9 @@
 
 {% block h1 %}
     {{ design.client.company_name }} <b>{{ design.name }}</b> v{{ design.hw_version }}
+    {% if design.obsolete %}
+        <span class="badge bg-warning text-dark ms-1">Obsolete</span>
+    {% endif %}
 {% endblock h1 %}
 
 {% block content %}
@@ -15,7 +18,15 @@
             <div class="mb-3 d-flex gap-2">
                 <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
                 {% if user.is_staff %}
-                    <a href="{% url 'erp:batch_add' %}?design={{ design.pk }}" class="btn btn-primary">Add New Batch</a>
+                    {% if not design.obsolete %}
+                        <a href="{% url 'erp:batch_add' %}?design={{ design.pk }}" class="btn btn-primary">Add New Batch</a>
+                    {% endif %}
+                    <form method="post" action="{% url 'design_toggle_obsolete' design.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-secondary">
+                            {% if design.obsolete %}Mark as Current{% else %}Mark as Obsolete{% endif %}
+                        </button>
+                    </form>
                 {% endif %}
             </div>
 
