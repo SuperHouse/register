@@ -72,6 +72,12 @@
                 </div>
 
                 <div class="mb-3">
+                    <label for="{{ form.stock.id_for_label }}" class="form-label fw-semibold">Stock</label>
+                    {{ form.stock }}
+                    {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
+                </div>
+
+                <div class="mb-3">
                     <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Image</label>
                     {{ form.image }}
                     {% if form.image.errors %}<div class="text-danger small mt-1">{{ form.image.errors }}</div>{% endif %}
@@ -122,6 +128,10 @@
                                                 <td class="text-body-secondary" {% if not forloop.last %}style="border-bottom: none;"{% endif %}>{{ source.manufacturer_sku }}</td>
                                                 <td class="text-body-secondary" {% if not forloop.last %}style="border-bottom: none;"{% endif %}>
                                                     {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
+                                                    {% if source.has_stale_variant_data %}
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                                           title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+                                                    {% endif %}
                                                 </td>
                                             {% else %}
                                                 <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
@@ -187,6 +197,10 @@
                                             <td class="text-body-secondary">{{ source.manufacturer_sku }}</td>
                                             <td class="text-body-secondary">
                                                 {% if source.stock is not None %}{{ source.stock }}{% else %}<span class="fst-italic">Unknown</span>{% endif %}
+                                                {% if source.has_stale_variant_data %}
+                                                    <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                                       title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+                                                {% endif %}
                                             </td>
                                             <td colspan="4" class="text-body-secondary fst-italic">No SKUs recorded</td>
                                             <td>

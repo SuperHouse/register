@@ -68,6 +68,7 @@ class DashboardStatsSchema(Schema):
     client_count: int
     design_count: int
     device_count: int
+    part_count: int
     chart_labels: list[str]
     chart_data: list[int]
 

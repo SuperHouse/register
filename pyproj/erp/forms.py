@@ -145,7 +145,9 @@ class PartImageWidget(forms.ClearableFileInput):
 class PartForm(forms.ModelForm):
     class Meta:
         model = Part
-        fields = ['name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'image']
+        fields = [
+            'name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'stock', 'image',
+        ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -154,6 +156,7 @@ class PartForm(forms.ModelForm):
             'package': forms.TextInput(attrs={'class': 'form-control'}),
             'value': forms.TextInput(attrs={'class': 'form-control'}),
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
 

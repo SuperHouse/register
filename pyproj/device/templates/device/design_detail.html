@@ -208,6 +208,9 @@
                                     <th>Device</th>
                                     <th>Package</th>
                                     <th>Value</th>
+                                    <th>Position</th>
+                                    <th>Rotation</th>
+                                    <th>Side</th>
                                     {% if user.is_staff %}<th></th>{% endif %}
                                 </tr>
                             </thead>
@@ -222,6 +225,9 @@
                                                 <td>{{ entry.part.device }}</td>
                                                 <td>{{ entry.part.package }}</td>
                                                 <td>{{ entry.part.value }}</td>
+                                                <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}, {{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                                <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                                <td>{{ entry.get_side_display|default:"—" }}</td>
                                                 <td class="text-nowrap">
                                                     <button type="submit" class="btn btn-sm btn-primary me-1" title="Save">
                                                         <i class="cil-save"></i>
@@ -242,6 +248,9 @@
                                             <td>{{ entry.part.device }}</td>
                                             <td>{{ entry.part.package }}</td>
                                             <td>{{ entry.part.value }}</td>
+                                            <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}, {{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                            <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}&deg;{% else %}&mdash;{% endif %}</td>
+                                            <td>{{ entry.get_side_display|default:"—" }}</td>
                                         {% endif %}
                                     </tr>
                                 {% endfor %}
@@ -250,13 +259,13 @@
                                         <form method="post" action="{% url 'erp:design_bom_entry_add' design.pk %}" class="d-contents">
                                             {% csrf_token %}
                                             <td>{{ bom_entry_form.reference }}</td>
-                                            <td colspan="4">{{ bom_entry_form.part }}</td>
+                                            <td colspan="7">{{ bom_entry_form.part }}</td>
                                             <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
                                         </form>
                                     </tr>
                                 {% endif %}
                                 {% if not bom_entries and not user.is_staff %}
-                                    <tr><td colspan="5"><i>No BOM has been added for this design.</i></td></tr>
+                                    <tr><td colspan="8"><i>No BOM has been added for this design.</i></td></tr>
                                 {% endif %}
                             </tbody>
                         </table>

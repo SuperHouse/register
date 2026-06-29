@@ -1,11 +1,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
+from datetime import timedelta
 
 from django.db import models
 from django.utils import timezone
 
 from device.models import Design
+
+STALE_REFRESH_THRESHOLD = timedelta(hours=48)
 
 
 def part_asset_upload_path(instance, filename):
@@ -95,6 +98,9 @@ class Part(models.Model):
     package = models.CharField(max_length=100, blank=True, help_text='Package type (e.g. 0402, SOT-23)')
     value = models.CharField(max_length=100, blank=True, help_text='Component value (e.g. 10k, 100nF)')
     fusion_library = models.CharField(max_length=200, blank=True, help_text='Fusion Electronics library name')
+    stock = models.IntegerField(
+        null=True, blank=True, help_text='Manually-tracked on-hand stock count, independent of supplier listings'
+    )
     image = models.ImageField(upload_to='part_images/', null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
 
@@ -111,6 +117,12 @@ class Part(models.Model):
         """Sum of stock across all supplier listings, or None if none have a known stock level."""
         known = [source.stock for source in self.sources.all() if source.stock is not None]
         return sum(known) if known else None
+
+    @property
+    def has_stale_source_data(self):
+        """True if any source listing has stale (or never-refreshed) variant data — see
+        PartSource.has_stale_variant_data."""
+        return any(source.has_stale_variant_data for source in self.sources.all())
 
 
 class DesignBomEntry(models.Model):
@@ -171,6 +183,16 @@ class PartSource(models.Model):
 
     def __str__(self):
         return f'{self.part}: {self.supplier_name}'
+
+    @property
+    def has_stale_variant_data(self):
+        """True if any of this listing's variants has never been refreshed, or was last
+        refreshed more than STALE_REFRESH_THRESHOLD ago."""
+        cutoff = timezone.now() - STALE_REFRESH_THRESHOLD
+        return any(
+            variant.last_refreshed is None or variant.last_refreshed < cutoff
+            for variant in self.variants.all()
+        )
 
 
 class PartSourceVariant(models.Model):

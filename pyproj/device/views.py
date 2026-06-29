@@ -24,6 +24,7 @@ from .forms import DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, De
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
+from erp.models import Part
 
 
 def dashboard(request):
@@ -61,6 +62,7 @@ def dashboard(request):
         'client_count': clients.count(),
         'design_count': designs.count(),
         'device_count': devices.count(),
+        'part_count': Part.objects.count(),
         'chart_labels': json.dumps(chart_labels),
         'chart_data': json.dumps(chart_data),
     }

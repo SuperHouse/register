@@ -13,6 +13,7 @@ from api.auth import session_or_api_key_auth
 from api.routes import router
 from crm.models import Org
 from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
+from erp.models import Part
 from .schemas import (
     DashboardStatsSchema,
     DesignSchema,
@@ -249,6 +250,7 @@ def get_dashboard_stats(request):
         'client_count': clients.count(),
         'design_count': designs.count(),
         'device_count': devices.count(),
+        'part_count': Part.objects.count(),
         'chart_labels': chart_labels,
         'chart_data': chart_data,
     }
