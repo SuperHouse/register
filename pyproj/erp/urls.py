@@ -71,4 +71,9 @@ urlpatterns = [
     path('batches/production-stage/<int:batch_production_stage_id>/set-status/<str:status>/', views.batch_production_stage_set_status, name='batch_production_stage_set_status'),
     path('batches/production-stage/<int:batch_production_stage_id>/delete/', views.batch_production_stage_delete, name='batch_production_stage_delete'),
     path('batches/<int:batch_id>/reorder-production-stages/', views.batch_production_stage_reorder, name='batch_production_stage_reorder'),
+
+    path('design-bom/<int:design_id>/populate/', views.design_bom_populate, name='design_bom_populate'),
+    path('design-bom/<int:design_id>/add/', views.design_bom_entry_add, name='design_bom_entry_add'),
+    path('design-bom/entry/<int:entry_id>/edit/', views.design_bom_entry_edit, name='design_bom_entry_edit'),
+    path('design-bom/entry/<int:entry_id>/delete/', views.design_bom_entry_delete, name='design_bom_entry_delete'),
 ]

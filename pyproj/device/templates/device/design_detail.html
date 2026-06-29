@@ -185,6 +185,85 @@
                 </div>
             {% endif %}
 
+            {% if user.is_staff or bom_entries %}
+                <h5 class="mt-4">Bill of Materials</h5>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        {% if user.is_staff %}
+                            <div class="mb-3">
+                                <form method="post" action="{% url 'erp:design_bom_populate' design.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                            {% if not bom_csv_asset %}disabled title="Upload a BOM CSV file first"{% else %}title="Add any new reference designators from the BOM CSV; existing entries are left untouched"{% endif %}>
+                                        <i class="bi bi-arrow-repeat"></i> Populate from BOM
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Part</th>
+                                    <th>Device</th>
+                                    <th>Package</th>
+                                    <th>Value</th>
+                                    {% if user.is_staff %}<th></th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry, entry_form in bom_entries_with_forms %}
+                                    <tr>
+                                        {% if user.is_staff %}
+                                            <form method="post" action="{% url 'erp:design_bom_entry_edit' entry.pk %}" class="d-contents">
+                                                {% csrf_token %}
+                                                <td>{{ entry_form.reference }}</td>
+                                                <td>{{ entry_form.part }}</td>
+                                                <td>{{ entry.part.device }}</td>
+                                                <td>{{ entry.part.package }}</td>
+                                                <td>{{ entry.part.value }}</td>
+                                                <td class="text-nowrap">
+                                                    <button type="submit" class="btn btn-sm btn-primary me-1" title="Save">
+                                                        <i class="cil-save"></i>
+                                                    </button>
+                                                </td>
+                                            </form>
+                                            <td>
+                                                <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                        <i class="cil-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </td>
+                                        {% else %}
+                                            <td>{{ entry.reference }}</td>
+                                            <td>{{ entry.part.name }}</td>
+                                            <td>{{ entry.part.device }}</td>
+                                            <td>{{ entry.part.package }}</td>
+                                            <td>{{ entry.part.value }}</td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                                {% if user.is_staff %}
+                                    <tr>
+                                        <form method="post" action="{% url 'erp:design_bom_entry_add' design.pk %}" class="d-contents">
+                                            {% csrf_token %}
+                                            <td>{{ bom_entry_form.reference }}</td>
+                                            <td colspan="4">{{ bom_entry_form.part }}</td>
+                                            <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
+                                        </form>
+                                    </tr>
+                                {% endif %}
+                                {% if not bom_entries and not user.is_staff %}
+                                    <tr><td colspan="5"><i>No BOM has been added for this design.</i></td></tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if user.is_staff or has_testing_assets %}
                 <h5 class="mt-4">Testing</h5>
                 <div class="card border-0 mb-3">

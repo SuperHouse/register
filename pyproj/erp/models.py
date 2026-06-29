@@ -113,6 +113,33 @@ class Part(models.Model):
         return sum(known) if known else None
 
 
+class DesignBomEntry(models.Model):
+    """A single placed component on a Design's BOM (e.g. RefDes R3 = a 10k resistor Part).
+
+    One row per physical placement, not a collapsed line item with a quantity, so that
+    placement data (position/rotation/side) can be attached per-RefDes later for generating
+    pick-and-place jobs and AOI targets.
+    """
+    TOP = 'TOP'
+    BOTTOM = 'BOTTOM'
+    SIDE_CHOICES = [(TOP, 'Top'), (BOTTOM, 'Bottom')]
+
+    design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='bom_entries')
+    part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name='design_bom_entries')
+    reference = models.CharField(max_length=50, help_text='Reference designator (e.g. R3)')
+    pos_x = models.DecimalField(max_digits=9, decimal_places=4, null=True, blank=True)
+    pos_y = models.DecimalField(max_digits=9, decimal_places=4, null=True, blank=True)
+    rotation = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    side = models.CharField(max_length=6, choices=SIDE_CHOICES, blank=True)
+
+    class Meta:
+        ordering = ['reference']
+        constraints = [models.UniqueConstraint(fields=['design', 'reference'], name='unique_design_bom_reference')]
+
+    def __str__(self):
+        return f'{self.design}: {self.reference} = {self.part}'
+
+
 class PartSubstitution(models.Model):
     """A part that can be used as a possible substitution for another part."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='substitutions')

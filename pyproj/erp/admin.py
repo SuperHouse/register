@@ -3,8 +3,8 @@
 from django.contrib import admin
 
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage, ProductionStageTemplate,
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
+    Part, PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage, ProductionStageTemplate,
     ProductionStageTemplateStep,
 )
 
@@ -107,3 +107,10 @@ class BomEquivalenceRuleAdmin(admin.ModelAdmin):
         'from_library', 'to_library', 'from_device', 'to_device',
         'from_package', 'to_package', 'from_value', 'to_value',
     ]
+
+
+@admin.register(DesignBomEntry)
+class DesignBomEntryAdmin(admin.ModelAdmin):
+    list_display = ['design', 'reference', 'part', 'side']
+    list_select_related = ['design', 'part']
+    search_fields = ['design__name', 'design__sku', 'reference', 'part__name']

@@ -5,8 +5,8 @@ from django.db.models import Q
 
 from device.models import Design
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
+    Part, PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
     ProductionStageTemplateStep,
 )
 
@@ -205,6 +205,16 @@ class PartSubstitutionForm(forms.ModelForm):
             qs = qs.exclude(pk=exclude_pk)
         self.fields['substitute'].queryset = qs
         self.fields['substitute'].empty_label = '— select a part —'
+
+
+class DesignBomEntryForm(forms.ModelForm):
+    class Meta:
+        model = DesignBomEntry
+        fields = ['reference', 'part']
+        widgets = {
+            'reference': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'part': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
 
 
 class PartAssetForm(forms.ModelForm):
