@@ -5,8 +5,8 @@ from django.db.models import Q
 
 from device.models import Design
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
+    Part, PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
     ProductionStageTemplateStep,
 )
 
@@ -145,7 +145,9 @@ class PartImageWidget(forms.ClearableFileInput):
 class PartForm(forms.ModelForm):
     class Meta:
         model = Part
-        fields = ['name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'image']
+        fields = [
+            'name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'stock', 'image',
+        ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
@@ -154,6 +156,7 @@ class PartForm(forms.ModelForm):
             'package': forms.TextInput(attrs={'class': 'form-control'}),
             'value': forms.TextInput(attrs={'class': 'form-control'}),
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
+            'stock': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
 
@@ -205,6 +208,16 @@ class PartSubstitutionForm(forms.ModelForm):
             qs = qs.exclude(pk=exclude_pk)
         self.fields['substitute'].queryset = qs
         self.fields['substitute'].empty_label = '— select a part —'
+
+
+class DesignBomEntryForm(forms.ModelForm):
+    class Meta:
+        model = DesignBomEntry
+        fields = ['reference', 'part']
+        widgets = {
+            'reference': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+            'part': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
 
 
 class PartAssetForm(forms.ModelForm):

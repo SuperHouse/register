@@ -162,6 +162,51 @@
                 </div>
             </div>
         </div>
+
+        <div class="row">
+            <div class="col-12 col-xl-10">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Parts Required</h5>
+                        {% if parts_required %}
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                    <tr class="highlight">
+                                        <th>Part</th>
+                                        <th>Qty</th>
+                                        <th>Stock</th>
+                                        <th>Available</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in parts_required %}
+                                        <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:part_edit' row.part.pk %}'">
+                                            <td>
+                                                {% if not row.part.sources.all %}
+                                                    <i class="bi bi-exclamation-triangle-fill text-warning me-1" title="No sources listed"></i>
+                                                {% endif %}
+                                                {{ row.part.name }}
+                                            </td>
+                                            <td>{{ row.required }}</td>
+                                            <td>{{ row.part.stock|default_if_none:"-" }}</td>
+                                            <td>
+                                                {{ row.part.total_stock|default_if_none:"-" }}
+                                                {% if row.part.has_stale_source_data %}
+                                                    <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                                       title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="text-body-secondary fst-italic mb-0">This design has no BOM entries, so no parts are required.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     {% endif %}
 {% endblock content %}
 

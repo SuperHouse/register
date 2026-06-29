@@ -74,6 +74,7 @@
                                 <th>Value</th>
                                 <th>Package</th>
                                 <th>Device</th>
+                                <th>Stock</th>
                                 <th>Available</th>
                                 <th style="width: 60px;"></th>
                             </tr>
@@ -81,7 +82,7 @@
                         <tbody>
                             {% if uncategorised %}
                                 <tr class="table-secondary">
-                                    <td colspan="7" class="fw-semibold text-body-secondary py-2">
+                                    <td colspan="8" class="fw-semibold text-body-secondary py-2">
                                         Uncategorised
                                     </td>
                                 </tr>
@@ -92,7 +93,7 @@
 
                             {% for category in categories_with_parts %}
                                 <tr class="table-secondary">
-                                    <td colspan="7" class="fw-semibold py-2">
+                                    <td colspan="8" class="fw-semibold py-2">
                                         {{ category.name }}
                                     </td>
                                 </tr>

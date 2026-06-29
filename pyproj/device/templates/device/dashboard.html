@@ -33,7 +33,7 @@
     </div>
 
     <div class="row">
-        <div class="col-12 col-md-6 col-lg-4 mb-4">
+        <div class="col-12 col-md-6 col-lg-{% if user.is_staff %}3{% else %}4{% endif %} mb-4">
             <a href="{% url 'organisation_list' %}" class="text-decoration-none">
                 <div class="card">
                     <div class="card-body text-center">
@@ -46,7 +46,7 @@
             </a>
         </div>
 
-        <div class="col-12 col-md-6 col-lg-4 mb-4">
+        <div class="col-12 col-md-6 col-lg-{% if user.is_staff %}3{% else %}4{% endif %} mb-4">
             <a href="{% url 'design_list' %}" class="text-decoration-none">
                 <div class="card">
                     <div class="card-body text-center">
@@ -59,7 +59,7 @@
             </a>
         </div>
 
-        <div class="col-12 col-md-6 col-lg-4 mb-4">
+        <div class="col-12 col-md-6 col-lg-{% if user.is_staff %}3{% else %}4{% endif %} mb-4">
             <a href="{% url 'device:top' %}" class="text-decoration-none">
                 <div class="card">
                     <div class="card-body text-center">
@@ -71,6 +71,21 @@
                 </div>
             </a>
         </div>
+
+        {% if user.is_staff %}
+            <div class="col-12 col-md-6 col-lg-3 mb-4">
+                <a href="{% url 'erp:part_list' %}" class="text-decoration-none">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Parts</h5>
+                            <p class="card-text">
+                                <span class="display-4 fw-bold" id="part-count">{{ part_count }}</span>
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        {% endif %}
     </div>
 
     <div class="row mt-4">
@@ -153,6 +168,7 @@
 
         function flashUpdate(elementId, newValue) {
             const el = document.getElementById(elementId);
+            if (!el) return;
             if (el.textContent != newValue) {
                 el.textContent = newValue;
                 const card = el.closest('.card');
@@ -177,6 +193,7 @@
                 flashUpdate('client-count', data.client_count);
                 flashUpdate('design-count', data.design_count);
                 flashUpdate('device-count', data.device_count);
+                flashUpdate('part-count', data.part_count);
 
                 // Resize chart if the container has changed width (e.g. after entering display mode)
                 if (chart && chart.canvas) {

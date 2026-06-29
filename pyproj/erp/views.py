@@ -4,6 +4,10 @@ import csv
 import io
 import json
 import os
+import re
+import xml.etree.ElementTree as ET
+from collections import Counter
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.contrib import messages
@@ -22,6 +26,7 @@ from .forms import (
     BomEquivalenceRuleForm,
     BomExclusionRuleForm,
     BomLibrarySettingForm,
+    DesignBomEntryForm,
     LocationForm,
     PartAssetForm,
     PartCategoryForm,
@@ -32,10 +37,10 @@ from .forms import (
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
-from device.models import DesignAsset
+from device.models import Design, DesignAsset
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, Location, Part,
-    PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant, PartSubstitution, ProductionStage,
+    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
+    Part, PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant, PartSubstitution, ProductionStage,
     ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
@@ -356,7 +361,7 @@ def location_delete(request, location_id):
 @staff_member_required
 def part_list(request):
     q = request.GET.get('q', '').strip()
-    parts_qs = Part.objects.prefetch_related('sources').order_by('name')
+    parts_qs = Part.objects.prefetch_related('sources__variants').order_by('name')
     if q:
         q_filter = Q(name__icontains=q) | Q(value__icontains=q) | Q(package__icontains=q) | Q(device__icontains=q)
         parts_qs = parts_qs.filter(q_filter)
@@ -413,6 +418,105 @@ def _bom_apply_equivalence(equivalence_rules, library, device, package, value):
     return library, device, package, value
 
 
+def _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name):
+    """Apply BOM import rules to one CSV row.
+
+    Returns (reference, part, created) or None if the row is excluded. Shared by the Parts
+    library CSV import (part_import_bom) and the per-design BOM import (design_bom_populate) —
+    both consume the same reference/device/package/value/library CSV column format.
+    """
+    reference = (row.get('reference') or '').strip()
+    device = (row.get('device') or '').strip()
+    package = (row.get('package') or '').strip()
+    value = (row.get('value') or '').strip()
+    library = (row.get('library') or '').strip()
+
+    if _bom_row_is_excluded(exclusion_rules, library, device, package, value):
+        return None
+
+    library, device, package, value = _bom_apply_equivalence(equivalence_rules, library, device, package, value)
+
+    library_setting = library_settings_by_name.get(library.lower())
+    if library_setting:
+        if library_setting.ignore_device:
+            device = ''
+        if library_setting.ignore_package:
+            package = ''
+        if library_setting.ignore_value:
+            value = ''
+
+    part = Part.objects.filter(device__iexact=device, package__iexact=package, value__iexact=value).first()
+    created = False
+    if not part:
+        name = ' '.join(p for p in [value, package, device.capitalize()] if p) or 'Unnamed Part'
+        part = Part.objects.create(name=name, device=device, package=package, value=value, fusion_library=library)
+        created = True
+
+    return reference, part, created
+
+
+_BRD_ROT_RE = re.compile(r'^(M)?R(-?\d+(?:\.\d+)?)$')
+
+
+def _parse_brd_placements(brd_path):
+    """Parse an EAGLE .brd file into {reference designator: {pos_x, pos_y, rotation, side}}.
+
+    Reference designators (the <element name="..."> attribute) match the BOM CSV's `reference`
+    column exactly, since both are generated from the same Fusion Electronics board for a given
+    design — so it's used as the join key rather than library/device/package/value, which don't
+    line up consistently between the two exports.
+    """
+    placements = {}
+    try:
+        elements = ET.parse(brd_path).find('drawing/board/elements')
+    except ET.ParseError:
+        return placements
+    if elements is None:
+        return placements
+
+    for element in elements.findall('element'):
+        reference = element.get('name')
+        if not reference:
+            continue
+        match = _BRD_ROT_RE.match(element.get('rot', 'R0'))
+        try:
+            placements[reference] = {
+                'pos_x': Decimal(element.get('x', '0')),
+                'pos_y': Decimal(element.get('y', '0')),
+                'rotation': Decimal(match.group(2)) if match else Decimal('0'),
+                'side': DesignBomEntry.BOTTOM if match and match.group(1) else DesignBomEntry.TOP,
+            }
+        except InvalidOperation:
+            continue
+    return placements
+
+
+def _apply_brd_placements(design):
+    """Backfill pos_x/pos_y/rotation/side on a design's BOM entries from its PCB Design File asset.
+
+    Returns the number of entries updated, or None if the design has no PCB Design File asset.
+    """
+    brd_asset = design.designasset_set.filter(asset_type=DesignAsset.PCB_DESIGN).first()
+    if not brd_asset:
+        return None
+
+    placements = _parse_brd_placements(brd_asset.file.path)
+    entries_to_update = []
+    for entry in design.bom_entries.all():
+        placement = placements.get(entry.reference)
+        if not placement:
+            continue
+        entry.pos_x = placement['pos_x']
+        entry.pos_y = placement['pos_y']
+        entry.rotation = placement['rotation']
+        entry.side = placement['side']
+        entries_to_update.append(entry)
+
+    if entries_to_update:
+        DesignBomEntry.objects.bulk_update(entries_to_update, ['pos_x', 'pos_y', 'rotation', 'side'])
+    return len(entries_to_update)
+
+
 @staff_member_required
 def part_import_bom(request):
     if request.method != 'POST':
@@ -438,33 +542,16 @@ def part_import_bom(request):
         excluded = 0
 
         for row in reader:
-            device = (row.get('device') or '').strip()
-            package = (row.get('package') or '').strip()
-            value = (row.get('value') or '').strip()
-            library = (row.get('library') or '').strip()
-
-            if _bom_row_is_excluded(exclusion_rules, library, device, package, value):
+            resolved = _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name)
+            if resolved is None:
                 excluded += 1
                 continue
 
-            library, device, package, value = _bom_apply_equivalence(equivalence_rules, library, device, package, value)
-
-            library_setting = library_settings_by_name.get(library.lower())
-            if library_setting:
-                if library_setting.ignore_device:
-                    device = ''
-                if library_setting.ignore_package:
-                    package = ''
-                if library_setting.ignore_value:
-                    value = ''
-
-            if Part.objects.filter(device__iexact=device, package__iexact=package, value__iexact=value).exists():
+            _reference, _part, created = resolved
+            if created:
+                added += 1
+            else:
                 skipped += 1
-                continue
-
-            name = ' '.join(p for p in [value, package, device.capitalize()] if p) or 'Unnamed Part'
-            Part.objects.create(name=name, device=device, package=package, value=value, fusion_library=library)
-            added += 1
 
         messages.success(
             request,
@@ -476,6 +563,120 @@ def part_import_bom(request):
         messages.warning(request, f'Error reading CSV: {e}')
 
     return redirect('erp:part_list')
+
+
+@staff_member_required
+def design_bom_populate(request, design_id):
+    """Seed a design's BOM entries from its uploaded BOM CSV DesignAsset.
+
+    Safe to run more than once: rows whose reference designator is already present on the
+    design are skipped, so re-running after manual edits never overwrites or duplicates them.
+    Also backfills pos_x/pos_y/rotation/side on every entry (new and pre-existing) from the
+    design's PCB Design File asset, if one is attached — see _apply_brd_placements().
+    """
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        bom_asset = design.designasset_set.filter(asset_type=DesignAsset.BOM).first()
+        if not bom_asset:
+            messages.warning(request, 'This design has no BOM CSV uploaded to populate from.')
+        else:
+            try:
+                content = bom_asset.file.read().decode('utf-8-sig')
+                reader = csv.DictReader(io.StringIO(content))
+
+                exclusion_rules = list(BomExclusionRule.objects.all())
+                equivalence_rules = list(BomEquivalenceRule.objects.all())
+                library_settings_by_name = {
+                    ls.library.lower(): ls for ls in BomLibrarySetting.objects.all()
+                }
+                existing_references = set(design.bom_entries.values_list('reference', flat=True))
+
+                added = 0
+                skipped = 0
+                excluded = 0
+                new_parts = 0
+
+                for row in reader:
+                    resolved = _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name)
+                    if resolved is None:
+                        excluded += 1
+                        continue
+
+                    reference, part, created = resolved
+                    if created:
+                        new_parts += 1
+                    if not reference or reference in existing_references:
+                        skipped += 1
+                        continue
+
+                    DesignBomEntry.objects.create(design=design, part=part, reference=reference)
+                    existing_references.add(reference)
+                    added += 1
+
+                positions_updated = _apply_brd_placements(design)
+                position_msg = (
+                    f' {positions_updated} position{"s" if positions_updated != 1 else ""} updated'
+                    f' from PCB design file.' if positions_updated is not None else ''
+                )
+                new_parts_msg = (
+                    f' {new_parts} new part{"s" if new_parts != 1 else ""} created in the Parts library.'
+                    if new_parts else ''
+                )
+
+                messages.success(
+                    request,
+                    f'BOM populated: {added} entr{"y" if added == 1 else "ies"} added, '
+                    f'{skipped} skipped (already present), '
+                    f'{excluded} excluded by rule{"s" if excluded != 1 else ""}.{new_parts_msg}{position_msg}',
+                )
+            except Exception as e:
+                messages.warning(request, f'Error reading CSV: {e}')
+
+    return redirect('design_detail', design_id=design.pk)
+
+
+@staff_member_required
+def design_bom_entry_add(request, design_id):
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        form = DesignBomEntryForm(request.POST)
+        form.instance.design = design
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'BOM entry added.')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+
+    return redirect('design_detail', design_id=design.pk)
+
+
+@staff_member_required
+def design_bom_entry_edit(request, entry_id):
+    entry = get_object_or_404(DesignBomEntry, pk=entry_id)
+
+    if request.method == 'POST':
+        form = DesignBomEntryForm(request.POST, instance=entry)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'BOM entry updated.')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+
+    return redirect('design_detail', design_id=entry.design_id)
+
+
+@staff_member_required
+def design_bom_entry_delete(request, entry_id):
+    entry = get_object_or_404(DesignBomEntry, pk=entry_id)
+    design_id = entry.design_id
+
+    if request.method == 'POST':
+        entry.delete()
+        messages.success(request, 'BOM entry deleted.')
+
+    return redirect('design_detail', design_id=design_id)
 
 
 @staff_member_required
@@ -1848,6 +2049,25 @@ def batch_add(request):
     return render(request, 'erp/batch_edit.html', ctx)
 
 
+def _batch_parts_required(batch):
+    """One row per distinct Part on the batch's design, with quantity-per-board (the number of
+    DesignBomEntry rows for that part) multiplied by the batch's quantity."""
+    entries = batch.design.bom_entries.select_related('part').prefetch_related('part__sources__variants')
+
+    counts = Counter()
+    parts_by_id = {}
+    for entry in entries:
+        counts[entry.part_id] += 1
+        parts_by_id[entry.part_id] = entry.part
+
+    rows = [
+        {'part': parts_by_id[part_id], 'required': count * batch.quantity}
+        for part_id, count in counts.items()
+    ]
+    rows.sort(key=lambda row: row['part'].name.lower())
+    return rows
+
+
 @staff_member_required
 def batch_edit(request, batch_id):
     batch = get_object_or_404(Batch, pk=batch_id)
@@ -1874,6 +2094,7 @@ def batch_edit(request, batch_id):
         'production_stages_with_forms': production_stages_with_forms,
         'apply_template_form': BatchApplyTemplateForm(),
         'add_production_stage_form': BatchProductionStageAddForm(),
+        'parts_required': _batch_parts_required(batch),
     }
 
     return render(request, 'erp/batch_edit.html', ctx)
