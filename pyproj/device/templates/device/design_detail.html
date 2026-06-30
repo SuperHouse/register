@@ -186,7 +186,7 @@
             {% endif %}
 
             {% if user.is_staff or bom_entries %}
-                <h5 class="mt-4">Bill of Materials</h5>
+                <h5 class="mt-4" id="bom">Bill of Materials</h5>
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
                         {% if user.is_staff %}
@@ -200,7 +200,7 @@
                                 </form>
                             </div>
                         {% endif %}
-                        <table class="table table-striped">
+                        <table class="table table-striped" id="bom-table">
                             <thead>
                                 <tr>
                                     <th>Reference</th>
@@ -208,33 +208,27 @@
                                     <th>Device</th>
                                     <th>Package</th>
                                     <th>Value</th>
-                                    <th>Position</th>
-                                    <th>Rotation</th>
+                                    <th>X</th>
+                                    <th>Y</th>
+                                    <th>Rot</th>
                                     <th>Side</th>
                                     {% if user.is_staff %}<th></th>{% endif %}
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for entry, entry_form in bom_entries_with_forms %}
-                                    <tr>
+                                {% for entry in bom_entries %}
+                                    <tr{% if user.is_staff %} class="clickable-row" onclick="window.location='{% url 'erp:design_bom_entry_edit' entry.pk %}'" style="cursor:pointer"{% endif %}>
+                                        <td>{{ entry.reference }}</td>
+                                        <td>{{ entry.part.name }}</td>
+                                        <td>{{ entry.part.device }}</td>
+                                        <td>{{ entry.part.package }}</td>
+                                        <td>{{ entry.part.value }}</td>
+                                        <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                        <td>{% if entry.pos_x != None %}{{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                        <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                        <td>{{ entry.get_side_display|default:"—" }}</td>
                                         {% if user.is_staff %}
-                                            <form method="post" action="{% url 'erp:design_bom_entry_edit' entry.pk %}" class="d-contents">
-                                                {% csrf_token %}
-                                                <td>{{ entry_form.reference }}</td>
-                                                <td>{{ entry_form.part }}</td>
-                                                <td>{{ entry.part.device }}</td>
-                                                <td>{{ entry.part.package }}</td>
-                                                <td>{{ entry.part.value }}</td>
-                                                <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}, {{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                                <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                                <td>{{ entry.get_side_display|default:"—" }}</td>
-                                                <td class="text-nowrap">
-                                                    <button type="submit" class="btn btn-sm btn-primary me-1" title="Save">
-                                                        <i class="cil-save"></i>
-                                                    </button>
-                                                </td>
-                                            </form>
-                                            <td>
+                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
                                                 <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
                                                     {% csrf_token %}
                                                     <button type="submit" class="btn btn-sm btn-danger" title="Delete">
@@ -242,15 +236,6 @@
                                                     </button>
                                                 </form>
                                             </td>
-                                        {% else %}
-                                            <td>{{ entry.reference }}</td>
-                                            <td>{{ entry.part.name }}</td>
-                                            <td>{{ entry.part.device }}</td>
-                                            <td>{{ entry.part.package }}</td>
-                                            <td>{{ entry.part.value }}</td>
-                                            <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}, {{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                            <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}&deg;{% else %}&mdash;{% endif %}</td>
-                                            <td>{{ entry.get_side_display|default:"—" }}</td>
                                         {% endif %}
                                     </tr>
                                 {% endfor %}
@@ -269,6 +254,9 @@
                                 {% endif %}
                             </tbody>
                         </table>
+                        <style>
+                            #bom-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
+                        </style>
                     </div>
                 </div>
             {% endif %}

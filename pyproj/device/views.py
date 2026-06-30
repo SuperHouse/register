@@ -170,8 +170,10 @@ def design_detail(request, design_id):
     pcb_top_asset = existing_core.get(DesignAsset.PCB_TOP)
     pcb_bottom_asset = existing_core.get(DesignAsset.PCB_BOTTOM)
     bom_csv_asset = existing_core.get(DesignAsset.BOM)
-    bom_entries = design.bom_entries.select_related('part', 'part__category').all()
-    bom_entries_with_forms = [(entry, DesignBomEntryForm(instance=entry)) for entry in bom_entries]
+    bom_entries = sorted(
+        design.bom_entries.select_related('part', 'part__category').all(),
+        key=lambda entry: entry.reference_sort_key,
+    )
 
     context = {
         'design': design,
@@ -186,7 +188,6 @@ def design_detail(request, design_id):
         'pcb_top_asset': pcb_top_asset,
         'pcb_bottom_asset': pcb_bottom_asset,
         'bom_entries': bom_entries,
-        'bom_entries_with_forms': bom_entries_with_forms,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,
     }
