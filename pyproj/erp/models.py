@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
+import re
 from datetime import timedelta
 
 from django.db import models
@@ -125,6 +126,9 @@ class Part(models.Model):
         return any(source.has_stale_variant_data for source in self.sources.all())
 
 
+_REFERENCE_SPLIT_RE = re.compile(r'^([A-Za-z]*)(\d*)(.*)$')
+
+
 class DesignBomEntry(models.Model):
     """A single placed component on a Design's BOM (e.g. RefDes R3 = a 10k resistor Part).
 
@@ -150,6 +154,18 @@ class DesignBomEntry(models.Model):
 
     def __str__(self):
         return f'{self.design}: {self.reference} = {self.part}'
+
+    @property
+    def reference_sort_key(self):
+        """Natural sort key for `reference` so e.g. "R2" sorts before "R11".
+
+        Plain string ordering (the DB-level `Meta.ordering` above) treats reference
+        designators as opaque text, so "R11" sorts before "R2". Splitting into a
+        (letter prefix, numeric value, remainder) tuple sorts numerically within
+        each prefix instead.
+        """
+        prefix, number, suffix = _REFERENCE_SPLIT_RE.match(self.reference).groups()
+        return (prefix.upper(), int(number) if number else -1, suffix.upper())
 
 
 class PartSubstitution(models.Model):

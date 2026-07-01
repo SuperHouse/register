@@ -662,10 +662,12 @@ def design_bom_entry_edit(request, entry_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'BOM entry updated.')
-        else:
-            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+            return redirect(reverse('design_detail', args=[entry.design_id]) + '#bom')
+        messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = DesignBomEntryForm(instance=entry)
 
-    return redirect('design_detail', design_id=entry.design_id)
+    return render(request, 'erp/design_bom_entry_edit.html', {'form': form, 'entry': entry})
 
 
 @staff_member_required
