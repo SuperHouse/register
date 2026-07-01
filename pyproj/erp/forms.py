@@ -210,6 +210,42 @@ class PartSubstitutionForm(forms.ModelForm):
         self.fields['substitute'].empty_label = '— select a part —'
 
 
+class PartReparentForm(forms.Form):
+    target_part = forms.ChoiceField(
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        label='Target part',
+    )
+
+    def __init__(self, *args, exclude_pk=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = (
+            Part.objects
+            .filter(category__isnull=False)
+            .select_related('category')
+            .order_by('category__name', 'name')
+        )
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+
+        groups = {}
+        for part in qs:
+            groups.setdefault(part.category.name, []).append((part.pk, str(part)))
+
+        choices = [('', '— select target part —')]
+        for cat_name in sorted(groups):
+            choices.append((cat_name, groups[cat_name]))
+        self.fields['target_part'].choices = choices
+
+    def clean_target_part(self):
+        pk = self.cleaned_data.get('target_part')
+        if not pk:
+            raise forms.ValidationError('Please select a part.')
+        try:
+            return Part.objects.get(pk=int(pk))
+        except (ValueError, Part.DoesNotExist):
+            raise forms.ValidationError('Invalid part selected.')
+
+
 class DesignBomEntryForm(forms.ModelForm):
     class Meta:
         model = DesignBomEntry

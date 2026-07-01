@@ -344,6 +344,56 @@
             </div>
         </div>
 
+        {% if bom_refs %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>BOM References</strong>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm align-middle mb-4">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Design</th>
+                            <th>Reference designators</th>
+                            <th>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in bom_refs %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'design_detail' row.design.pk %}">
+                                        {% if row.design.client %}{{ row.design.client.company_name }} — {% endif %}{{ row.design.sku }}: {{ row.design.name }} v{{ row.design.hw_version }}
+                                    </a>
+                                </td>
+                                <td class="text-body-secondary">{{ row.refs|join:", " }}</td>
+                                <td class="text-body-secondary">{{ row.refs|length }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <form method="post" action="{% url 'erp:part_reparent' part.pk %}"
+                      onsubmit="return confirm('Reparent all BOM entries from this part to the selected part?\n\nThis cannot be undone.');">
+                    {% csrf_token %}
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-10">
+                            {{ reparent_form.target_part }}
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <button type="submit" class="btn btn-outline-warning w-100">
+                                <i class="cil-transfer"></i> Reparent All
+                            </button>
+                        </div>
+                    </div>
+                    <div class="form-text">
+                        Reassigns every Design BOM entry pointing to this part so it points to the selected part instead.
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
         <div class="card">
             <div class="card-header">
                 <strong>Attachments</strong>
