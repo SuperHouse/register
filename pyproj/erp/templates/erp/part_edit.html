@@ -53,6 +53,16 @@
                                 {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
                             </div>
                             <div class="col-12 col-lg-6">
+                                <label for="{{ form.smt_joints.id_for_label }}" class="form-label fw-semibold">SMT Joints</label>
+                                {{ form.smt_joints }}
+                                {% if form.smt_joints.errors %}<div class="text-danger small mt-1">{{ form.smt_joints.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.pth_joints.id_for_label }}" class="form-label fw-semibold">PTH Joints</label>
+                                {{ form.pth_joints }}
+                                {% if form.pth_joints.errors %}<div class="text-danger small mt-1">{{ form.pth_joints.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
                                 <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
                                 {{ form.category }}
                                 {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}

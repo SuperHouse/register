@@ -98,6 +98,12 @@ class Part(models.Model):
     device = models.CharField(max_length=200, blank=True, help_text='Component device or part identifier')
     package = models.CharField(max_length=100, blank=True, help_text='Package type (e.g. 0402, SOT-23)')
     value = models.CharField(max_length=100, blank=True, help_text='Component value (e.g. 10k, 100nF)')
+    smt_joints = models.PositiveIntegerField(
+        null=True, blank=True, help_text='Number of SMT (surface-mount) solder joints for one placement of this part'
+    )
+    pth_joints = models.PositiveIntegerField(
+        null=True, blank=True, help_text='Number of PTH (through-hole) solder joints for one placement of this part'
+    )
     fusion_library = models.CharField(max_length=200, blank=True, help_text='Fusion Electronics library name')
     stock = models.IntegerField(
         null=True, blank=True, help_text='Manually-tracked on-hand stock count, independent of supplier listings'
