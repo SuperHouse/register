@@ -174,6 +174,8 @@ def design_detail(request, design_id):
         design.bom_entries.select_related('part', 'part__category').all(),
         key=lambda entry: entry.reference_sort_key,
     )
+    bom_total_smt_joints = sum(entry.part.smt_joints or 0 for entry in bom_entries)
+    bom_total_pth_joints = sum(entry.part.pth_joints or 0 for entry in bom_entries)
 
     context = {
         'design': design,
@@ -188,6 +190,8 @@ def design_detail(request, design_id):
         'pcb_top_asset': pcb_top_asset,
         'pcb_bottom_asset': pcb_bottom_asset,
         'bom_entries': bom_entries,
+        'bom_total_smt_joints': bom_total_smt_joints,
+        'bom_total_pth_joints': bom_total_pth_joints,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,
     }
