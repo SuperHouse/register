@@ -146,7 +146,8 @@ class PartForm(forms.ModelForm):
     class Meta:
         model = Part
         fields = [
-            'name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'stock', 'image',
+            'name', 'description', 'category', 'device', 'package', 'value', 'fusion_library', 'stock',
+            'no_stock_required', 'image',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -157,6 +158,7 @@ class PartForm(forms.ModelForm):
             'value': forms.TextInput(attrs={'class': 'form-control'}),
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control'}),
+            'no_stock_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
 

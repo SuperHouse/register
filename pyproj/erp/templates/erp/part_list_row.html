@@ -6,7 +6,7 @@
         {% endif %}
     </td>
     <td>
-        {% if not part.sources.all %}
+        {% if not part.sources.all and not part.no_stock_required %}
             <i class="bi bi-exclamation-triangle-fill text-warning me-1" title="No sources listed"></i>
         {% endif %}
         {{ part.name }}
@@ -14,11 +14,15 @@
     <td>{{ part.value }}</td>
     <td>{{ part.package }}</td>
     <td>{{ part.device }}</td>
-    <td>{{ part.stock|default_if_none:"-" }}</td>
+    <td>{% if part.no_stock_required %}<i class="bi bi-infinity"></i>{% else %}{{ part.stock|default_if_none:"-" }}{% endif %}</td>
     <td>
-        {{ part.total_stock|default_if_none:"-" }}
-        {% if part.has_stale_source_data %}
-            <i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+        {% if part.no_stock_required %}
+            <i class="bi bi-infinity"></i>
+        {% else %}
+            {{ part.total_stock|default_if_none:"-" }}
+            {% if part.has_stale_source_data %}
+                <i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+            {% endif %}
         {% endif %}
     </td>
     <td class="text-body-secondary">

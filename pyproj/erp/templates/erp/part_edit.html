@@ -77,6 +77,12 @@
                     {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
                 </div>
 
+                <div class="mb-3 form-check">
+                    {{ form.no_stock_required }}
+                    <label for="{{ form.no_stock_required.id_for_label }}" class="form-check-label">No Stock Required</label>
+                    {% if form.no_stock_required.errors %}<div class="text-danger small mt-1">{{ form.no_stock_required.errors }}</div>{% endif %}
+                </div>
+
                 <div class="mb-3">
                     <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Image</label>
                     {{ form.image }}

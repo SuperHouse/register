@@ -102,6 +102,10 @@ class Part(models.Model):
     stock = models.IntegerField(
         null=True, blank=True, help_text='Manually-tracked on-hand stock count, independent of supplier listings'
     )
+    no_stock_required = models.BooleanField(
+        default=False,
+        help_text='Part is placed on the BOM but never physically stocked (e.g. test points, DNP parts)'
+    )
     image = models.ImageField(upload_to='part_images/', null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
 
