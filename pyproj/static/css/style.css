@@ -99,26 +99,23 @@ tr.highlight th {
     transition: margin-left 0.25s ease-in-out;
 }
 
-/* On mobile, sidebar should be hidden by default and overlay when shown */
+/* On mobile, sidebar is hidden by default and slides in as a drawer when toggled */
 @media (max-width: 991.98px) {
     #sidebar.sidebar-fixed {
-        transform: translateX(-100%) !important;
+        /* CoreUI's own stylesheet hides the sidebar via margin-left below its
+           767.98px breakpoint (only removed when it has CoreUI's own "show"
+           class, which our custom drawer never adds — we drive visibility
+           entirely via transform below). Pin it to 0 so that rule can't fight
+           our transform-based open/close. */
+        margin-left: 0;
+        transform: translateX(-100%);
         transition: transform 0.25s ease-in-out;
-        z-index: 1030 !important;
-        visibility: visible !important;
-        display: block !important;
-        opacity: 1 !important;
     }
-    
-    #sidebar.sidebar-fixed.sidebar-lg-show {
-        transform: translateX(0) !important;
-        transition: transform 0.25s ease-in-out;
-        z-index: 1030 !important;
-        visibility: visible !important;
-        display: block !important;
-        opacity: 1 !important;
+
+    #sidebar.sidebar-fixed.sidebar-show {
+        transform: translateX(0);
     }
-    
+
     .sidebar-fixed ~ .body {
         margin-left: 0;
     }
@@ -197,21 +194,6 @@ tr.highlight th {
     bottom: -5px;
 }
 
-/* Ensure header toggler is visible on mobile devices only */
-@media (max-width: 991.98px) {
-    .header-toggler.d-lg-none {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-    }
-}
-
-/* Hide header toggler on large screens */
-@media (min-width: 992px) {
-    .header-toggler.d-lg-none {
-        display: none !important;
-    }
-}
 
 /* Header layout */
 .header {
@@ -313,4 +295,14 @@ body.display-mode {
 body.display-mode .body.flex-grow-1 {
     margin-left: 0 !important;
     transition: none !important;
+}
+/* Sidebar backdrop — shown on mobile when drawer is open */
+#sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1029;
 }

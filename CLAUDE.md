@@ -336,6 +336,14 @@ Pages that benefit from a clean, kiosk-style view (e.g. a status board on a shop
 - Exiting requires reloading the page **without** a `?display=1` query parameter — there's no explicit "Exit" button.
 - `reloadPreservingDisplayMode()` (also in `script.js`) is for any page whose own polling needs to force a full reload (e.g. to resync added/removed rows, like the Batches list) without silently kicking the user out of display mode: it reloads with `?display=1` appended if display mode is currently active, and a `DOMContentLoaded` listener re-applies `enterDisplayMode()` whenever that marker is present. A plain manual reload (no marker) still exits display mode as before.
 
+## Mobile Navigation
+
+Below the `lg` breakpoint (991.98px), the sidebar becomes an off-canvas drawer instead of the persistent desktop sidebar. [partial-topnav.html](pyproj/device/templates/device/partial-topnav.html)'s hamburger button (`.header-toggler`) toggles a `sidebar-show` class on `#sidebar` — handled entirely by a click listener in [static/js/script.js](pyproj/static/js/script.js), not CoreUI's own `data-coreui-toggle` JS (those attributes are stripped from the button at `DOMContentLoaded` so the two mechanisms can't fight over the same click). Opening the drawer also inserts a `#sidebar-backdrop` overlay; tapping it, or the toggler again, closes the drawer.
+
+The drawer's open/closed state is driven purely by `transform: translateX(...)` in [static/css/style.css](pyproj/static/css/style.css). CoreUI's bundled CSS has its own competing rule that hides the sidebar via `margin-left`, scoped to CoreUI's own `max-width: 767.98px` breakpoint, which only lifts when the sidebar carries CoreUI's `.show` class — a class this app's drawer never adds. `#sidebar.sidebar-fixed` therefore pins `margin-left: 0` inside the mobile media query so that CoreUI rule can't override the transform on phone-width viewports.
+
+There is no separate mobile bottom navigation bar — the full sidebar (including staff-only items) is reached via the hamburger drawer at every screen size.
+
 ## Printable Pages
 
 Pages that need a clean, A4-friendly printout (e.g. handing a Batch's details to production staff) follow a shared pattern rather than adding `@media print` rules to the interactive page:
