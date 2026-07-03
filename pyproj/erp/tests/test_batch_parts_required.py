@@ -76,7 +76,7 @@ def test_parts_required_columns(client, staff_user, design):
     content = response.content.decode()
 
     assert '<th>Part</th>' in content
-    assert '<th>Required</th>' in content
+    assert '<th>Qty</th>' in content
     assert '<th>Stock</th>' in content
     assert '<th>Available</th>' in content
     assert '<th>Value</th>' not in content
