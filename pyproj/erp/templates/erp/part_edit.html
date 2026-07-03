@@ -31,62 +31,62 @@
                     </div>
                     {% endif %}
                     <div class="col">
-                        <div class="mb-3">
-                            <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Name</label>
-                            {{ form.name }}
-                            {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
-                        </div>
-                        <div class="mb-3">
-                            <label for="{{ form.device.id_for_label }}" class="form-label fw-semibold">Device</label>
-                            {{ form.device }}
-                            {% if form.device.errors %}<div class="text-danger small mt-1">{{ form.device.errors }}</div>{% endif %}
-                        </div>
-                        <div class="mb-3">
-                            <label for="{{ form.package.id_for_label }}" class="form-label fw-semibold">Package</label>
-                            {{ form.package }}
-                            {% if form.package.errors %}<div class="text-danger small mt-1">{{ form.package.errors }}</div>{% endif %}
-                        </div>
-                        <div class="mb-3">
-                            <label for="{{ form.value.id_for_label }}" class="form-label fw-semibold">Value</label>
-                            {{ form.value }}
-                            {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
-                        </div>
-                        <div class="mb-3">
-                            <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
-                            {{ form.category }}
-                            {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}
+                        <div class="row g-3">
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.name.id_for_label }}" class="form-label fw-semibold">Name</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.device.id_for_label }}" class="form-label fw-semibold">Device</label>
+                                {{ form.device }}
+                                {% if form.device.errors %}<div class="text-danger small mt-1">{{ form.device.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.package.id_for_label }}" class="form-label fw-semibold">Package</label>
+                                {{ form.package }}
+                                {% if form.package.errors %}<div class="text-danger small mt-1">{{ form.package.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.value.id_for_label }}" class="form-label fw-semibold">Value</label>
+                                {{ form.value }}
+                                {% if form.value.errors %}<div class="text-danger small mt-1">{{ form.value.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.category.id_for_label }}" class="form-label fw-semibold">Category</label>
+                                {{ form.category }}
+                                {% if form.category.errors %}<div class="text-danger small mt-1">{{ form.category.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.fusion_library.id_for_label }}" class="form-label fw-semibold">Fusion Library</label>
+                                {{ form.fusion_library }}
+                                {% if form.fusion_library.errors %}<div class="text-danger small mt-1">{{ form.fusion_library.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.stock.id_for_label }}" class="form-label fw-semibold">Stock</label>
+                                {{ form.stock }}
+                                {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label fw-semibold d-block">&nbsp;</label>
+                                <div class="form-check">
+                                    {{ form.no_stock_required }}
+                                    <label for="{{ form.no_stock_required.id_for_label }}" class="form-check-label">No Stock Required</label>
+                                </div>
+                                {% if form.no_stock_required.errors %}<div class="text-danger small mt-1">{{ form.no_stock_required.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12">
+                                <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">Description</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12">
+                                <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Image</label>
+                                {{ form.image }}
+                                {% if form.image.errors %}<div class="text-danger small mt-1">{{ form.image.errors }}</div>{% endif %}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">Description</label>
-                    {{ form.description }}
-                    {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
-                </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.fusion_library.id_for_label }}" class="form-label fw-semibold">Fusion Library</label>
-                    {{ form.fusion_library }}
-                    {% if form.fusion_library.errors %}<div class="text-danger small mt-1">{{ form.fusion_library.errors }}</div>{% endif %}
-                </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.stock.id_for_label }}" class="form-label fw-semibold">Stock</label>
-                    {{ form.stock }}
-                    {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
-                </div>
-
-                <div class="mb-3 form-check">
-                    {{ form.no_stock_required }}
-                    <label for="{{ form.no_stock_required.id_for_label }}" class="form-check-label">No Stock Required</label>
-                    {% if form.no_stock_required.errors %}<div class="text-danger small mt-1">{{ form.no_stock_required.errors }}</div>{% endif %}
-                </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.image.id_for_label }}" class="form-label fw-semibold">Image</label>
-                    {{ form.image }}
-                    {% if form.image.errors %}<div class="text-danger small mt-1">{{ form.image.errors }}</div>{% endif %}
                 </div>
 
                 <div class="d-flex gap-2">
