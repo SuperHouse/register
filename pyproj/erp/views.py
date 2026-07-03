@@ -12,7 +12,7 @@ from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Prefetch, ProtectedError, Q
+from django.db.models import Count, Prefetch, ProtectedError, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -31,6 +31,7 @@ from .forms import (
     PartAssetForm,
     PartCategoryForm,
     PartForm,
+    PartReparentForm,
     PartSourceForm,
     PartSubstitutionForm,
     ProductionStageForm,
@@ -361,7 +362,7 @@ def location_delete(request, location_id):
 @staff_member_required
 def part_list(request):
     q = request.GET.get('q', '').strip()
-    parts_qs = Part.objects.prefetch_related('sources__variants').order_by('name')
+    parts_qs = Part.objects.prefetch_related('sources__variants').annotate(bom_entry_count=Count('design_bom_entries')).order_by('name')
     if q:
         q_filter = Q(name__icontains=q) | Q(value__icontains=q) | Q(package__icontains=q) | Q(device__icontains=q)
         parts_qs = parts_qs.filter(q_filter)
@@ -700,7 +701,11 @@ def part_add(request):
 @staff_member_required
 def part_edit(request, part_id):
     part = get_object_or_404(
-        Part.objects.prefetch_related('substitutions__substitute', 'sources__variants__price_breaks'),
+        Part.objects.prefetch_related(
+            'substitutions__substitute',
+            'sources__variants__price_breaks',
+            'design_bom_entries__design__client',
+        ),
         pk=part_id,
     )
 
@@ -714,14 +719,46 @@ def part_edit(request, part_id):
     else:
         form = PartForm(instance=part)
 
+    # Group BOM entries by design for the BOM References card.
+    _by_design = {}
+    for entry in part.design_bom_entries.all():
+        if entry.design_id not in _by_design:
+            _by_design[entry.design_id] = {'design': entry.design, 'refs': []}
+        _by_design[entry.design_id]['refs'].append(entry.reference)
+    bom_refs = sorted(_by_design.values(), key=lambda x: x['design'].sku)
+    for row in bom_refs:
+        row['refs'].sort()
+
     ctx = {
         'form': form,
         'part': part,
         'source_form': PartSourceForm(),
         'asset_form': PartAssetForm(),
         'substitution_form': PartSubstitutionForm(exclude_pk=part.pk),
+        'reparent_form': PartReparentForm(exclude_pk=part.pk),
+        'bom_refs': bom_refs,
     }
     return render(request, 'erp/part_edit.html', ctx)
+
+
+@staff_member_required
+def part_reparent(request, part_id):
+    part = get_object_or_404(Part, pk=part_id)
+
+    if request.method == 'POST':
+        form = PartReparentForm(request.POST, exclude_pk=part.pk)
+        if form.is_valid():
+            target = form.cleaned_data['target_part']
+            count = DesignBomEntry.objects.filter(part=part).update(part=target)
+            messages.success(
+                request,
+                f'Reparented {count} BOM {"entry" if count == 1 else "entries"} from '
+                f'"{part.name}" to "{target.name}".',
+            )
+            return redirect('erp:part_edit', part_id=part.pk)
+        messages.warning(request, 'Please select a valid target part.')
+
+    return redirect('erp:part_edit', part_id=part.pk)
 
 
 @staff_member_required

@@ -12,6 +12,7 @@ urlpatterns = [
     path('parts/add/', views.part_add, name='part_add'),
     path('parts/<int:part_id>/', views.part_edit, name='part_edit'),
     path('parts/<int:part_id>/delete/', views.part_delete, name='part_delete'),
+    path('parts/<int:part_id>/reparent/', views.part_reparent, name='part_reparent'),
     path('parts/<int:part_id>/add-asset/', views.part_asset_add, name='part_asset_add'),
     path('parts/asset/<int:asset_id>/delete/', views.part_asset_delete, name='part_asset_delete'),
     path('parts/<int:part_id>/add-source/', views.part_source_add, name='part_source_add'),

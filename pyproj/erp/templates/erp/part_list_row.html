@@ -21,6 +21,9 @@
             <i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
         {% endif %}
     </td>
+    <td class="text-body-secondary">
+        {% if part.bom_entry_count %}{{ part.bom_entry_count }}{% else %}-{% endif %}
+    </td>
     <td>
         <a href="{% url 'erp:part_delete' part.pk %}"
            class="btn btn-sm btn-outline-danger"

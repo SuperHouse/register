@@ -76,13 +76,14 @@
                                 <th>Device</th>
                                 <th>Stock</th>
                                 <th>Available</th>
+                                <th title="Number of Design BOM entries referencing this part">BOM Refs</th>
                                 <th style="width: 60px;"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% if uncategorised %}
                                 <tr class="table-secondary">
-                                    <td colspan="8" class="fw-semibold text-body-secondary py-2">
+                                    <td colspan="9" class="fw-semibold text-body-secondary py-2">
                                         Uncategorised
                                     </td>
                                 </tr>
@@ -93,7 +94,7 @@
 
                             {% for category in categories_with_parts %}
                                 <tr class="table-secondary">
-                                    <td colspan="8" class="fw-semibold py-2">
+                                    <td colspan="9" class="fw-semibold py-2">
                                         {{ category.name }}
                                     </td>
                                 </tr>
