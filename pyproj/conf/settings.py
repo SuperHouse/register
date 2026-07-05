@@ -29,6 +29,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
+# ALLOWED_HOSTS = ['*']
+
 PROJECT_ROOT = BASE_DIR.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 from __VERSION import VERSION
@@ -231,7 +233,7 @@ DEMO_MODE = os.environ.get("DEMO_MODE") in (True, 'True')
 ENABLE_GRAVATAR = os.environ.get("ENABLE_GRAVATAR", "False") in (True, 'True', 'true', '1')
 BACKGROUND_SETTINGS = {
     'dev': {
-        'CSS_BODY_BACKGROUND_COLOUR': '#e5edf5',
+        'CSS_BODY_BACKGROUND_COLOUR': '#fff6f6',
         'CSS_BODY_BACKGROUND_IMAGE': None,
         # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': '#ffffff',
     },
@@ -241,7 +243,7 @@ BACKGROUND_SETTINGS = {
         # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
     },
     'prod': {
-        'CSS_BODY_BACKGROUND_COLOUR': None,
+        'CSS_BODY_BACKGROUND_COLOUR': '#e5edf5',
         # 'CSS_BODY_BACKGROUND_IMAGE': '/static/img/live-data-dont-use-en.png',
         'CSS_BODY_BACKGROUND_IMAGE': None,
         # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
