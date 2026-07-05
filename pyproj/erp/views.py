@@ -514,7 +514,9 @@ def _apply_brd_placements(design):
         entries_to_update.append(entry)
 
     if entries_to_update:
-        DesignBomEntry.objects.bulk_update(entries_to_update, ['pos_x', 'pos_y', 'rotation', 'side'])
+        DesignBomEntry.objects.bulk_update(
+            entries_to_update, ['pos_x', 'pos_y', 'rotation', 'side'], batch_size=100
+        )
     return len(entries_to_update)
 
 
