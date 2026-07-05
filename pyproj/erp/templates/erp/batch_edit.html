@@ -182,18 +182,22 @@
                                     {% for row in parts_required %}
                                         <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:part_edit' row.part.pk %}'">
                                             <td>
-                                                {% if not row.part.sources.all %}
+                                                {% if not row.part.sources.all and not row.part.no_stock_required %}
                                                     <i class="bi bi-exclamation-triangle-fill text-warning me-1" title="No sources listed"></i>
                                                 {% endif %}
                                                 {{ row.part.name }}
                                             </td>
                                             <td>{{ row.required }}</td>
-                                            <td>{{ row.part.stock|default_if_none:"-" }}</td>
+                                            <td>{% if row.part.no_stock_required %}<i class="bi bi-infinity"></i>{% else %}{{ row.part.stock|default_if_none:"-" }}{% endif %}</td>
                                             <td>
-                                                {{ row.part.total_stock|default_if_none:"-" }}
-                                                {% if row.part.has_stale_source_data %}
-                                                    <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
-                                                       title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+                                                {% if row.part.no_stock_required %}
+                                                    <i class="bi bi-infinity"></i>
+                                                {% else %}
+                                                    {{ row.part.total_stock|default_if_none:"-" }}
+                                                    {% if row.part.has_stale_source_data %}
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                                           title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
+                                                    {% endif %}
                                                 {% endif %}
                                             </td>
                                         </tr>
