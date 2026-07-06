@@ -3,7 +3,7 @@
 import re
 from datetime import datetime
 
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -13,7 +13,7 @@ from api.auth import session_or_api_key_auth
 from api.routes import router
 from crm.models import Org
 from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
-from erp.models import Part
+from erp.models import Batch, Part
 from .schemas import (
     DashboardStatsSchema,
     DesignSchema,
@@ -251,6 +251,8 @@ def get_dashboard_stats(request):
         'design_count': designs.count(),
         'device_count': devices.count(),
         'part_count': Part.objects.count(),
+        'batch_count': Batch.objects.count(),
+        'stock_count': Part.objects.aggregate(total=Sum('stock'))['total'] or 0,
         'chart_labels': chart_labels,
         'chart_data': chart_data,
     }

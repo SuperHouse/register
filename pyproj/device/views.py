@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files import File
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -24,7 +24,7 @@ from .forms import DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, De
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
-from erp.models import Part
+from erp.models import Batch, Part
 
 
 def dashboard(request):
@@ -63,6 +63,8 @@ def dashboard(request):
         'design_count': designs.count(),
         'device_count': devices.count(),
         'part_count': Part.objects.count(),
+        'batch_count': Batch.objects.count(),
+        'stock_count': Part.objects.aggregate(total=Sum('stock'))['total'] or 0,
         'chart_labels': json.dumps(chart_labels),
         'chart_data': json.dumps(chart_data),
     }
