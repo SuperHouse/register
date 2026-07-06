@@ -1,0 +1,183 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Testers - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Testers
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        Testers are Testomatic chassis that can be set up to test different types of boards.
+        Test modules are inserted into a chassis to customise it for a specific target device under test;
+        each physical test module is an instance of a test module type, which defines the designs it's compatible with.
+    </p>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Testers</h5>
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th style="width: 60px;"></th>
+                        <th>Name</th>
+                        <th style="width: 120px;">Version</th>
+                        <th>Notes</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for tester in testers %}
+                        <tr>
+                            <td>#{{ tester.pk }}</td>
+                            <td>{{ tester.name }}</td>
+                            <td>{{ tester.version }}</td>
+                            <td>{{ tester.notes|default_if_none:"" }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'testing:tester_edit' tester.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'testing:tester_delete' tester.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5"><i>There are no testers yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'testing:tester_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td></td>
+                            <td>{{ tester_form.name }}</td>
+                            <td>{{ tester_form.version }}</td>
+                            <td>{{ tester_form.notes }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <h5 class="card-title">Test Modules</h5>
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th style="width: 60px;"></th>
+                        <th>Name</th>
+                        <th style="width: 120px;">Version</th>
+                        <th>Notes</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module in modules %}
+                        <tr>
+                            <td>#{{ module.pk }}</td>
+                            <td>{{ module.module_type.name }}</td>
+                            <td>{{ module.module_type.version }}</td>
+                            <td>{{ module.notes|default_if_none:"" }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'testing:test_module_edit' module.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'testing:test_module_delete' module.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5"><i>There are no test modules yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'testing:test_module_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td></td>
+                            <td colspan="2">{{ module_form.module_type }}</td>
+                            <td>{{ module_form.notes }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Test Module Types</h5>
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th style="width: 60px;"></th>
+                        <th>Name</th>
+                        <th style="width: 120px;">Version</th>
+                        <th style="width: 170px;">Compatible Designs</th>
+                        <th style="width: 120px;">Modules</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module_type in module_types %}
+                        <tr>
+                            <td>#{{ module_type.pk }}</td>
+                            <td>{{ module_type.name }}</td>
+                            <td>{{ module_type.version }}</td>
+                            <td>{{ module_type.compatible_designs.count }}</td>
+                            <td>{{ module_type.modules.count }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'testing:test_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'testing:test_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6"><i>There are no test module types yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'testing:test_module_type_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td></td>
+                            <td>{{ module_type_form.name }}</td>
+                            <td>{{ module_type_form.version }}</td>
+                            <td colspan="2"></td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock content %}

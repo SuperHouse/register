@@ -17,7 +17,7 @@ The archive contains:
 | File | Contents |
 |---|---|
 | `manifest.json` | Export timestamp, app version, record counts |
-| `data.json` | All records from the `crm`, `device`, and `erp` apps |
+| `data.json` | All records from the `crm`, `device`, `erp`, and `testing` apps |
 | `media/` | All uploaded files (design assets, images, part assets, etc.) |
 
 **User accounts are not included.** Users must be re-created on the target installation manually. Thumbnail cache files are also excluded — they regenerate automatically on first access.

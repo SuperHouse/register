@@ -88,6 +88,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'testing' %}active{% endif %}"
+                           href="{% url 'testing:tester_list' %}">
+                            <i class="nav-icon cil-task"></i>
+                            Testers
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if url_name == 'organisation_list' or url_name == 'organisation_detail' or url_name == 'organisation_edit' %}active{% endif %}"
                            href="{% url 'organisation_list' %}">
                             <i class="nav-icon cil-building"></i>

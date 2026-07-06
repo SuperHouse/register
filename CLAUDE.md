@@ -12,6 +12,7 @@ register/
 │   ├── api/            # Django Ninja API app: NinjaAPI instance, shared router, auth
 │   ├── crm/            # Org (client/customer) model, organisation + user management views, API endpoints
 │   ├── erp/            # ERP app: Settings hub, Production Stages and Production Stage Templates (for future Batch tracking)
+│   ├── testing/        # Testers app: Testomatic chassis (Tester) and test module tracking (TestModuleType/TestModule)
 │   ├── pcba/           # Placeholder app; pcba.designs holds a WIP redesign of Design/DesignAsset (not yet in use)
 │   ├── device/         # Main app: all PCB/device logic, API endpoints, views
 │   └── manage.py
@@ -221,6 +222,19 @@ ERP/stock-and-ordering features. Provides the **Settings** hub with **Production
 - `static/js/script.js` also provides a shared `getCookie(name)` helper (used to read the `csrftoken` cookie for the `X-CSRFToken` header on the AJAX `fetch()` calls above).
 - Sidebar: staff users see a "Batches" link (`erp:batch_list`) above "Boards", a "Parts" link (`erp:part_list`) between "Organisations" and "Settings", and a "Settings" link (`erp:settings_index`). Active-state detection uses `url_name` prefix slicing: Parts is active when `url_name` starts with `"part_"` but not `"part_c"` (which is `part_category_*`, a Settings URL) and is not `"part_import_filter_list"` (the merged Part Import Filters page, also a Settings URL); Settings uses an `{% elif %}` chain to re-include `part_category_*` and `part_import_filter_list` after the `"part_"` exclusion. The Design detail page has an "Add New Batch" button (staff only) linking to `erp:batch_add` with `?design=<id>`, which pre-selects that design in the `BatchForm`.
 
+### `testing`
+
+Test equipment tracking: **Testers** (physical Testomatic chassis that can be set up to test different board types) and **Test Modules** (inserted into a chassis to customise it for a specific target Device Under Test). The section is reached via a staff-only top-level "Testers" sidebar link (`testing:tester_list`, active when `app_name == 'testing'`); all views are `@staff_member_required`. URLs are mounted at the site root under `testers/...` (`app_name = 'testing'`, included from `conf/urls.py` like `erp.urls`).
+
+- **[models.py](pyproj/testing/models.py)**:
+  - `Tester` — a physical chassis. Fields: `name`, `version` (blank allowed), `notes`. IDs are the auto PK, displayed as `#<pk>` (same convention as Batches). Will later grow API-key/self-identification fields for uploading test results.
+  - `TestModuleType` — an abstract definition of a test module: `name`, `version`, and `compatible_designs` (M2M → `device.Design`, `related_name='test_module_types'` — one module type may suit multiple designs, e.g. a revised design with unchanged test points). Equivalence between module types is **not** modelled explicitly; it's implicit via shared compatible designs.
+  - `TestModule` — a physical module: `module_type` (FK → `TestModuleType`, `PROTECT`, `related_name='modules'`) plus `notes`. Its displayed name/version come from the type.
+- **[views.py](pyproj/testing/views.py)** / **[urls.py](pyproj/testing/urls.py)** — `tester_list` (`/testers/`) is the main page: three cards (Testers, Test Modules, Test Module Types) each with an inline add row. Because three add forms share the page, the list view is GET-only and each inline row POSTs to a dedicated POST-only add view (`tester_add`, `test_module_add`, `test_module_type_add`), and each form uses a distinct prefix (`tester`/`module`/`module_type`) to avoid duplicate field ids. `test_module_type_add` redirects to the new type's edit page so compatible designs can be added immediately; the other add views redirect back to the list. Standard edit/delete views per model; `test_module_type_delete` guards `ProtectedError` (type in use by physical modules). `test_module_type_edit` also manages the `compatible_designs` M2M (add via dropdown using `CompatibleDesignAddForm`, which excludes already-added and obsolete designs; remove via per-row POST forms — `test_module_type_design_add`/`_remove`) and lists the type's physical modules.
+- **[forms.py](pyproj/testing/forms.py)** — `TesterForm`, `TestModuleTypeForm` (name/version only — the M2M is managed via the dedicated views), `TestModuleForm`, `CompatibleDesignAddForm` (single `DesignChoiceField` — a local copy of erp's, labelling options `"{org} {sku}: {name} v{version}"`).
+- **[admin.py](pyproj/testing/admin.py)** — registers all three models; `TestModuleTypeAdmin` uses `filter_horizontal` for `compatible_designs` and an inline `TestModule` editor.
+- Included in `export_data`/`import_data` (see `device` management commands below); in `_flush_app_data()` the testing models are deleted first (`TestModule` before `TestModuleType` because of PROTECT).
+
 ### `pcba`
 
 Placeholder app, plus a `pcba.designs` sub-app (also in `INSTALLED_APPS`) containing a parallel, **not-yet-wired-up** redesign of the PCB design data model:
@@ -241,7 +255,7 @@ All PCB business logic lives here.
 - **[urls.py](pyproj/device/urls.py)** — URL patterns under `/device/`. Note: design and organisation URLs are in `conf/urls.py`, not here.
 - **[context_processor.py](pyproj/device/context_processor.py)** — Context processors: `background_processor` (deploy-type background), `demo_processor` (demo mode vars), `version_processor` (injects `app_version` from `settings.VERSION`).
 - **[management/commands/import-xlsx.py](pyproj/device/management/commands/import-xlsx.py)** — Bulk import from Excel; requires sheets `Devices` and `DeviceTypes` (any additional sheets such as Queue or Patched Boards are ignored).
-- **[management/commands/export_data.py](pyproj/device/management/commands/export_data.py)** — Exports all `crm`, `device`, and `erp` records plus `MEDIA_ROOT` files (excluding thumbnail cache) to a self-contained ZIP archive. User accounts are not included. Run with `python manage.py export_data [output.zip]`.
+- **[management/commands/export_data.py](pyproj/device/management/commands/export_data.py)** — Exports all `crm`, `device`, `erp`, and `testing` records plus `MEDIA_ROOT` files (excluding thumbnail cache) to a self-contained ZIP archive. User accounts are not included. Run with `python manage.py export_data [output.zip]`.
 - **[management/commands/import_data.py](pyproj/device/management/commands/import_data.py)** — Imports a ZIP produced by `export_data`, performing a clean-slate replace (deletes all existing app data first). The database flush and load run inside a single transaction so a failure rolls back cleanly. Run with `python manage.py import_data archive.zip [--yes]`. Run as a different user than the one that owns existing `MEDIA_ROOT` files (e.g. running manually as a login user while uWSGI writes as `uwsgi`), this can fail with `PermissionError` deleting old media files — the production uWSGI vassal template sets `umask = 002` so new uploads stay group-writable, but pre-existing files/dirs created before that setting was added may still need `chmod -R g+w` on `MEDIA_ROOT` once.
 
 ### `authuser`
