@@ -47,6 +47,7 @@ def test_non_staff_users_are_redirected(client, plain_user, tester, module_type,
         reverse('testing:test_module_add'),
         reverse('testing:test_module_edit', args=[module.pk]),
         reverse('testing:test_module_delete', args=[module.pk]),
+        reverse('testing:test_module_type_list'),
         reverse('testing:test_module_type_add'),
         reverse('testing:test_module_type_edit', args=[module_type.pk]),
         reverse('testing:test_module_type_delete', args=[module_type.pk]),
@@ -64,6 +65,7 @@ def test_staff_sees_list_edit_and_delete_pages(client, staff_user, tester, modul
     client.force_login(staff_user)
     for url in [
         reverse('testing:tester_list'),
+        reverse('testing:test_module_type_list'),
         reverse('testing:tester_edit', args=[tester.pk]),
         reverse('testing:tester_delete', args=[tester.pk]),
         reverse('testing:test_module_edit', args=[module.pk]),
@@ -76,13 +78,21 @@ def test_staff_sees_list_edit_and_delete_pages(client, staff_user, tester, modul
 
 
 @pytest.mark.django_db
-def test_list_page_shows_all_three_sections(client, staff_user, tester, module):
+def test_tester_list_shows_testers_and_modules(client, staff_user, tester, module):
     client.force_login(staff_user)
     content = client.get(reverse('testing:tester_list')).content.decode()
     assert 'Testomatic' in content
-    assert 'MIC Tester' in content
+    assert 'MIC Tester' in content  # the module's type name, shown in the Test Modules card
     assert f'#{tester.pk}' in content
     assert f'#{module.pk}' in content
+
+
+@pytest.mark.django_db
+def test_module_type_list_shows_module_types(client, staff_user, module_type):
+    client.force_login(staff_user)
+    content = client.get(reverse('testing:test_module_type_list')).content.decode()
+    assert 'MIC Tester' in content
+    assert f'#{module_type.pk}' in content
 
 
 @pytest.mark.django_db

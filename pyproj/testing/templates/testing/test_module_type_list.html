@@ -1,0 +1,72 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Test Module Types - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Test Module Types
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        A test module type is the abstract definition of a test module: its name, version, and the board designs it's
+        compatible with. Each physical test module (managed in the Testers section) is an instance of a type.
+    </p>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th style="width: 60px;"></th>
+                        <th>Name</th>
+                        <th style="width: 120px;">Version</th>
+                        <th style="width: 170px;">Compatible Designs</th>
+                        <th style="width: 120px;">Modules</th>
+                        <th style="width: 90px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for module_type in module_types %}
+                        <tr>
+                            <td>#{{ module_type.pk }}</td>
+                            <td>{{ module_type.name }}</td>
+                            <td>{{ module_type.version }}</td>
+                            <td>{{ module_type.compatible_designs.count }}</td>
+                            <td>{{ module_type.modules.count }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'testing:test_module_type_edit' module_type.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'testing:test_module_type_delete' module_type.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6"><i>There are no test module types yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'testing:test_module_type_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td></td>
+                            <td>{{ module_type_form.name }}</td>
+                            <td>{{ module_type_form.version }}</td>
+                            <td colspan="2"></td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock content %}

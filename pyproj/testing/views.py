@@ -12,17 +12,26 @@ from .models import Tester, TestModule, TestModuleType
 
 @staff_member_required
 def tester_list(request):
-    # The three inline-add forms share this page, so each gets a prefix to
+    # The two inline-add forms share this page, so each gets a prefix to
     # keep its field names and HTML ids distinct.
     ctx = {
         'testers': Tester.objects.all(),
         'modules': TestModule.objects.select_related('module_type'),
-        'module_types': TestModuleType.objects.prefetch_related('compatible_designs', 'modules'),
         'tester_form': TesterForm(prefix='tester'),
         'module_form': TestModuleForm(prefix='module'),
-        'module_type_form': TestModuleTypeForm(prefix='module_type'),
     }
     return render(request, 'testing/tester_list.html', ctx)
+
+
+@staff_member_required
+def test_module_type_list(request):
+    # Test module types are the abstract definitions, managed in Settings
+    # (distinct from the concrete Testers/Test Modules in the Testers section).
+    ctx = {
+        'module_types': TestModuleType.objects.prefetch_related('compatible_designs', 'modules'),
+        'module_type_form': TestModuleTypeForm(prefix='module_type'),
+    }
+    return render(request, 'testing/test_module_type_list.html', ctx)
 
 
 @staff_member_required
@@ -123,7 +132,7 @@ def test_module_type_add(request):
             return redirect('testing:test_module_type_edit', module_type_id=module_type.pk)
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
-    return redirect('testing:tester_list')
+    return redirect('testing:test_module_type_list')
 
 
 @staff_member_required
@@ -163,7 +172,7 @@ def test_module_type_delete(request, module_type_id):
             messages.success(request, 'Test module type deleted.')
         except ProtectedError:
             messages.warning(request, 'This test module type cannot be deleted because one or more physical test modules are of this type.')
-        return redirect('testing:tester_list')
+        return redirect('testing:test_module_type_list')
 
     ctx = {'module_type': module_type}
     return render(request, 'testing/test_module_type_delete.html', ctx)

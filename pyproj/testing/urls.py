@@ -14,6 +14,7 @@ urlpatterns = [
     path('testers/modules/add/', views.test_module_add, name='test_module_add'),
     path('testers/modules/<int:module_id>/', views.test_module_edit, name='test_module_edit'),
     path('testers/modules/<int:module_id>/delete/', views.test_module_delete, name='test_module_delete'),
+    path('settings/test-module-types/', views.test_module_type_list, name='test_module_type_list'),
     path('testers/module-types/add/', views.test_module_type_add, name='test_module_type_add'),
     path('testers/module-types/<int:module_type_id>/', views.test_module_type_edit, name='test_module_type_edit'),
     path('testers/module-types/<int:module_type_id>/delete/', views.test_module_type_delete, name='test_module_type_delete'),
