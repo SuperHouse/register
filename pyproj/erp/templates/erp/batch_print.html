@@ -64,7 +64,9 @@
                 {% for stage in batch.production_stages.all %}
                     <tr>
                         <td>{{ stage.name }}</td>
-                        <td>{{ stage.get_status_display }}</td>
+                        <td>
+                            <span class="status-dot" style="background-color: {{ stage.get_status_color }};"></span>{{ stage.get_status_display }}
+                        </td>
                         <td>{{ stage.due_date|date:"j-M-Y"|default:"" }}</td>
                         <td>{{ stage.completion_date|date:"j-M-Y H:i"|default:"" }}</td>
                     </tr>

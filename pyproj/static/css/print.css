@@ -119,6 +119,18 @@ table.print-fields th {
     object-fit: contain;
 }
 
+.status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+    /* Force background colours to print (Chrome/WebKit) */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
 h2.print-section-heading {
     font-size: 13pt;
     margin: 20px 0 8px;

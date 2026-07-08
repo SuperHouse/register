@@ -462,3 +462,15 @@ class BatchProductionStage(models.Model):
         }
 
         return classes.get(self.status, 'bg-secondary')
+
+    def get_status_color(self):
+        """Hex colour matching get_status_color_class(), for contexts without
+        the Bootstrap/CoreUI stylesheet loaded (e.g. the printable page)."""
+        colors = {
+            self.NOT_STARTED: '#6c757d',
+            self.IN_PROGRESS: '#39f',
+            self.ON_HOLD: '#f9b115',
+            self.DONE: '#2eb85c',
+        }
+
+        return colors.get(self.status, '#6c757d')
