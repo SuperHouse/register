@@ -47,6 +47,7 @@ urlpatterns = [
     path('users/<int:user_id>/', crm_views.user_edit, name='user_edit'),
     path('users/<int:user_id>/regenerate-key/', crm_views.user_regenerate_key, name='user_regenerate_key'),
     path('', include('erp.urls')),
+    path('', include('testing.urls')),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
     path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),

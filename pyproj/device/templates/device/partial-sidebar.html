@@ -88,6 +88,13 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'testing' and url_name|slice:":16" != "test_module_type" %}active{% endif %}"
+                           href="{% url 'testing:tester_list' %}">
+                            <i class="nav-icon cil-task"></i>
+                            Testers
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if url_name == 'organisation_list' or url_name == 'organisation_detail' or url_name == 'organisation_edit' %}active{% endif %}"
                            href="{% url 'organisation_list' %}">
                             <i class="nav-icon cil-building"></i>
@@ -102,7 +109,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if app_name == 'erp' and url_name != 'batch_list' and url_name != 'batch_edit' and url_name != 'batch_add' and url_name|slice:":5" != "part_" %}active{% elif app_name == 'erp' and url_name|slice:":14" == "part_category_" %}active{% elif app_name == 'erp' and url_name == "part_import_filter_list" %}active{% endif %}"
+                        <a class="nav-link {% if app_name == 'erp' and url_name != 'batch_list' and url_name != 'batch_edit' and url_name != 'batch_add' and url_name|slice:":5" != "part_" %}active{% elif app_name == 'erp' and url_name|slice:":14" == "part_category_" %}active{% elif app_name == 'erp' and url_name == "part_import_filter_list" %}active{% elif app_name == 'testing' and url_name|slice:":16" == "test_module_type" %}active{% endif %}"
                            href="{% url 'erp:settings_index' %}">
                             <i class="nav-icon cil-settings"></i>
                             Settings

@@ -19,7 +19,11 @@ def _flush_app_data():
     from device.models import DeviceEvent, DeviceAsset, DeviceImage, TestImage, TestRecord, Device, DesignAsset, Design
     from crm.models import Org
     from easy_thumbnails.models import Source, Thumbnail
+    from testing.models import Tester, TestModule, TestModuleType
 
+    TestModule.objects.all().delete()
+    TestModuleType.objects.all().delete()
+    Tester.objects.all().delete()
     BatchProductionStage.objects.all().delete()
     Batch.objects.all().delete()
     ProductionStageTemplateStep.objects.all().delete()
