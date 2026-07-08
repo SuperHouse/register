@@ -71,6 +71,21 @@ class Batch(models.Model):
             return f'{self.design} ({self.po})'
         return f'{self.design} x{self.quantity}'
 
+    @property
+    def progress_category(self):
+        """Overall progress bucket for the Batches list: 'new', 'in_progress', or 'complete'.
+
+        'complete' means every production stage is Done; 'new' means every stage is
+        Not Started (including a batch with no stages at all); anything in between is
+        'in_progress'.
+        """
+        stages = list(self.production_stages.all())
+        if stages and all(s.status == BatchProductionStage.DONE for s in stages):
+            return 'complete'
+        if all(s.status == BatchProductionStage.NOT_STARTED for s in stages):
+            return 'new'
+        return 'in_progress'
+
 
 class Location(models.Model):
     """A physical location in a hierarchy (e.g. building > room > shelf)."""

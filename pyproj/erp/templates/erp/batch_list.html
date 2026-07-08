@@ -36,50 +36,58 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for batch in batches %}
-                        <tr data-batch-id="{{ batch.pk }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
-                            <td>#{{ batch.pk }}</td>
-                            <td style="width: 70px; padding: 4px 8px;">
-                                {% with batch.design.pcb_top_assets|first as pcb_top %}
-                                    {% if pcb_top %}
-                                        <img src="{{ pcb_top.file.url }}"
-                                             alt="PCB Top View"
-                                             style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                            <td>{{ batch.design }}</td>
-                            <td>{{ batch.po }}</td>
-                            <td>{{ batch.quantity }}</td>
-                            <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
-                            <td>
-                                <div class="d-flex gap-1 batch-progress">
-                                    {% for stage in batch.production_stages.all %}
-                                        <span class="rounded {{ stage.get_status_color_class }}"
-                                              style="width: 14px; height: 14px;"
-                                              title="{{ stage.name }}: {{ stage.get_status_display }}"></span>
-                                    {% endfor %}
-                                </div>
-                            </td>
-                            <td class="text-nowrap hide-in-display-mode">
-                                <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print" onclick="event.stopPropagation();">
-                                    <i class="cil-print"></i>
-                                </a>
-                                <form method="post" action="{% url 'erp:batch_duplicate' batch.pk %}" class="d-inline" onclick="event.stopPropagation();">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate">
-                                        <i class="cil-copy"></i>
-                                    </button>
-                                </form>
-                                <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
-                                    <i class="cil-trash"></i>
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
+                    {% if not has_batches %}
                         <tr>
                             <td colspan="8"><i>There are no batches yet.</i></td>
                         </tr>
+                    {% endif %}
+                    {% for title, category, group in batch_groups %}
+                        {% if group %}
+                            <tr class="table-secondary">
+                                <th colspan="8">{{ title }}</th>
+                            </tr>
+                            {% for batch in group %}
+                                <tr data-batch-id="{{ batch.pk }}" data-category="{{ category }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                                    <td>#{{ batch.pk }}</td>
+                                    <td style="width: 70px; padding: 4px 8px;">
+                                        {% with batch.design.pcb_top_assets|first as pcb_top %}
+                                            {% if pcb_top %}
+                                                <img src="{{ pcb_top.file.url }}"
+                                                     alt="PCB Top View"
+                                                     style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                            {% endif %}
+                                        {% endwith %}
+                                    </td>
+                                    <td>{{ batch.design }}</td>
+                                    <td>{{ batch.po }}</td>
+                                    <td>{{ batch.quantity }}</td>
+                                    <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
+                                    <td>
+                                        <div class="d-flex gap-1 batch-progress">
+                                            {% for stage in batch.production_stages.all %}
+                                                <span class="rounded {{ stage.get_status_color_class }}"
+                                                      style="width: 14px; height: 14px;"
+                                                      title="{{ stage.name }}: {{ stage.get_status_display }}"></span>
+                                            {% endfor %}
+                                        </div>
+                                    </td>
+                                    <td class="text-nowrap hide-in-display-mode">
+                                        <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print" onclick="event.stopPropagation();">
+                                            <i class="cil-print"></i>
+                                        </a>
+                                        <form method="post" action="{% url 'erp:batch_duplicate' batch.pk %}" class="d-inline" onclick="event.stopPropagation();">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate">
+                                                <i class="cil-copy"></i>
+                                            </button>
+                                        </form>
+                                        <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
+                                            <i class="cil-trash"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
                     {% endfor %}
                 </tbody>
             </table>
@@ -93,6 +101,18 @@
             container.innerHTML = stages.map(stage =>
                 `<span class="rounded ${stage.color_class}" style="width: 14px; height: 14px;" title="${stage.name}: ${stage.status_display}"></span>`
             ).join('');
+        }
+
+        // Mirror Batch.progress_category (erp/models.py) so a status change that moves a
+        // batch between the New / In Progress / Complete sections triggers a full reload.
+        function batchCategory(stages) {
+            if (stages.length && stages.every(stage => stage.status === 'DONE')) {
+                return 'complete';
+            }
+            if (stages.every(stage => stage.status === 'NOT_STARTED')) {
+                return 'new';
+            }
+            return 'in_progress';
         }
 
         async function updateBatchList() {
@@ -114,6 +134,17 @@
                 const sameBatches = renderedIds.length === fetchedIds.length
                     && renderedIds.every(id => fetchedIds.includes(id));
                 if (!sameBatches) {
+                    reloadPreservingDisplayMode();
+                    return;
+                }
+
+                // If any batch has moved to a different section (New / In Progress /
+                // Complete), reload so it's re-grouped rather than left in the wrong one.
+                const categoryChanged = data.batches.some(batch => {
+                    const row = document.querySelector(`tr[data-batch-id="${batch.id}"]`);
+                    return row && row.dataset.category !== batchCategory(batch.stages);
+                });
+                if (categoryChanged) {
                     reloadPreservingDisplayMode();
                     return;
                 }

@@ -2027,8 +2027,17 @@ def batch_list(request):
         'production_stages',
     )
 
+    groups = {'new': [], 'in_progress': [], 'complete': []}
+    for batch in batches:
+        groups[batch.progress_category].append(batch)
+
     ctx = {
-        'batches': batches,
+        'batch_groups': [
+            ('New', 'new', groups['new']),
+            ('In Progress', 'in_progress', groups['in_progress']),
+            ('Complete', 'complete', groups['complete']),
+        ],
+        'has_batches': any(groups.values()),
     }
 
     return render(request, 'erp/batch_list.html', ctx)
@@ -2045,6 +2054,7 @@ def batch_list_data(request):
                 'stages': [
                     {
                         'name': stage.name,
+                        'status': stage.status,
                         'status_display': stage.get_status_display(),
                         'color_class': stage.get_status_color_class(),
                     }
