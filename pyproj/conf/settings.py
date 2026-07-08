@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'device',
     'crm',
     'erp',
+    'testing',
     'pcba',
     "pcba.designs"
 ]

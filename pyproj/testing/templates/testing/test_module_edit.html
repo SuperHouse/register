@@ -1,0 +1,44 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Edit Test Module - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Edit Test Module #{{ module.pk }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.module_type.id_for_label }}" class="form-label">{{ form.module_type.label }}</label>
+                            {{ form.module_type }}
+                            {% if form.module_type.errors %}<div class="text-danger small">{{ form.module_type.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
+                            {{ form.notes }}
+                            {% if form.notes.errors %}<div class="text-danger small">{{ form.notes.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'testing:tester_list' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
