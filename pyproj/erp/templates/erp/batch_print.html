@@ -22,26 +22,33 @@
             </div>
         </div>
 
-        <table class="print-table print-fields">
-            <tr>
-                <th>Design</th>
-                <td>{{ batch.design.client.company_name }} {{ batch.design.sku }}: {{ batch.design.name }} v{{ batch.design.hw_version }}</td>
-            </tr>
-            <tr>
-                <th>Purchase Order</th>
-                <td>{{ batch.po|default:"" }}</td>
-            </tr>
-            <tr>
-                <th>Quantity</th>
-                <td>{{ batch.quantity }}</td>
-            </tr>
-            {% if batch.notes %}
-                <tr>
-                    <th>Notes</th>
-                    <td>{{ batch.notes|linebreaksbr }}</td>
-                </tr>
+        <div class="batch-print-details">
+            {% if pcb_top %}
+                <div class="batch-print-image">
+                    <img src="{{ pcb_top.file.url }}?v={{ pcb_top.file_version }}" alt="PCB Top View">
+                </div>
             {% endif %}
-        </table>
+            <table class="print-table print-fields">
+                <tr>
+                    <th>Design</th>
+                    <td>{{ batch.design.client.company_name }} {{ batch.design.sku }}: {{ batch.design.name }} v{{ batch.design.hw_version }}</td>
+                </tr>
+                <tr>
+                    <th>Purchase Order</th>
+                    <td>{{ batch.po|default:"" }}</td>
+                </tr>
+                <tr>
+                    <th>Quantity</th>
+                    <td>{{ batch.quantity }}</td>
+                </tr>
+                {% if batch.notes %}
+                    <tr>
+                        <th>Notes</th>
+                        <td>{{ batch.notes|linebreaksbr }}</td>
+                    </tr>
+                {% endif %}
+            </table>
+        </div>
 
         <h2 class="print-section-heading">Production Stages</h2>
         <table class="print-table">

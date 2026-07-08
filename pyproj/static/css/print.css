@@ -99,6 +99,26 @@ table.print-fields th {
     background: #f5f5f5;
 }
 
+.batch-print-details {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.batch-print-details .print-table {
+    flex: 1 1 auto;
+}
+
+.batch-print-image {
+    flex: 0 0 auto;
+}
+
+.batch-print-image img {
+    max-width: 45mm;
+    max-height: 45mm;
+    object-fit: contain;
+}
+
 h2.print-section-heading {
     font-size: 13pt;
     margin: 20px 0 8px;

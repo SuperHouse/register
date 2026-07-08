@@ -2146,6 +2146,8 @@ def batch_edit(request, batch_id):
         'apply_template_form': BatchApplyTemplateForm(),
         'add_production_stage_form': BatchProductionStageAddForm(),
         'parts_required': _batch_parts_required(batch),
+        'pcb_top': DesignAsset.objects.filter(
+            design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
     }
 
     return render(request, 'erp/batch_edit.html', ctx)
@@ -2155,7 +2157,12 @@ def batch_edit(request, batch_id):
 def batch_print(request, batch_id):
     batch = get_object_or_404(Batch.objects.select_related('design__client'), pk=batch_id)
     batch_url = request.build_absolute_uri(reverse('erp:batch_edit', args=[batch.pk]))
-    ctx = {'batch': batch, 'batch_url': batch_url}
+    ctx = {
+        'batch': batch,
+        'batch_url': batch_url,
+        'pcb_top': DesignAsset.objects.filter(
+            design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
+    }
     return render(request, 'erp/batch_print.html', ctx)
 
 
