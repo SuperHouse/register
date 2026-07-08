@@ -16,6 +16,38 @@ class DesignChoiceField(forms.ModelChoiceField):
         return f'{obj.client.company_name} {obj.sku}: {obj.name} v{obj.hw_version}'
 
 
+class GroupedPartChoiceIterator(forms.models.ModelChoiceIterator):
+    """Yields Part options grouped into <optgroup>s by category name
+    (uncategorised parts last), matching the PartReparentForm dropdown."""
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield ('', self.field.empty_label)
+
+        groups = {}
+        uncategorised = []
+        for part in self.queryset:
+            choice = self.choice(part)
+            if part.category_id:
+                groups.setdefault(part.category.name, []).append(choice)
+            else:
+                uncategorised.append(choice)
+
+        for cat_name in sorted(groups):
+            yield (cat_name, groups[cat_name])
+        if uncategorised:
+            yield ('(uncategorised)', uncategorised)
+
+
+class GroupedPartChoiceField(forms.ModelChoiceField):
+    """A ModelChoiceField over Part whose options are grouped into
+    <optgroup>s by category. Set the queryset with
+    ``select_related('category').order_by('category__name', 'name')`` so
+    grouping and per-group ordering are correct without extra queries."""
+
+    iterator = GroupedPartChoiceIterator
+
+
 class ProductionStageForm(forms.ModelForm):
     class Meta:
         model = ProductionStage
@@ -198,20 +230,22 @@ class PartSourceForm(forms.Form):
 
 
 class PartSubstitutionForm(forms.ModelForm):
+    substitute = GroupedPartChoiceField(
+        queryset=Part.objects.none(),
+        empty_label='— select a part —',
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+    )
+
     class Meta:
         model = PartSubstitution
         fields = ['substitute']
-        widgets = {
-            'substitute': forms.Select(attrs={'class': 'form-select form-select-sm'}),
-        }
 
     def __init__(self, *args, exclude_pk=None, **kwargs):
         super().__init__(*args, **kwargs)
-        qs = Part.objects.all()
+        qs = Part.objects.select_related('category').order_by('category__name', 'name')
         if exclude_pk:
             qs = qs.exclude(pk=exclude_pk)
         self.fields['substitute'].queryset = qs
-        self.fields['substitute'].empty_label = '— select a part —'
 
 
 class PartReparentForm(forms.Form):
@@ -251,12 +285,16 @@ class PartReparentForm(forms.Form):
 
 
 class DesignBomEntryForm(forms.ModelForm):
+    part = GroupedPartChoiceField(
+        queryset=Part.objects.select_related('category').order_by('category__name', 'name'),
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+    )
+
     class Meta:
         model = DesignBomEntry
         fields = ['reference', 'part']
         widgets = {
             'reference': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
-            'part': forms.Select(attrs={'class': 'form-select form-select-sm'}),
         }
 
 
