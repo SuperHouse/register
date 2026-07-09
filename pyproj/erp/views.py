@@ -2146,6 +2146,7 @@ def batch_edit(request, batch_id):
         'apply_template_form': BatchApplyTemplateForm(),
         'add_production_stage_form': BatchProductionStageAddForm(),
         'parts_required': _batch_parts_required(batch),
+        'boards': batch.devices.order_by('pk'),
         'pcb_top': DesignAsset.objects.filter(
             design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
     }

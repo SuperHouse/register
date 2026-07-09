@@ -43,6 +43,7 @@ class Design(models.Model):
 
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
+    batch = models.ForeignKey('erp.Batch', on_delete=models.SET_NULL, null=True, blank=True, related_name='devices')
     creation_dt = models.DateTimeField(default=timezone.now)
     invoice = models.CharField(max_length=20, null=True, blank=True)
     po = models.CharField('Purchase order', max_length=20, null=True, blank=True)

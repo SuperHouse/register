@@ -13,6 +13,7 @@ from device.models import (
     TestRecord,
 )
 from crm.models import Org
+from erp.models import Batch
 from utils import date_from_str, int_map
 
 # timezone.activate(tz)
@@ -125,7 +126,7 @@ class Command(BaseCommand):
         ws_device = wb['Devices']
 
         known_device_keys = tuple(
-            'Serial/DeviceTypeSerial/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/PO/Shipped'.split('/')
+            'Serial/DeviceTypeSerial/Batch/Assembled/Tested/Firmware/Notes/Device/HW Version/Invoice/PO/Shipped'.split('/')
         )
         ignore_device_keys = tuple(
             'ExtAddr/Truck/Location/Compound'.split('/')
@@ -151,6 +152,12 @@ class Command(BaseCommand):
             # self.stdout.write(f'{row=}')
             device_id = int(row['Serial'])
             design_id = int(row['DeviceTypeSerial'])
+            batch_id = int(row['Batch']) if row['Batch'] else None
+            if batch_id is not None and not Batch.objects.filter(pk=batch_id).exists():
+                self.stdout.write(self.style.WARNING(
+                    f"Device {device_id}: batch {batch_id} does not exist, leaving batch unset."
+                ))
+                batch_id = None
             tested = row['Tested']
             sw_version = row['Firmware']
             creation_dt = row['Assembled']
@@ -228,6 +235,7 @@ class Command(BaseCommand):
             device_data = {
                 'id': device_id,
                 'design_id': design_id,
+                'batch_id': batch_id,
                 'creation_dt': timezone.make_aware(datetime.datetime.combine(creation_dt.date(), datetime.time())),
                 'invoice': invoice,
                 'po': porder,
@@ -239,6 +247,7 @@ class Command(BaseCommand):
                 device = Device.objects.get(pk=device_id)
                 # Update existing device
                 device.design_id = device_data['design_id']
+                device.batch_id = device_data['batch_id']
                 device.creation_dt = device_data['creation_dt']
                 device.invoice = device_data['invoice']
                 device.po = device_data['po']

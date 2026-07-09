@@ -220,6 +220,38 @@
                 </div>
             </div>
         </div>
+
+        <div class="row">
+            <div class="col-12 col-xl-10">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Boards</h5>
+                        {% if boards %}
+                            <table class="table table-striped align-middle mb-0">
+                                <thead>
+                                    <tr class="highlight">
+                                        <th>Serial</th>
+                                        <th>Created</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for board in boards %}
+                                        <tr style="cursor: pointer;" onclick="window.location='{% url 'device:device_detail' board.pk %}'">
+                                            <td>#{{ board.pk }}</td>
+                                            <td>{{ board.get_creation_dt_as_string }}</td>
+                                            <td>{{ board.notes|default_if_none:"" }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        {% else %}
+                            <p class="text-body-secondary fst-italic mb-0">No boards are associated with this batch yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     {% endif %}
 {% endblock content %}
 

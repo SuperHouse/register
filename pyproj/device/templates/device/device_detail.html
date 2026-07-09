@@ -42,6 +42,16 @@
             </td>
         </tr>
         <tr>
+            <th>Batch:</th>
+            <td>
+                {% if device.batch %}
+                    <a href="{% url 'erp:batch_edit' device.batch.pk %}">#{{ device.batch.pk }}</a>
+                {% else %}
+                    <i>Not set</i>
+                {% endif %}
+            </td>
+        </tr>
+        <tr>
             <th>Created:</th>
             <td>{{ device.get_creation_dt_as_string }}</td>
         </tr>
