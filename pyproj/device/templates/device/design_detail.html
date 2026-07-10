@@ -214,6 +214,7 @@
                                     <th>Side</th>
                                     <th>SMT</th>
                                     <th>PTH</th>
+                                    <th>Cost</th>
                                     {% if user.is_staff %}<th></th>{% endif %}
                                 </tr>
                             </thead>
@@ -243,6 +244,13 @@
                                                 {{ entry.part.pth_joints }}
                                             {% endif %}
                                         </td>
+                                        <td class="text-nowrap">
+                                            {% if entry.unit_price_break %}
+                                                {{ entry.unit_price_break.symbol }}{{ entry.unit_price_break.price|floatformat:-4 }} {{ entry.unit_price_break.currency }}
+                                            {% else %}
+                                                <span class="fst-italic text-body-secondary">—</span>
+                                            {% endif %}
+                                        </td>
                                         {% if user.is_staff %}
                                             <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
                                                 <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
@@ -263,20 +271,28 @@
                                             <td colspan="7">{{ bom_entry_form.part }}</td>
                                             <td></td>
                                             <td></td>
+                                            <td></td>
                                             <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
                                         </form>
                                     </tr>
                                 {% endif %}
                                 {% if not bom_entries and not user.is_staff %}
-                                    <tr><td colspan="11"><i>No BOM has been added for this design.</i></td></tr>
+                                    <tr><td colspan="12"><i>No BOM has been added for this design.</i></td></tr>
                                 {% endif %}
                             </tbody>
                             {% if bom_entries %}
                                 <tfoot>
                                     <tr class="fw-semibold">
-                                        <td colspan="9" class="text-end">Total joints:</td>
+                                        <td colspan="9" class="text-end">Total:</td>
                                         <td>{{ bom_total_smt_joints }}</td>
                                         <td>{{ bom_total_pth_joints }}</td>
+                                        <td class="text-nowrap">
+                                            {% if bom_total_cost is not None %}
+                                                ${{ bom_total_cost|floatformat:2 }}
+                                            {% else %}
+                                                <span class="fst-italic text-body-secondary">—</span>
+                                            {% endif %}
+                                        </td>
                                         {% if user.is_staff %}<td></td>{% endif %}
                                     </tr>
                                 </tfoot>

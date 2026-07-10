@@ -150,6 +150,28 @@ class Part(models.Model):
         PartSource.has_stale_variant_data."""
         return any(source.has_stale_variant_data for source in self.sources.all())
 
+    def cheapest_price_break_for_quantity(self, quantity):
+        """The PartPriceBreak, across every known supplier variant, giving the lowest
+        per-unit price actually payable when buying `quantity` of this part.
+
+        For each variant this is the price at its highest break quantity that doesn't
+        exceed `quantity` (e.g. breaks at 1/10/100, buying 13, uses the 10-break) — or,
+        if `quantity` doesn't reach any break, the variant's lowest available break (the
+        only price on offer). Returns None if the part has no price break data at all.
+        """
+        best = None
+        for source in self.sources.all():
+            for variant in source.variants.all():
+                breaks = list(variant.price_breaks.all())
+                if not breaks:
+                    continue
+                applicable = [b for b in breaks if b.quantity <= quantity]
+                candidate = max(applicable, key=lambda b: b.quantity) if applicable \
+                    else min(breaks, key=lambda b: b.quantity)
+                if best is None or candidate.price < best.price:
+                    best = candidate
+        return best
+
 
 _REFERENCE_SPLIT_RE = re.compile(r'^([A-Za-z]*)(\d*)(.*)$')
 

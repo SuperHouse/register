@@ -2,6 +2,7 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 from django.contrib import messages
@@ -173,11 +174,30 @@ def design_detail(request, design_id):
     pcb_bottom_asset = existing_core.get(DesignAsset.PCB_BOTTOM)
     bom_csv_asset = existing_core.get(DesignAsset.BOM)
     bom_entries = sorted(
-        design.bom_entries.select_related('part', 'part__category').all(),
+        design.bom_entries.select_related('part', 'part__category').prefetch_related(
+            'part__sources__variants__price_breaks'
+        ),
         key=lambda entry: entry.reference_sort_key,
     )
     bom_total_smt_joints = sum(entry.part.smt_joints or 0 for entry in bom_entries)
     bom_total_pth_joints = sum(entry.part.pth_joints or 0 for entry in bom_entries)
+
+    # Cost is calculated per distinct Part (using its total quantity across the whole
+    # design to pick the right price break), then applied as a per-unit price to every
+    # row for that part - so summing the column gives the correct total BOM cost.
+    parts_by_id = {}
+    part_quantities = Counter()
+    for entry in bom_entries:
+        parts_by_id[entry.part_id] = entry.part
+        part_quantities[entry.part_id] += 1
+    price_break_by_part_id = {
+        part_id: parts_by_id[part_id].cheapest_price_break_for_quantity(quantity)
+        for part_id, quantity in part_quantities.items()
+    }
+    for entry in bom_entries:
+        entry.unit_price_break = price_break_by_part_id[entry.part_id]
+    known_costs = [entry.unit_price_break.price for entry in bom_entries if entry.unit_price_break]
+    bom_total_cost = sum(known_costs) if known_costs else None
 
     context = {
         'design': design,
@@ -194,6 +214,7 @@ def design_detail(request, design_id):
         'bom_entries': bom_entries,
         'bom_total_smt_joints': bom_total_smt_joints,
         'bom_total_pth_joints': bom_total_pth_joints,
+        'bom_total_cost': bom_total_cost,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,
     }
