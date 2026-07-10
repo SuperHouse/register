@@ -33,6 +33,16 @@ class Design(models.Model):
     price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     price2 = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     obsolete = models.BooleanField(default=False)
+    assembly_time_minutes = models.PositiveIntegerField(
+        default=0, verbose_name='Assembly Time', help_text='Minutes'
+    )
+    additional_materials = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0, verbose_name='Additional Materials'
+    )
+    pcb_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='PCB Cost')
+    conformal_coating = models.BooleanField(default=False, verbose_name='Conformal Coating')
+    anti_shock_glue = models.BooleanField(default=False, verbose_name='Anti-Shock Glue')
+    packaging = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Packaging')
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['sku', 'hw_version'], name='unique_sku_hwversion')]

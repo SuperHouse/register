@@ -437,6 +437,41 @@ class BomEquivalenceRule(models.Model):
         return f'{from_parts} → {to_parts}'
 
 
+class AssemblyCostSettings(models.Model):
+    """Singleton record of global assembly-cost settings, used to calculate each Design's
+    Build Costing breakdown (see device.models.Design)."""
+    smt_joint_cost_cents = models.DecimalField(
+        max_digits=8, decimal_places=4, default=0, verbose_name='Cost per SMT joint (cents)',
+        help_text='e.g. 0.5 for half a cent',
+    )
+    pth_joint_cost_cents = models.DecimalField(
+        max_digits=8, decimal_places=4, default=0, verbose_name='Cost per PTH joint (cents)',
+        help_text='e.g. 5 for five cents',
+    )
+    labour_rate = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0, verbose_name='Assembly labour rate',
+        help_text='Charge per hour of assembly labour',
+    )
+    kitting_margin_percent = models.DecimalField(
+        max_digits=6, decimal_places=2, default=0, verbose_name='Parts kitting margin (%)',
+        help_text='e.g. 20 for 20%',
+    )
+    conformal_coating_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    anti_shock_glue_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        verbose_name = 'Assembly cost settings'
+        verbose_name_plural = 'Assembly cost settings'
+
+    def __str__(self):
+        return 'Assembly Cost Settings'
+
+    @classmethod
+    def get_solo(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class BatchProductionStage(models.Model):
     """A production stage on a Batch, snapshotted from a ProductionStage at the time it was added."""
     NOT_STARTED = 'NOT_STARTED'

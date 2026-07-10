@@ -3,6 +3,7 @@
 import os
 import tempfile
 from collections import Counter
+from decimal import Decimal
 from pathlib import Path
 
 from django.contrib import messages
@@ -12,6 +13,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q, Sum
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
 import json
@@ -21,11 +23,11 @@ from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
-from .forms import DesignAssetEditForm, DesignAssetForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .forms import DesignAssetEditForm, DesignAssetForm, DesignBuildCostingForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
-from erp.models import Batch, Part
+from erp.models import AssemblyCostSettings, Batch, Part
 
 
 def dashboard(request):
@@ -199,6 +201,24 @@ def design_detail(request, design_id):
     known_costs = [entry.unit_price_break.price for entry in bom_entries if entry.unit_price_break]
     bom_total_cost = sum(known_costs) if known_costs else None
 
+    assembly_cost_settings = AssemblyCostSettings.get_solo()
+    bom_cost = bom_total_cost or Decimal('0')
+    build_costing_rows = [
+        ('BoM Cost', bom_cost),
+        ('BoM Kitting Fee', bom_cost * assembly_cost_settings.kitting_margin_percent / Decimal('100')),
+        ('Additional BoM', design.additional_materials),
+        ('PCB', design.pcb_cost),
+        ('Production Consumables', (
+            Decimal(bom_total_pth_joints) * assembly_cost_settings.pth_joint_cost_cents
+            + Decimal(bom_total_smt_joints) * assembly_cost_settings.smt_joint_cost_cents
+        ) / Decimal('100')),
+        ('Packaging', design.packaging),
+        ('Conformal Coating', assembly_cost_settings.conformal_coating_charge if design.conformal_coating else Decimal('0')),
+        ('Anti-Shock Glue', assembly_cost_settings.anti_shock_glue_charge if design.anti_shock_glue else Decimal('0')),
+        ('Assembly Fee', Decimal(design.assembly_time_minutes) / Decimal('60') * assembly_cost_settings.labour_rate),
+    ]
+    build_costing_total = sum(value for _, value in build_costing_rows)
+
     context = {
         'design': design,
         'devices': devices,
@@ -217,6 +237,9 @@ def design_detail(request, design_id):
         'bom_total_cost': bom_total_cost,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,
+        'build_costing_form': DesignBuildCostingForm(instance=design) if request.user.is_staff else None,
+        'build_costing_rows': build_costing_rows,
+        'build_costing_total': build_costing_total,
     }
 
     return render(request, 'device/design_detail.html', context)
@@ -391,6 +414,23 @@ def design_toggle_obsolete(request, design_id):
         messages.success(request, f'Design marked as {"obsolete" if design.obsolete else "current"}.')
 
     return redirect('design_detail', design_id=design.pk)
+
+
+@staff_member_required
+def design_build_costing_update(request, design_id):
+    """Save a design's Build Costing input fields (assembly time, additional materials,
+    PCB cost, conformal coating / anti-shock glue flags, packaging)."""
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        form = DesignBuildCostingForm(request.POST, instance=design)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Build costing updated.')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+
+    return redirect(f"{reverse('design_detail', args=[design.pk])}#build-costing")
 
 
 def inc_demo(request):

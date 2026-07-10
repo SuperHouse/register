@@ -305,6 +305,75 @@
                 </div>
             {% endif %}
 
+            {% if user.is_staff %}
+                <h5 class="mt-4" id="build-costing">Build Costing</h5>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        <form method="post" action="{% url 'design_build_costing_update' design.pk %}">
+                            {% csrf_token %}
+
+                            {% if build_costing_form.non_field_errors %}
+                                <div class="alert alert-danger">{{ build_costing_form.non_field_errors }}</div>
+                            {% endif %}
+
+                            <div class="row mb-3">
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <label for="{{ build_costing_form.assembly_time_minutes.id_for_label }}" class="form-label">{{ build_costing_form.assembly_time_minutes.label }} (min)</label>
+                                    {{ build_costing_form.assembly_time_minutes }}
+                                    {% if build_costing_form.assembly_time_minutes.errors %}<div class="text-danger small">{{ build_costing_form.assembly_time_minutes.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <label for="{{ build_costing_form.additional_materials.id_for_label }}" class="form-label">{{ build_costing_form.additional_materials.label }} ($)</label>
+                                    {{ build_costing_form.additional_materials }}
+                                    {% if build_costing_form.additional_materials.errors %}<div class="text-danger small">{{ build_costing_form.additional_materials.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <label for="{{ build_costing_form.pcb_cost.id_for_label }}" class="form-label">{{ build_costing_form.pcb_cost.label }} ($)</label>
+                                    {{ build_costing_form.pcb_cost }}
+                                    {% if build_costing_form.pcb_cost.errors %}<div class="text-danger small">{{ build_costing_form.pcb_cost.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2">
+                                    <label for="{{ build_costing_form.packaging.id_for_label }}" class="form-label">{{ build_costing_form.packaging.label }} ($)</label>
+                                    {{ build_costing_form.packaging }}
+                                    {% if build_costing_form.packaging.errors %}<div class="text-danger small">{{ build_costing_form.packaging.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        {{ build_costing_form.conformal_coating }}
+                                        <label for="{{ build_costing_form.conformal_coating.id_for_label }}" class="form-check-label">{{ build_costing_form.conformal_coating.label }}</label>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4 col-lg-2 d-flex align-items-end">
+                                    <div class="form-check mb-2">
+                                        {{ build_costing_form.anti_shock_glue }}
+                                        <label for="{{ build_costing_form.anti_shock_glue.id_for_label }}" class="form-check-label">{{ build_costing_form.anti_shock_glue.label }}</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                        </form>
+
+                        <table class="table table-bordered w-auto mt-4 mb-0">
+                            <tbody>
+                                {% for label, value in build_costing_rows %}
+                                    <tr>
+                                        <th>{{ label }}</th>
+                                        <td class="text-end">${{ value|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-semibold">
+                                    <th>Total Price / Unit</th>
+                                    <td class="text-end">${{ build_costing_total|floatformat:2 }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if user.is_staff or has_testing_assets %}
                 <h5 class="mt-4">Testing</h5>
                 <div class="card border-0 mb-3">

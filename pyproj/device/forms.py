@@ -27,6 +27,23 @@ class DateTimeLocalInput(forms.DateTimeInput):
         return value.strftime('%Y-%m-%dT%H:%M')
 
 
+class DesignBuildCostingForm(forms.ModelForm):
+    class Meta:
+        model = Design
+        fields = [
+            'assembly_time_minutes', 'additional_materials', 'pcb_cost',
+            'conformal_coating', 'anti_shock_glue', 'packaging',
+        ]
+        widgets = {
+            'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
+            'additional_materials': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'pcb_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'conformal_coating': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'anti_shock_glue': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'packaging': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+        }
+
+
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Org

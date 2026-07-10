@@ -3,10 +3,26 @@
 from django.contrib import admin
 
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
-    Part, PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage, ProductionStageTemplate,
-    ProductionStageTemplateStep,
+    AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage,
+    ProductionStageTemplate, ProductionStageTemplateStep,
 )
+
+
+@admin.register(AssemblyCostSettings)
+class AssemblyCostSettingsAdmin(admin.ModelAdmin):
+    list_display = [
+        'smt_joint_cost_cents', 'pth_joint_cost_cents', 'labour_rate', 'kitting_margin_percent',
+        'conformal_coating_charge', 'anti_shock_glue_charge',
+    ]
+
+    def has_add_permission(self, request):
+        # Singleton - only one row (pk=1) should ever exist; it's created on first access
+        # via AssemblyCostSettings.get_solo().
+        return not AssemblyCostSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class PartSourceVariantInline(admin.TabularInline):

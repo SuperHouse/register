@@ -19,6 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .forms import (
+    AssemblyCostSettingsForm,
     BatchApplyTemplateForm,
     BatchForm,
     BatchProductionStageAddForm,
@@ -40,9 +41,9 @@ from .forms import (
 )
 from device.models import Design, DesignAsset
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
-    Part, PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant, PartSubstitution, ProductionStage,
-    ProductionStageTemplate, ProductionStageTemplateStep,
+    AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant,
+    PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -70,6 +71,24 @@ def _apply_template_to_batch(batch, template):
 @staff_member_required
 def settings_index(request):
     return render(request, 'erp/settings_index.html')
+
+
+@staff_member_required
+def assembly_cost_settings_edit(request):
+    settings_obj = AssemblyCostSettings.get_solo()
+
+    if request.method == 'POST':
+        form = AssemblyCostSettingsForm(request.POST, instance=settings_obj)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Assembly cost settings updated.')
+            return redirect('erp:assembly_cost_settings_edit')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = AssemblyCostSettingsForm(instance=settings_obj)
+
+    return render(request, 'erp/assembly_cost_settings_edit.html', {'form': form})
 
 
 @staff_member_required

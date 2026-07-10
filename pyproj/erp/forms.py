@@ -5,9 +5,9 @@ from django.db.models import Q
 
 from device.models import Design
 from .models import (
-    Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, DesignBomEntry, Location,
-    Part, PartAsset, PartCategory, PartSubstitution, ProductionStage, ProductionStageTemplate,
-    ProductionStageTemplateStep,
+    AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSubstitution, ProductionStage,
+    ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -74,6 +74,23 @@ class ProductionStageTemplateStepForm(forms.ModelForm):
         fields = ['production_stage']
         widgets = {
             'production_stage': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+
+class AssemblyCostSettingsForm(forms.ModelForm):
+    class Meta:
+        model = AssemblyCostSettings
+        fields = [
+            'smt_joint_cost_cents', 'pth_joint_cost_cents', 'labour_rate', 'kitting_margin_percent',
+            'conformal_coating_charge', 'anti_shock_glue_charge',
+        ]
+        widgets = {
+            'smt_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
+            'pth_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
+            'labour_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'kitting_margin_percent': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'conformal_coating_charge': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'anti_shock_glue_charge': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
         }
 
 
