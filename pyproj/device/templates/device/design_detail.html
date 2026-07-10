@@ -55,44 +55,118 @@
                     {% endif %}
                 </div>
             {% endif %}
-            <div class="card border-0 mb-4">
+            <div class="card border-0 mb-4" id="design-details">
                 <div class="card-body py-10">
-                    <table class="table table-bordered">
-<!--
-                        {% if user.is_staff %}
+                    {% if user.is_staff %}
+                        <form method="post" action="{% url 'design_update' design.pk %}">
+                            {% csrf_token %}
+                            {% if design_form.non_field_errors %}
+                                <div class="alert alert-danger">{{ design_form.non_field_errors }}</div>
+                            {% endif %}
+                            <table class="table table-bordered">
+                                <tr>
+                                    <th style="width: 220px;">{{ design_form.sku.label }}:</th>
+                                    <td>
+                                        {{ design_form.sku }}
+                                        {% if design_form.sku.errors %}<div class="text-danger small">{{ design_form.sku.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.description.label }}:</th>
+                                    <td>
+                                        {{ design_form.description }}
+                                        {% if design_form.description.errors %}<div class="text-danger small">{{ design_form.description.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.price.label }}:</th>
+                                    <td>
+                                        <div class="input-group" style="max-width: 150px;">
+                                            <span class="input-group-text">$</span>
+                                            {{ design_form.price }}
+                                        </div>
+                                        {% if design_form.price.errors %}<div class="text-danger small">{{ design_form.price.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.assembly_time_minutes.label }}:</th>
+                                    <td>
+                                        <div class="input-group" style="max-width: 180px;">
+                                            {{ design_form.assembly_time_minutes }}
+                                            <span class="input-group-text">minutes</span>
+                                        </div>
+                                        {% if design_form.assembly_time_minutes.errors %}<div class="text-danger small">{{ design_form.assembly_time_minutes.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.additional_materials.label }}:</th>
+                                    <td>
+                                        <div class="input-group" style="max-width: 150px;">
+                                            <span class="input-group-text">$</span>
+                                            {{ design_form.additional_materials }}
+                                        </div>
+                                        {% if design_form.additional_materials.errors %}<div class="text-danger small">{{ design_form.additional_materials.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.pcb_cost.label }}:</th>
+                                    <td>
+                                        <div class="input-group" style="max-width: 150px;">
+                                            <span class="input-group-text">$</span>
+                                            {{ design_form.pcb_cost }}
+                                        </div>
+                                        {% if design_form.pcb_cost.errors %}<div class="text-danger small">{{ design_form.pcb_cost.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.packaging.label }}:</th>
+                                    <td>
+                                        <div class="input-group" style="max-width: 150px;">
+                                            <span class="input-group-text">$</span>
+                                            {{ design_form.packaging }}
+                                        </div>
+                                        {% if design_form.packaging.errors %}<div class="text-danger small">{{ design_form.packaging.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.conformal_coating.label }}:</th>
+                                    <td>
+                                        <div class="form-check">
+                                            {{ design_form.conformal_coating }}
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>{{ design_form.anti_shock_glue.label }}:</th>
+                                    <td>
+                                        <div class="form-check">
+                                            {{ design_form.anti_shock_glue }}
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                        </form>
+                    {% else %}
+                        <table class="table table-bordered">
                             <tr>
-                                <th>Organisation:</th>
-                                <td>{{ design.client.company_name }}</td>
+                                <th>SKU:</th>
+                                <td>{{ design.sku }}</td>
                             </tr>
-                        {% endif %}
--->
-                        <tr>
-                            <th>SKU:</th>
-                            <td>{{ design.sku }}</td>
-                        </tr>
-<!--
-                        <tr>
-                            <th>Name:</th>
-                            <td>{{ design.name }}</td>
-                        </tr>
-                        <tr>
-                            <th>H/W Version:</th>
-                            <td>{{ design.hw_version }}</td>
-                        </tr>
--->
-                        <tr>
-                            <th>Description:</th>
-                            <td>{{ design.description|default:"<i>Not set</i>" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Price:</th>
-                            <td>{{ design.price|default:"<i>Not set</i>" }}</td>
-                        </tr>
-                        <tr>
-                            <th>Devices:</th>
-                            <td>{{ device_count }}</td>
-                        </tr>
-                    </table>
+                            <tr>
+                                <th>Description:</th>
+                                <td>{{ design.description|default:"<i>Not set</i>" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Price:</th>
+                                <td>{{ design.price|default:"<i>Not set</i>" }}</td>
+                            </tr>
+                            <tr>
+                                <th>Devices:</th>
+                                <td>{{ device_count }}</td>
+                            </tr>
+                        </table>
+                    {% endif %}
                 </div>
             </div>
 
@@ -309,52 +383,7 @@
                 <h5 class="mt-4" id="build-costing">Build Costing</h5>
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
-                        <form method="post" action="{% url 'design_build_costing_update' design.pk %}">
-                            {% csrf_token %}
-
-                            {% if build_costing_form.non_field_errors %}
-                                <div class="alert alert-danger">{{ build_costing_form.non_field_errors }}</div>
-                            {% endif %}
-
-                            <div class="row mb-3">
-                                <div class="col-6 col-md-4 col-lg-2">
-                                    <label for="{{ build_costing_form.assembly_time_minutes.id_for_label }}" class="form-label">{{ build_costing_form.assembly_time_minutes.label }} (min)</label>
-                                    {{ build_costing_form.assembly_time_minutes }}
-                                    {% if build_costing_form.assembly_time_minutes.errors %}<div class="text-danger small">{{ build_costing_form.assembly_time_minutes.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-2">
-                                    <label for="{{ build_costing_form.additional_materials.id_for_label }}" class="form-label">{{ build_costing_form.additional_materials.label }} ($)</label>
-                                    {{ build_costing_form.additional_materials }}
-                                    {% if build_costing_form.additional_materials.errors %}<div class="text-danger small">{{ build_costing_form.additional_materials.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-2">
-                                    <label for="{{ build_costing_form.pcb_cost.id_for_label }}" class="form-label">{{ build_costing_form.pcb_cost.label }} ($)</label>
-                                    {{ build_costing_form.pcb_cost }}
-                                    {% if build_costing_form.pcb_cost.errors %}<div class="text-danger small">{{ build_costing_form.pcb_cost.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-2">
-                                    <label for="{{ build_costing_form.packaging.id_for_label }}" class="form-label">{{ build_costing_form.packaging.label }} ($)</label>
-                                    {{ build_costing_form.packaging }}
-                                    {% if build_costing_form.packaging.errors %}<div class="text-danger small">{{ build_costing_form.packaging.errors }}</div>{% endif %}
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-2 d-flex align-items-end">
-                                    <div class="form-check mb-2">
-                                        {{ build_costing_form.conformal_coating }}
-                                        <label for="{{ build_costing_form.conformal_coating.id_for_label }}" class="form-check-label">{{ build_costing_form.conformal_coating.label }}</label>
-                                    </div>
-                                </div>
-                                <div class="col-6 col-md-4 col-lg-2 d-flex align-items-end">
-                                    <div class="form-check mb-2">
-                                        {{ build_costing_form.anti_shock_glue }}
-                                        <label for="{{ build_costing_form.anti_shock_glue.id_for_label }}" class="form-check-label">{{ build_costing_form.anti_shock_glue.label }}</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
-                        </form>
-
-                        <table class="table table-bordered w-auto mt-4 mb-0">
+                        <table class="table table-bordered w-auto mb-0">
                             <tbody>
                                 {% for label, value in build_costing_rows %}
                                     <tr>

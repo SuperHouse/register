@@ -23,7 +23,7 @@ from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
-from .forms import DesignAssetEditForm, DesignAssetForm, DesignBuildCostingForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .forms import DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
@@ -237,7 +237,7 @@ def design_detail(request, design_id):
         'bom_total_cost': bom_total_cost,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,
-        'build_costing_form': DesignBuildCostingForm(instance=design) if request.user.is_staff else None,
+        'design_form': DesignDetailsForm(instance=design) if request.user.is_staff else None,
         'build_costing_rows': build_costing_rows,
         'build_costing_total': build_costing_total,
     }
@@ -417,20 +417,21 @@ def design_toggle_obsolete(request, design_id):
 
 
 @staff_member_required
-def design_build_costing_update(request, design_id):
-    """Save a design's Build Costing input fields (assembly time, additional materials,
+def design_update(request, design_id):
+    """Save the editable fields shown in a design's top info card: SKU, description,
+    price, and the Build Costing input fields (assembly time, additional materials,
     PCB cost, conformal coating / anti-shock glue flags, packaging)."""
     design = get_object_or_404(Design, pk=design_id)
 
     if request.method == 'POST':
-        form = DesignBuildCostingForm(request.POST, instance=design)
+        form = DesignDetailsForm(request.POST, instance=design)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Build costing updated.')
+            messages.success(request, 'Design updated.')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
 
-    return redirect(f"{reverse('design_detail', args=[design.pk])}#build-costing")
+    return redirect(f"{reverse('design_detail', args=[design.pk])}#design-details")
 
 
 def inc_demo(request):

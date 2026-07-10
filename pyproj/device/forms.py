@@ -27,14 +27,21 @@ class DateTimeLocalInput(forms.DateTimeInput):
         return value.strftime('%Y-%m-%dT%H:%M')
 
 
-class DesignBuildCostingForm(forms.ModelForm):
+class DesignDetailsForm(forms.ModelForm):
+    """Editable fields shown in the Design detail page's top info card: the core
+    identity/pricing fields (currently only ever set via the XLSX import command) plus
+    the Build Costing input fields."""
     class Meta:
         model = Design
         fields = [
+            'sku', 'description', 'price',
             'assembly_time_minutes', 'additional_materials', 'pcb_cost',
             'conformal_coating', 'anti_shock_glue', 'packaging',
         ]
         widgets = {
+            'sku': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 250px;'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'additional_materials': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'pcb_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
