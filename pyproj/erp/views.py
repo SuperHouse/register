@@ -2120,10 +2120,77 @@ def batch_add(request):
     return render(request, 'erp/batch_edit.html', ctx)
 
 
+def compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities):
+    """For each distinct Part in `per_board_counts` (a {part_id: quantity} mapping — how many of
+    that part one board needs, e.g. Design.bom_part_counts()), look up its cheapest reachable
+    price break at the quantity given for that part in `pricing_quantities` (a separate
+    {part_id: quantity} mapping — the volume actually being priced at).
+
+    Passing `pricing_quantities = per_board_counts` prices at a single board's volume (the
+    Design detail page's Build Costing); passing `per_board_counts` scaled up by a Batch's
+    build quantity instead prices at the batch's actual order volume, while the returned
+    bom_total_cost stays a per-board figure (the Batch detail page's Build Costing) — see
+    Part.cheapest_price_break_for_quantity() for why buying in bulk can reach a cheaper break.
+
+    Returns (price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints).
+    """
+    price_break_by_part_id = {
+        part_id: parts_by_id[part_id].cheapest_price_break_for_quantity(pricing_quantities.get(part_id, 0))
+        for part_id in per_board_counts
+    }
+    bom_total_smt_joints = sum(
+        (parts_by_id[part_id].smt_joints or 0) * count for part_id, count in per_board_counts.items()
+    )
+    bom_total_pth_joints = sum(
+        (parts_by_id[part_id].pth_joints or 0) * count for part_id, count in per_board_counts.items()
+    )
+    known_costs = [
+        price_break_by_part_id[part_id].price * count
+        for part_id, count in per_board_counts.items() if price_break_by_part_id[part_id]
+    ]
+    bom_total_cost = sum(known_costs) if known_costs else None
+    return price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints
+
+
+def build_costing_rows(design, bom_cost, bom_total_smt_joints, bom_total_pth_joints, assembly_cost_settings):
+    """The Build Costing breakdown for one board of `design` — same rows shown on the Design
+    detail page — given a BoM cost and joint totals (see compute_bom_pricing()) and the global
+    AssemblyCostSettings rates. Returns (rows, total) as a list of (label, Decimal) pairs and
+    their Decimal sum; shared by the Design detail page and the Batch detail page (the latter
+    prices the BoM Cost row at the batch's build volume via compute_bom_pricing(), but the
+    other rows and this breakdown itself are unaffected by quantity and stay per-board).
+    Conformal Coating and Anti-Shock Glue are omitted from the returned rows (though still
+    included in `total`) when they come to zero, since most designs use neither."""
+    bom_cost = bom_cost or Decimal('0')
+    rows = [
+        ('BoM Cost', bom_cost),
+        ('BoM Kitting Fee', bom_cost * assembly_cost_settings.kitting_margin_percent / Decimal('100')),
+        ('Additional BoM', design.additional_materials),
+        ('PCB', design.pcb_cost),
+        ('Production Consumables', (
+            Decimal(bom_total_pth_joints) * assembly_cost_settings.pth_joint_cost_cents
+            + Decimal(bom_total_smt_joints) * assembly_cost_settings.smt_joint_cost_cents
+        ) / Decimal('100')),
+        ('Packaging', design.packaging),
+        ('Conformal Coating', assembly_cost_settings.conformal_coating_charge if design.conformal_coating else Decimal('0')),
+        ('Anti-Shock Glue', assembly_cost_settings.anti_shock_glue_charge if design.anti_shock_glue else Decimal('0')),
+        ('Assembly Fee', Decimal(design.assembly_time_minutes) / Decimal('60') * assembly_cost_settings.labour_rate),
+    ]
+    total = sum(value for _, value in rows)
+    hide_if_zero = {'Conformal Coating', 'Anti-Shock Glue'}
+    rows = [(label, value) for label, value in rows if value != 0 or label not in hide_if_zero]
+    return rows, total
+
+
 def _batch_parts_required(batch):
     """One row per distinct Part on the batch's design, with quantity-per-board (the number of
-    DesignBomEntry rows for that part) multiplied by the batch's quantity."""
-    entries = batch.design.bom_entries.select_related('part').prefetch_related('part__sources__variants')
+    DesignBomEntry rows for that part) multiplied by the batch's quantity. Each row also carries
+    the per-board count on its own (`per_board`) — reused by batch_edit to price the Batch
+    detail page's Build Costing section at the batch's actual order volume (see
+    compute_bom_pricing()) without recomputing the same counts twice."""
+    entries = batch.design.bom_entries.select_related('part').prefetch_related(
+        'part__sources__variants__price_breaks'
+    )
 
     counts = Counter()
     parts_by_id = {}
@@ -2132,7 +2199,7 @@ def _batch_parts_required(batch):
         parts_by_id[entry.part_id] = entry.part
 
     rows = [
-        {'part': parts_by_id[part_id], 'required': count * batch.quantity}
+        {'part': parts_by_id[part_id], 'per_board': count, 'required': count * batch.quantity}
         for part_id, count in counts.items()
     ]
     rows.sort(key=lambda row: row['part'].name.lower())
@@ -2159,16 +2226,30 @@ def batch_edit(request, batch_id):
         for batch_production_stage in batch.production_stages.all()
     ]
 
+    parts_required = _batch_parts_required(batch)
+    parts_by_id = {row['part'].pk: row['part'] for row in parts_required}
+    per_board_counts = {row['part'].pk: row['per_board'] for row in parts_required}
+    pricing_quantities = {row['part'].pk: row['required'] for row in parts_required}
+    _, bom_cost, bom_total_smt_joints, bom_total_pth_joints = compute_bom_pricing(
+        parts_by_id, per_board_counts, pricing_quantities
+    )
+    build_costing_rows_data, build_costing_total = build_costing_rows(
+        batch.design, bom_cost, bom_total_smt_joints, bom_total_pth_joints, AssemblyCostSettings.get_solo()
+    )
+
     ctx = {
         'form': form,
         'batch': batch,
         'production_stages_with_forms': production_stages_with_forms,
         'apply_template_form': BatchApplyTemplateForm(),
         'add_production_stage_form': BatchProductionStageAddForm(),
-        'parts_required': _batch_parts_required(batch),
+        'parts_required': parts_required,
         'boards': batch.devices.order_by('pk'),
         'pcb_top': DesignAsset.objects.filter(
             design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
+        'build_costing_rows': build_costing_rows_data,
+        'build_costing_total': build_costing_total,
+        'total_batch_cost': build_costing_total * batch.quantity,
     }
 
     return render(request, 'erp/batch_edit.html', ctx)

@@ -2,7 +2,6 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
 import tempfile
-from decimal import Decimal
 from pathlib import Path
 
 from django.contrib import messages
@@ -27,6 +26,7 @@ from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, Devic
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
 from erp.models import AssemblyCostSettings, Batch, Part
+from erp.views import build_costing_rows as get_build_costing_rows, compute_bom_pricing
 
 
 def dashboard(request):
@@ -180,40 +180,22 @@ def design_detail(request, design_id):
         ),
         key=lambda entry: entry.reference_sort_key,
     )
-    bom_total_smt_joints = sum(entry.part.smt_joints or 0 for entry in bom_entries)
-    bom_total_pth_joints = sum(entry.part.pth_joints or 0 for entry in bom_entries)
 
     # Cost is calculated per distinct Part (using its total quantity across the whole
     # design to pick the right price break), then applied as a per-unit price to every
     # row for that part - so summing the column gives the correct total BOM cost.
     parts_by_id = {entry.part_id: entry.part for entry in bom_entries}
     part_quantities = design.bom_part_counts()
-    price_break_by_part_id = {
-        part_id: parts_by_id[part_id].cheapest_price_break_for_quantity(quantity)
-        for part_id, quantity in part_quantities.items()
-    }
+    price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints = compute_bom_pricing(
+        parts_by_id, part_quantities, part_quantities
+    )
     for entry in bom_entries:
         entry.unit_price_break = price_break_by_part_id[entry.part_id]
-    known_costs = [entry.unit_price_break.price for entry in bom_entries if entry.unit_price_break]
-    bom_total_cost = sum(known_costs) if known_costs else None
 
     assembly_cost_settings = AssemblyCostSettings.get_solo()
-    bom_cost = bom_total_cost or Decimal('0')
-    build_costing_rows = [
-        ('BoM Cost', bom_cost),
-        ('BoM Kitting Fee', bom_cost * assembly_cost_settings.kitting_margin_percent / Decimal('100')),
-        ('Additional BoM', design.additional_materials),
-        ('PCB', design.pcb_cost),
-        ('Production Consumables', (
-            Decimal(bom_total_pth_joints) * assembly_cost_settings.pth_joint_cost_cents
-            + Decimal(bom_total_smt_joints) * assembly_cost_settings.smt_joint_cost_cents
-        ) / Decimal('100')),
-        ('Packaging', design.packaging),
-        ('Conformal Coating', assembly_cost_settings.conformal_coating_charge if design.conformal_coating else Decimal('0')),
-        ('Anti-Shock Glue', assembly_cost_settings.anti_shock_glue_charge if design.anti_shock_glue else Decimal('0')),
-        ('Assembly Fee', Decimal(design.assembly_time_minutes) / Decimal('60') * assembly_cost_settings.labour_rate),
-    ]
-    build_costing_total = sum(value for _, value in build_costing_rows)
+    build_costing_rows, build_costing_total = get_build_costing_rows(
+        design, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints, assembly_cost_settings
+    )
 
     context = {
         'design': design,

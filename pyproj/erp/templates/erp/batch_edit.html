@@ -225,6 +225,41 @@
             <div class="col-12 col-xl-10">
                 <div class="card">
                     <div class="card-body">
+                        <h5 class="card-title">Build Costing</h5>
+                        <table class="table table-bordered w-auto mb-3">
+                            <tbody>
+                                {% for label, value in build_costing_rows %}
+                                    <tr>
+                                        <th>{{ label }}</th>
+                                        <td class="text-end">${{ value|floatformat:2 }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr class="fw-semibold">
+                                    <th>Total Price / Unit</th>
+                                    <td class="text-end">${{ build_costing_total|floatformat:2 }}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <table class="table table-bordered w-auto mb-0">
+                            <tbody>
+                                <tr class="fw-semibold">
+                                    <th>Total Batch Cost ({{ batch.quantity }} units)
+                                    </th>
+                                    <td class="text-end">${{ total_batch_cost|floatformat:2 }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12 col-xl-10">
+                <div class="card">
+                    <div class="card-body">
                         <h5 class="card-title">Boards</h5>
                         {% if boards %}
                             <table class="table table-striped align-middle mb-0">
