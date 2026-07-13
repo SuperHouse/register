@@ -154,23 +154,34 @@ class Part(models.Model):
         """The PartPriceBreak, across every known supplier variant, giving the lowest
         per-unit price actually payable when buying `quantity` of this part.
 
-        For each variant this is the price at its highest break quantity that doesn't
-        exceed `quantity` (e.g. breaks at 1/10/100, buying 13, uses the 10-break) — or,
-        if `quantity` doesn't reach any break, the variant's lowest available break (the
-        only price on offer). Returns None if the part has no price break data at all.
+        A break's real minimum purchase quantity is `max(break.quantity, variant.moq)`,
+        not just `break.quantity` — a break nominally "at quantity 1" on a variant whose
+        MOQ is 2000 (e.g. a full reel) isn't a real per-unit price unless you're buying
+        at least 2000 of them, so it can't be used to price a design that only needs a
+        handful. For each variant this picks the price at its highest break whose real
+        minimum purchase quantity doesn't exceed `quantity` (e.g. breaks at 1/10/100,
+        buying 13, uses the 10-break). Breaks genuinely reachable at `quantity` are always
+        preferred over ones that aren't, regardless of price, since an unreached break's
+        price is only payable by buying more than what's actually needed — only when no
+        variant has any break reachable at `quantity` do we fall back to the cheapest
+        "smallest lot you can buy" option (each variant's break with the lowest real
+        minimum purchase quantity). Returns None if the part has no price break data.
         """
-        best = None
+        reached = []
+        unreached = []
         for source in self.sources.all():
             for variant in source.variants.all():
                 breaks = list(variant.price_breaks.all())
                 if not breaks:
                     continue
-                applicable = [b for b in breaks if b.quantity <= quantity]
-                candidate = max(applicable, key=lambda b: b.quantity) if applicable \
-                    else min(breaks, key=lambda b: b.quantity)
-                if best is None or candidate.price < best.price:
-                    best = candidate
-        return best
+                moq = variant.moq or 0
+                reachable = [b for b in breaks if max(b.quantity, moq) <= quantity]
+                if reachable:
+                    reached.append(max(reachable, key=lambda b: b.quantity))
+                else:
+                    unreached.append(min(breaks, key=lambda b: max(b.quantity, moq)))
+        candidates = reached or unreached
+        return min(candidates, key=lambda b: b.price) if candidates else None
 
 
 _REFERENCE_SPLIT_RE = re.compile(r'^([A-Za-z]*)(\d*)(.*)$')

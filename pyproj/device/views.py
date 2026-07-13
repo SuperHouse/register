@@ -2,7 +2,6 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
 import tempfile
-from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 
@@ -187,11 +186,8 @@ def design_detail(request, design_id):
     # Cost is calculated per distinct Part (using its total quantity across the whole
     # design to pick the right price break), then applied as a per-unit price to every
     # row for that part - so summing the column gives the correct total BOM cost.
-    parts_by_id = {}
-    part_quantities = Counter()
-    for entry in bom_entries:
-        parts_by_id[entry.part_id] = entry.part
-        part_quantities[entry.part_id] += 1
+    parts_by_id = {entry.part_id: entry.part for entry in bom_entries}
+    part_quantities = design.bom_part_counts()
     price_break_by_part_id = {
         part_id: parts_by_id[part_id].cheapest_price_break_for_quantity(quantity)
         for part_id, quantity in part_quantities.items()
