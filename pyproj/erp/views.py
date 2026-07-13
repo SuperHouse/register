@@ -6,6 +6,7 @@ import json
 import os
 import re
 import xml.etree.ElementTree as ET
+from urllib.parse import quote as urlquote
 from collections import Counter
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -1461,7 +1462,7 @@ def part_source_fetch_digikey(request):
         client_id, access_token = _get_digikey_access_token()
 
         resp = http_requests.get(
-            _digikey_base_url() + f'/products/v4/search/{sku}/productdetails',
+            _digikey_base_url() + f'/products/v4/search/{urlquote(sku, safe="")}/productdetails',
             headers={
                 'Authorization': f'Bearer {access_token}',
                 'X-DIGIKEY-Client-Id': client_id,
@@ -1485,7 +1486,7 @@ def part_source_fetch_digikey(request):
         product = p.get('Product') or p
         digi_key_pn = product.get('DigiKeyPartNumber') or sku
         manufacturer_pn = product.get('ManufacturerProductNumber') or ''
-        product_url = product.get('ProductUrl') or f'https://www.digikey.com/en/products/detail/{sku}'
+        product_url = product.get('ProductUrl') or f'https://www.digikey.com/en/products/detail/{urlquote(sku, safe="")}'
         quantity = product.get('QuantityAvailable')
         stock = int(quantity) if quantity is not None else None
         primary_photo = product.get('PhotoUrl')
@@ -1579,7 +1580,7 @@ def _refresh_variant(variant):
         elif 'digikey' in supplier:
             client_id, access_token = _get_digikey_access_token()
             resp = http_requests.get(
-                _digikey_base_url() + f'/products/v4/search/{sku}/productdetails',
+                _digikey_base_url() + f'/products/v4/search/{urlquote(sku, safe="")}/productdetails',
                 headers={
                     'Authorization': f'Bearer {access_token}',
                     'X-DIGIKEY-Client-Id': client_id,
