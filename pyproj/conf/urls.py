@@ -55,6 +55,8 @@ urlpatterns = [
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),
     path('api/v1/', api.urls),
+    # Short-link form used on board stickers, e.g. https://d.superlab.au/5678
+    path('<int:device_number>/', RedirectView.as_view(pattern_name='device:device_detail', permanent=False), name='device_detail_short'),
 
     # If we're running behind a web server, we won't see media requests, so this will do nothing.
     re_path(
