@@ -258,6 +258,20 @@ class PartSource(models.Model):
     def __str__(self):
         return f'{self.part}: {self.supplier_name}'
 
+    def save(self, *args, **kwargs):
+        """Save, then append a PartSourceStockHistory snapshot whenever stock changes.
+
+        Overridden here (rather than logged at each call site) so every code path that
+        writes stock - manual add, supplier refresh, or a direct admin edit - is captured
+        for the availability-trend history, without every caller needing to remember to
+        log it themselves.
+        """
+        is_new = self._state.adding
+        old_stock = None if is_new else PartSource.objects.filter(pk=self.pk).values_list('stock', flat=True).first()
+        super().save(*args, **kwargs)
+        if is_new or old_stock != self.stock:
+            self.stock_history.create(stock=self.stock)
+
     @property
     def has_stale_variant_data(self):
         """True if any of this listing's variants has never been refreshed, or was last
@@ -267,6 +281,24 @@ class PartSource(models.Model):
             variant.last_refreshed is None or variant.last_refreshed < cutoff
             for variant in self.variants.all()
         )
+
+
+class PartSourceStockHistory(models.Model):
+    """A timestamped snapshot of a PartSource's stock level, written by PartSource.save()
+    whenever stock changes. Grows over time into a history usable for availability-trend
+    tracking; PartSource.stock itself is left untouched so nothing that reads current
+    stock needs to change or join against this table.
+    """
+    source = models.ForeignKey(PartSource, on_delete=models.CASCADE, related_name='stock_history')
+    stock = models.PositiveIntegerField(null=True, blank=True)
+    recorded_dt = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_dt']
+        verbose_name_plural = 'part source stock history'
+
+    def __str__(self):
+        return f'{self.source}: {self.stock} @ {self.recorded_dt}'
 
 
 class PartSourceVariant(models.Model):

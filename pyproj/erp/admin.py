@@ -4,8 +4,8 @@ from django.contrib import admin
 
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSource, PartSourceVariant, ProductionStage,
-    ProductionStageTemplate, ProductionStageTemplateStep,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSource, PartSourceStockHistory, PartSourceVariant,
+    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -41,6 +41,20 @@ class PartSourceAdmin(admin.ModelAdmin):
     list_select_related = ['part']
     search_fields = ['part__name', 'supplier_name', 'manufacturer_sku']
     inlines = [PartSourceVariantInline]
+
+
+@admin.register(PartSourceStockHistory)
+class PartSourceStockHistoryAdmin(admin.ModelAdmin):
+    list_display = ['source', 'stock', 'recorded_dt']
+    list_select_related = ['source', 'source__part']
+    search_fields = ['source__part__name', 'source__supplier_name']
+    readonly_fields = ['source', 'stock', 'recorded_dt']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class PartAssetInline(admin.TabularInline):
