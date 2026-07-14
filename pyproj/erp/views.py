@@ -43,8 +43,8 @@ from .forms import (
 from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartSource, PartSourceVariant,
-    PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartPriceBreakHistory, PartSource,
+    PartSourceVariant, PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -961,7 +961,17 @@ def _lcsc_search(sku):
 
 
 def _save_price_breaks(variant, price_breaks):
-    """Replace all price breaks for a variant with the supplied list."""
+    """Replace all price breaks for a variant with the supplied list.
+
+    Also appends a PartPriceBreakHistory snapshot of the resulting breaks, but only when
+    they differ from what was previously stored, so a refresh that reports unchanged
+    pricing (the common case day to day) doesn't grow the history table with duplicate
+    rows. Compares against DB-normalised values on both sides (the old set is read before
+    the delete; the new set is read back after creating the replacement rows) rather than
+    the raw API values, so Decimal/string/float formatting differences in what a supplier
+    API returns can't cause a false "changed" reading.
+    """
+    old_breaks = set(variant.price_breaks.values_list('quantity', 'price', 'currency'))
     variant.price_breaks.all().delete()
     for pb in price_breaks:
         qty = pb.get('quantity')
@@ -973,6 +983,13 @@ def _save_price_breaks(variant, price_breaks):
                 price=price,
                 currency=pb.get('currency') or 'USD',
             )
+
+    new_breaks = set(variant.price_breaks.values_list('quantity', 'price', 'currency'))
+    if new_breaks != old_breaks:
+        PartPriceBreakHistory.objects.bulk_create([
+            PartPriceBreakHistory(variant=variant, quantity=qty, price=price, currency=currency)
+            for qty, price, currency in new_breaks
+        ])
 
 
 def _digikey_base_url():

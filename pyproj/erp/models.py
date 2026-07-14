@@ -352,6 +352,33 @@ class PartPriceBreak(models.Model):
         return self.CURRENCY_SYMBOLS.get(self.currency, '')
 
 
+class PartPriceBreakHistory(models.Model):
+    """A timestamped snapshot of one of a PartSourceVariant's price breaks, written by
+    _save_price_breaks() (see erp/views.py) whenever the resulting set of breaks differs
+    from what was previously stored for that variant. Mirrors PartSourceStockHistory's
+    role for stock: builds a growing history for future price-trend/fluctuation analysis
+    without PartPriceBreak (the current-price table) needing to be queried any
+    differently to show a simple current price. Kept as its own table, one row per
+    (variant, quantity) pair per snapshot - same shape as PartPriceBreak itself - rather
+    than merged into PartSourceStockHistory, since price breaks are per-variant (each
+    packaging/SKU has its own) while stock is per-listing (PartSource); the two history
+    tables are written from the same supplier refresh call so their recorded_dt values
+    naturally land close together without needing to force them identical.
+    """
+    variant = models.ForeignKey(PartSourceVariant, on_delete=models.CASCADE, related_name='price_break_history')
+    quantity = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=6)
+    currency = models.CharField(max_length=10, default='USD')
+    recorded_dt = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_dt', 'quantity']
+        verbose_name_plural = 'part price break history'
+
+    def __str__(self):
+        return f'{self.variant}: qty {self.quantity} @ {self.currency} {self.price} ({self.recorded_dt})'
+
+
 class PartAsset(models.Model):
     """A file attachment on a Part (e.g. datasheet)."""
     part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='assets')

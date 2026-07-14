@@ -4,8 +4,8 @@ from django.contrib import admin
 
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSource, PartSourceStockHistory, PartSourceVariant,
-    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory, PartSource,
+    PartSourceStockHistory, PartSourceVariant, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -49,6 +49,20 @@ class PartSourceStockHistoryAdmin(admin.ModelAdmin):
     list_select_related = ['source', 'source__part']
     search_fields = ['source__part__name', 'source__supplier_name']
     readonly_fields = ['source', 'stock', 'recorded_dt']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(PartPriceBreakHistory)
+class PartPriceBreakHistoryAdmin(admin.ModelAdmin):
+    list_display = ['variant', 'quantity', 'price', 'currency', 'recorded_dt']
+    list_select_related = ['variant', 'variant__source', 'variant__source__part']
+    search_fields = ['variant__source__part__name', 'variant__source__supplier_name', 'variant__supplier_sku']
+    readonly_fields = ['variant', 'quantity', 'price', 'currency', 'recorded_dt']
 
     def has_add_permission(self, request):
         return False
