@@ -191,8 +191,9 @@
                                     {% for row in parts_required %}
                                         <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:part_edit' row.part.pk %}'">
                                             <td>
-                                                {% if not row.part.sources.all and not row.part.no_stock_required %}
-                                                    <i class="bi bi-exclamation-triangle-fill text-warning me-1" title="No sources listed"></i>
+                                                {% if row.part.has_no_sources or row.part.missing_joint_data %}
+                                                    <i class="bi bi-exclamation-triangle-fill text-warning me-1"
+                                                       title="{% if row.part.has_no_sources and row.part.missing_joint_data %}No sources listed, and SMT/PTH joint counts not set{% elif row.part.has_no_sources %}No sources listed{% else %}SMT/PTH joint counts not set{% endif %}"></i>
                                                 {% endif %}
                                                 {{ row.part.name }}
                                             </td>

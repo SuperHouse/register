@@ -6,8 +6,9 @@
         {% endif %}
     </td>
     <td>
-        {% if not part.sources.all and not part.no_stock_required %}
-            <i class="bi bi-exclamation-triangle-fill text-warning me-1" title="No sources listed"></i>
+        {% if part.has_no_sources or part.missing_joint_data %}
+            <i class="bi bi-exclamation-triangle-fill text-warning me-1"
+               title="{% if part.has_no_sources and part.missing_joint_data %}No sources listed, and SMT/PTH joint counts not set{% elif part.has_no_sources %}No sources listed{% else %}SMT/PTH joint counts not set{% endif %}"></i>
         {% endif %}
         {{ part.name }}
     </td>

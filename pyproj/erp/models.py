@@ -157,6 +157,18 @@ class Part(models.Model):
         PartSource.has_stale_variant_data."""
         return any(source.has_stale_variant_data for source in self.sources.all())
 
+    @property
+    def has_no_sources(self):
+        """True if the part has no supplier listings at all and isn't exempt via
+        no_stock_required (e.g. test points, DNP parts, which are never sourced)."""
+        return not self.no_stock_required and not self.sources.exists()
+
+    @property
+    def missing_joint_data(self):
+        """True if either smt_joints or pth_joints hasn't been set, which understates
+        the Production Consumables figure in Build Costing (see erp.views.compute_bom_pricing)."""
+        return self.smt_joints is None or self.pth_joints is None
+
     def cheapest_price_break_for_quantity(self, quantity):
         """The PartPriceBreak, across every known supplier variant, giving the lowest
         per-unit price actually payable when buying `quantity` of this part.
