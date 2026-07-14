@@ -1,4 +1,5 @@
 {% extends "device/base-with-sidebar.html" %}
+{% load erp_tags %}
 
 {% block title %}
     {% if part %}{{ part.name }}{% else %}Add Part{% endif %} - SuperHouse Device Register
@@ -7,6 +8,16 @@
 {% block h1 %}
     {% if part %}{{ part.name }}{% else %}Add Part{% endif %}
 {% endblock h1 %}
+
+{% block extra_head %}
+    {% if part and stock_chart_data %}
+        <!-- Chart.js, for the Stock History chart -->
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    {% endif %}
+    <style>
+        .stock-sparkline { vertical-align: middle; }
+    </style>
+{% endblock extra_head %}
 
 {% block content %}
     <div class="card mb-4">
@@ -115,6 +126,20 @@
     </div>
 
     {% if part %}
+        {% if stock_chart_data %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Stock History</strong>
+                </div>
+                <div class="card-body">
+                    {{ stock_chart_data|json_script:"stock-chart-data" }}
+                    <div style="position: relative; height: 280px;">
+                        <canvas id="stock-history-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         <div class="card mb-4">
             <div class="card-header">
                 <strong>Sources</strong>
@@ -127,6 +152,7 @@
                                 <th>Supplier</th>
                                 <th>Manufacturer SKU</th>
                                 <th>Stock</th>
+                                <th>Trend</th>
                                 <th>Supplier SKU</th>
                                 <th>Packaging</th>
                                 <th>MOQ</th>
@@ -149,7 +175,9 @@
                                                            title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
                                                     {% endif %}
                                                 </td>
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}>{{ source|stock_sparkline_svg }}</td>
                                             {% else %}
+                                                <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
                                                 <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
                                                 <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
                                                 <td {% if not forloop.last %}style="border-bottom: none;"{% endif %}></td>
@@ -218,6 +246,7 @@
                                                        title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
                                                 {% endif %}
                                             </td>
+                                            <td>{{ source|stock_sparkline_svg }}</td>
                                             <td colspan="4" class="text-body-secondary fst-italic">No SKUs recorded</td>
                                             <td>
                                                 <form method="post" action="{% url 'erp:part_source_delete' source.pk %}"
@@ -491,6 +520,76 @@
         document.querySelectorAll('[data-coreui-toggle="tooltip"]').forEach(function (el) {
             new coreui.Tooltip(el);
         });
+
+        // Stock History chart: one line per Source (fixed categorical order, matching
+        // erp/templatetags/erp_tags.py's sparkline accent) plus a thicker "Total" line
+        // in ink rather than a categorical hue, since it's an aggregate, not a supplier
+        // identity. A part with more than 8 sources runs out of hue slots; extras fall
+        // back to the muted tone rather than generating a new hue.
+        const stockChartDataEl = document.getElementById('stock-chart-data');
+        if (stockChartDataEl && window.Chart) {
+            const CATEGORICAL_COLORS = [
+                '#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834',
+            ];
+            const TOTAL_COLOR = '#0b0b0b';
+            const FALLBACK_COLOR = '#898781';
+
+            const chartData = JSON.parse(stockChartDataEl.textContent);
+            let colorIndex = 0;
+            const datasets = chartData.datasets.map(function (ds) {
+                if (ds.total) {
+                    return {
+                        label: ds.label, data: ds.data,
+                        borderColor: TOTAL_COLOR, backgroundColor: TOTAL_COLOR,
+                        borderWidth: 3, pointRadius: 0, tension: 0,
+                    };
+                }
+                const color = colorIndex < CATEGORICAL_COLORS.length ? CATEGORICAL_COLORS[colorIndex] : FALLBACK_COLOR;
+                colorIndex++;
+                return {
+                    label: ds.label, data: ds.data,
+                    borderColor: color, backgroundColor: color,
+                    borderWidth: 2, pointRadius: 2, tension: 0,
+                };
+            });
+
+            new Chart(document.getElementById('stock-history-chart'), {
+                type: 'line',
+                data: {datasets: datasets},
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {mode: 'x', intersect: false},
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            min: chartData.x_min,
+                            max: chartData.x_max,
+                            ticks: {callback: function (value) { return new Date(value).toLocaleDateString(); }},
+                            grid: {color: '#e1e0d9'},
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: {precision: 0},
+                            title: {display: true, text: 'Stock'},
+                            grid: {color: '#e1e0d9'},
+                        },
+                    },
+                    plugins: {
+                        legend: {position: 'bottom'},
+                        tooltip: {
+                            mode: 'x',
+                            intersect: false,
+                            callbacks: {
+                                title: function (items) {
+                                    return items.length ? new Date(items[0].parsed.x).toLocaleString() : '';
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+        }
 
         // Auto-populate Name from filename when a file is selected
         const fileInput = document.querySelector('input[name="file"]');

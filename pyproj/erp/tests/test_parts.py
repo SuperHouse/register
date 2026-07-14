@@ -98,8 +98,12 @@ def test_part_edit_shows_stale_warning_per_source(client, staff_user):
     response = client.get(reverse('erp:part_edit', args=[part.pk]))
     content = response.content.decode()
 
+    # Search from the Sources card onward, since the supplier names also appear earlier
+    # on the page inside the Stock History chart's embedded JSON data.
+    sources_start = content.find('<strong>Sources</strong>')
+
     def row(name):
-        idx = content.find(name)
+        idx = content.find(name, sources_start)
         start = content.rfind('<tr', 0, idx)
         end = content.find('</tr>', idx)
         return content[start:end]

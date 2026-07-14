@@ -45,6 +45,7 @@ from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
     DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartPriceBreakHistory, PartSource,
     PartSourceVariant, PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    STOCK_TREND_PERIOD,
 )
 
 
@@ -704,6 +705,73 @@ def design_bom_entry_delete(request, entry_id):
     return redirect('design_detail', design_id=design_id)
 
 
+def _part_stock_chart_data(part):
+    """Build Chart.js-ready datasets for the Part detail page's stock history chart.
+
+    One dataset per PartSource (its own recorded stock readings over time, oldest
+    first) plus, when the part has more than one source with any history, a Total
+    dataset built by forward-filling each source's last known reading as of every
+    distinct timestamp across all sources and summing only the sources with a known
+    reading at that point - a source with no reading yet is excluded from the sum
+    rather than counted as zero stock, so the Total doesn't dip misleadingly low
+    before a newly added source's first refresh. Returns None if no source on the
+    part has any stock history yet, so the caller can skip rendering the chart card.
+
+    Also returns x_min/x_max: a fixed STOCK_TREND_PERIOD-wide window ending now,
+    regardless of how much history actually exists, so a part with only a few days
+    of data doesn't render as an artificially stretched-out trend filling the whole
+    chart width. Chart.js clips each dataset to this window itself - the datasets
+    above are left untouched (not pre-filtered to the window) so widening
+    STOCK_TREND_PERIOD later doesn't require changing how data is gathered here.
+    """
+    per_source_points = {}
+    for source in part.sources.all():
+        points = [
+            (h.recorded_dt, h.stock)
+            for h in reversed(source.stock_history.all())
+            if h.stock is not None
+        ]
+        if points:
+            per_source_points[source.pk] = points
+
+    if not per_source_points:
+        return None
+
+    datasets = []
+    for source in part.sources.all():
+        points = per_source_points.get(source.pk)
+        if points:
+            datasets.append({
+                'label': source.supplier_name,
+                'total': False,
+                'data': [{'x': dt.timestamp() * 1000, 'y': stock} for dt, stock in points],
+            })
+
+    if len(per_source_points) > 1:
+        all_timestamps = sorted({dt for points in per_source_points.values() for dt, _ in points})
+        cursor = {pk: 0 for pk in per_source_points}
+        last_known = {}
+        total_points = []
+        for ts in all_timestamps:
+            for pk, points in per_source_points.items():
+                i = cursor[pk]
+                while i < len(points) and points[i][0] <= ts:
+                    last_known[pk] = points[i][1]
+                    i += 1
+                cursor[pk] = i
+            if last_known:
+                total_points.append({'x': ts.timestamp() * 1000, 'y': sum(last_known.values())})
+        datasets.append({'label': 'Total', 'total': True, 'data': total_points})
+
+    window_end = timezone.now()
+    window_start = window_end - STOCK_TREND_PERIOD
+    return {
+        'datasets': datasets,
+        'x_min': window_start.timestamp() * 1000,
+        'x_max': window_end.timestamp() * 1000,
+    }
+
+
 @staff_member_required
 def part_add(request):
     if request.method == 'POST':
@@ -726,6 +794,7 @@ def part_edit(request, part_id):
         Part.objects.prefetch_related(
             'substitutions__substitute',
             'sources__variants__price_breaks',
+            'sources__stock_history',
             'design_bom_entries__design__client',
         ),
         pk=part_id,
@@ -759,6 +828,7 @@ def part_edit(request, part_id):
         'substitution_form': PartSubstitutionForm(exclude_pk=part.pk),
         'reparent_form': PartReparentForm(exclude_pk=part.pk),
         'bom_refs': bom_refs,
+        'stock_chart_data': _part_stock_chart_data(part),
     }
     return render(request, 'erp/part_edit.html', ctx)
 

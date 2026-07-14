@@ -11,6 +11,13 @@ from device.models import Design
 
 STALE_REFRESH_THRESHOLD = timedelta(hours=48)
 
+# The fixed window shown on the horizontal axis of the stock trend charts (Part edit
+# page's Stock History chart and each source's sparkline), regardless of how much
+# history has actually been recorded - so a part with only a few days of data doesn't
+# render as an artificially stretched-out trend line filling the whole width. Bump this
+# once more history has accumulated (e.g. to 365 days for a 12-month view).
+STOCK_TREND_PERIOD = timedelta(days=30)
+
 
 def part_asset_upload_path(instance, filename):
     return f'part_assets/{instance.part_id}/{filename}'
