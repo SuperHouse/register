@@ -30,11 +30,13 @@
         {% if part.bom_entry_count %}{{ part.bom_entry_count }}{% else %}-{% endif %}
     </td>
     <td>
-        <a href="{% url 'erp:part_delete' part.pk %}"
-           class="btn btn-sm btn-outline-danger"
-           title="Delete"
-           onclick="event.stopPropagation();">
-            <i class="cil-trash"></i>
-        </a>
+        {% if not part.bom_entry_count %}
+            <a href="{% url 'erp:part_delete' part.pk %}"
+               class="btn btn-sm btn-outline-danger"
+               title="Delete"
+               onclick="event.stopPropagation();">
+                <i class="cil-trash"></i>
+            </a>
+        {% endif %}
     </td>
 </tr>
