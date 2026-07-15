@@ -28,6 +28,7 @@ from .forms import (
     BomEquivalenceRuleForm,
     BomExclusionRuleForm,
     BomLibrarySettingForm,
+    BomSupplementRuleForm,
     DesignBomEntryForm,
     LocationForm,
     PartAssetForm,
@@ -43,9 +44,9 @@ from .forms import (
 from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartPriceBreakHistory, PartSource,
-    PartSourceVariant, PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
-    STOCK_TREND_PERIOD,
+    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak,
+    PartPriceBreakHistory, PartSource, PartSourceVariant, PartSubstitution, ProductionStage, ProductionStageTemplate,
+    ProductionStageTemplateStep, STOCK_TREND_PERIOD,
 )
 
 
@@ -440,12 +441,53 @@ def _bom_apply_equivalence(equivalence_rules, library, device, package, value):
     return library, device, package, value
 
 
+def _bom_supplement_matches(rule, library, device, package, value):
+    return (
+        _bom_field_matches(rule.library, library)
+        and _bom_field_matches(rule.device, device)
+        and _bom_field_matches(rule.package, package)
+        and _bom_field_matches(rule.value, value)
+    )
+
+
+def _expand_bom_supplement_rows(row, supplement_rules):
+    """Return [row] plus one synthetic row per BomSupplementRule matching it.
+
+    Matching is against the row's raw CSV fields, before exclusion/equivalence/library-setting
+    rules run - a supplement rule describes the BOM as exported by Fusion, not some already
+    transformed version of it. Every rule that matches contributes one extra row (e.g. a fuse
+    holder footprint whose Value implies a same-value fuse part that never gets its own PCB
+    footprint). Each returned row - the original and every supplement - is then run through the
+    normal per-row pipeline independently, exactly as if the CSV had contained that many rows
+    to begin with.
+    """
+    reference = (row.get('reference') or '').strip()
+    device = (row.get('device') or '').strip()
+    package = (row.get('package') or '').strip()
+    value = (row.get('value') or '').strip()
+    library = (row.get('library') or '').strip()
+
+    rows = [row]
+    for rule in supplement_rules:
+        if _bom_supplement_matches(rule, library, device, package, value):
+            rows.append({
+                'reference': f'{reference}{rule.reference_suffix}' if reference else '',
+                'device': rule.supplement_device or device,
+                'package': rule.supplement_package or package,
+                'value': rule.supplement_value or value,
+                'library': rule.supplement_library or library,
+            })
+    return rows
+
+
 def _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name):
     """Apply BOM import rules to one CSV row.
 
     Returns (reference, part, created) or None if the row is excluded. Shared by the Parts
     library CSV import (part_import_bom) and the per-design BOM import (design_bom_populate) —
-    both consume the same reference/device/package/value/library CSV column format.
+    both consume the same reference/device/package/value/library CSV column format. Callers
+    should first pass each raw CSV row through _expand_bom_supplement_rows() so any supplement
+    rows it generates are resolved the same way as a normal imported row.
     """
     reference = (row.get('reference') or '').strip()
     device = (row.get('device') or '').strip()
@@ -467,7 +509,13 @@ def _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settin
         if library_setting.ignore_value:
             value = ''
 
-    part = Part.objects.filter(device__iexact=device, package__iexact=package, value__iexact=value).first()
+    # order_by('pk') overrides Part's default Meta.ordering (name) so that, if more than one
+    # Part already matches this tuple (e.g. an old duplicate that was never cleaned up), the
+    # earliest-created - almost always the canonical one other designs already reference - wins
+    # deterministically, rather than whichever happens to sort first alphabetically by name.
+    part = Part.objects.filter(
+        device__iexact=device, package__iexact=package, value__iexact=value,
+    ).order_by('pk').first()
     created = False
     if not part:
         name = ' '.join(p for p in [value, package, device.capitalize()] if p) or 'Unnamed Part'
@@ -555,6 +603,7 @@ def part_import_bom(request):
         content = csv_file.read().decode('utf-8-sig')
         reader = csv.DictReader(io.StringIO(content))
 
+        supplement_rules = list(BomSupplementRule.objects.all())
         exclusion_rules = list(BomExclusionRule.objects.all())
         equivalence_rules = list(BomEquivalenceRule.objects.all())
         library_settings_by_name = {
@@ -566,16 +615,19 @@ def part_import_bom(request):
         excluded = 0
 
         for row in reader:
-            resolved = _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name)
-            if resolved is None:
-                excluded += 1
-                continue
+            for expanded_row in _expand_bom_supplement_rows(row, supplement_rules):
+                resolved = _resolve_bom_csv_row(
+                    expanded_row, exclusion_rules, equivalence_rules, library_settings_by_name,
+                )
+                if resolved is None:
+                    excluded += 1
+                    continue
 
-            _reference, _part, created = resolved
-            if created:
-                added += 1
-            else:
-                skipped += 1
+                _reference, _part, created = resolved
+                if created:
+                    added += 1
+                else:
+                    skipped += 1
 
         messages.success(
             request,
@@ -609,6 +661,7 @@ def design_bom_populate(request, design_id):
                 content = bom_asset.file.read().decode('utf-8-sig')
                 reader = csv.DictReader(io.StringIO(content))
 
+                supplement_rules = list(BomSupplementRule.objects.all())
                 exclusion_rules = list(BomExclusionRule.objects.all())
                 equivalence_rules = list(BomEquivalenceRule.objects.all())
                 library_settings_by_name = {
@@ -622,21 +675,24 @@ def design_bom_populate(request, design_id):
                 new_parts = 0
 
                 for row in reader:
-                    resolved = _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settings_by_name)
-                    if resolved is None:
-                        excluded += 1
-                        continue
+                    for expanded_row in _expand_bom_supplement_rows(row, supplement_rules):
+                        resolved = _resolve_bom_csv_row(
+                            expanded_row, exclusion_rules, equivalence_rules, library_settings_by_name,
+                        )
+                        if resolved is None:
+                            excluded += 1
+                            continue
 
-                    reference, part, created = resolved
-                    if created:
-                        new_parts += 1
-                    if not reference or reference in existing_references:
-                        skipped += 1
-                        continue
+                        reference, part, created = resolved
+                        if created:
+                            new_parts += 1
+                        if not reference or reference in existing_references:
+                            skipped += 1
+                            continue
 
-                    DesignBomEntry.objects.create(design=design, part=part, reference=reference)
-                    existing_references.add(reference)
-                    added += 1
+                        DesignBomEntry.objects.create(design=design, part=part, reference=reference)
+                        existing_references.add(reference)
+                        added += 1
 
                 positions_updated = _apply_brd_placements(design)
                 position_msg = (
@@ -1967,13 +2023,18 @@ def part_category_delete(request, part_category_id):
     return render(request, 'erp/part_category_delete.html', ctx)
 
 
-def _part_import_filter_context(exclusion_form=None, equivalence_form=None, library_form=None):
+def _part_import_filter_context(
+    supplement_form=None, exclusion_form=None, equivalence_form=None, library_form=None,
+):
     """Shared context for the merged Part Import Filters page.
 
-    Sections are ordered to match the order rules are applied in part_import_bom:
-    exclusion, then equivalence, then library (ignore-value) settings.
+    Sections are ordered to match the order rules are applied in part_import_bom / _expand_bom_supplement_rows
+    / _resolve_bom_csv_row: supplement expansion first, then exclusion, then equivalence, then library
+    (ignore-value) settings.
     """
     return {
+        'supplement_rules': BomSupplementRule.objects.all(),
+        'supplement_form': supplement_form or BomSupplementRuleForm(),
         'exclusion_rules': BomExclusionRule.objects.all(),
         'exclusion_form': exclusion_form or BomExclusionRuleForm(),
         'equivalence_rules': BomEquivalenceRule.objects.all(),
@@ -1986,6 +2047,52 @@ def _part_import_filter_context(exclusion_form=None, equivalence_form=None, libr
 @staff_member_required
 def part_import_filter_list(request):
     return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context())
+
+
+@staff_member_required
+def bom_supplement_rule_add(request):
+    if request.method != 'POST':
+        return redirect('erp:part_import_filter_list')
+
+    form = BomSupplementRuleForm(request.POST)
+    if form.is_valid():
+        form.save()
+        messages.success(request, 'Supplemental part rule added.')
+        return redirect('erp:part_import_filter_list')
+
+    messages.warning(request, 'Please correct the errors below.')
+    return render(request, 'erp/part_import_filter_list.html', _part_import_filter_context(supplement_form=form))
+
+
+@staff_member_required
+def bom_supplement_rule_edit(request, supplement_rule_id):
+    supplement_rule = get_object_or_404(BomSupplementRule, pk=supplement_rule_id)
+
+    if request.method == 'POST':
+        form = BomSupplementRuleForm(request.POST, instance=supplement_rule)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Supplemental part rule updated.')
+            return redirect('erp:part_import_filter_list')
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = BomSupplementRuleForm(instance=supplement_rule)
+
+    ctx = {'form': form, 'supplement_rule': supplement_rule}
+    return render(request, 'erp/bom_supplement_rule_edit.html', ctx)
+
+
+@staff_member_required
+def bom_supplement_rule_delete(request, supplement_rule_id):
+    supplement_rule = get_object_or_404(BomSupplementRule, pk=supplement_rule_id)
+
+    if request.method == 'POST':
+        supplement_rule.delete()
+        messages.success(request, 'Supplemental part rule deleted.')
+        return redirect('erp:part_import_filter_list')
+
+    ctx = {'supplement_rule': supplement_rule}
+    return render(request, 'erp/bom_supplement_rule_delete.html', ctx)
 
 
 @staff_member_required

@@ -526,6 +526,68 @@ class BomEquivalenceRule(models.Model):
         return f'{from_parts} → {to_parts}'
 
 
+class BomSupplementRule(models.Model):
+    """A rule that adds an extra BOM row alongside a matching one during BOM import.
+
+    Some footprints imply a second, separately-stocked part that never appears in the PCB
+    export - e.g. a fuse holder footprint whose Value ("1A", "2A", ...) really means "this
+    board also needs a 1A fuse", but the fuse itself has no footprint of its own to generate
+    a BOM row. Matching is against the row's raw CSV fields, before exclusion/equivalence/
+    library-setting rules run - the supplement row is generated first, then both the original
+    row and the supplement row are run through the rest of the pipeline independently, exactly
+    as if the CSV had contained two rows to begin with.
+
+    library/device/package/value may be left blank to match any value for that field, same as
+    BomExclusionRule/BomEquivalenceRule. supplement_library/supplement_device/supplement_package/
+    supplement_value may be left blank to copy the matched row's corresponding field - this is
+    what makes e.g. a fuse holder's Value ("1A") carry straight through to the generated fuse
+    part without needing one rule per fuse rating.
+
+    Gotcha: if a BomLibrarySetting.ignore_value is used to collapse the matched part's own
+    Value across ratings (e.g. so every fuse holder is one Part regardless of amperage), leaving
+    supplement_library blank means the generated row shares that same library and gets its Value
+    blanked too - the fuse would end up with no Value at all. Give supplement_library a distinct
+    name from the matched library whenever the matched library has an ignore_value setting, so
+    library settings only apply to the row they were written for.
+    """
+    library = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any library')
+    device = models.CharField(max_length=200, blank=True, help_text='Leave blank to match any device')
+    package = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any package')
+    value = models.CharField(max_length=100, blank=True, help_text='Leave blank to match any value')
+    supplement_library = models.CharField(
+        max_length=200, blank=True,
+        help_text='Leave blank to copy the matched row\'s library. Give it a distinct name if the matched '
+                   'library has an Ignore Value library setting, or that setting will blank this row\'s '
+                   'Value too.',
+    )
+    supplement_device = models.CharField(
+        max_length=200, blank=True, help_text='Leave blank to copy the matched row\'s device',
+    )
+    supplement_package = models.CharField(
+        max_length=100, blank=True, help_text='Leave blank to copy the matched row\'s package',
+    )
+    supplement_value = models.CharField(
+        max_length=100, blank=True, help_text='Leave blank to copy the matched row\'s value',
+    )
+    reference_suffix = models.CharField(
+        max_length=20,
+        help_text='Appended to the matched row\'s reference designator to make a unique reference for the '
+                   'generated entry, e.g. "-FUSE" turns F1 into F1-FUSE.',
+    )
+
+    class Meta:
+        ordering = ['library', 'device', 'package', 'value']
+
+    def __str__(self):
+        parts = [
+            f'library={self.library or "(any)"}',
+            f'device={self.device or "(any)"}',
+            f'package={self.package or "(any)"}',
+            f'value={self.value or "(any)"}',
+        ]
+        return f'{", ".join(parts)} → +{self.reference_suffix}'
+
+
 class AssemblyCostSettings(models.Model):
     """Singleton record of global assembly-cost settings, used to calculate each Design's
     Build Costing breakdown (see device.models.Design)."""

@@ -11,12 +11,109 @@
 {% block content %}
     <p class="text-body-secondary">
         These filters are applied, in order, when importing parts from a BOM CSV: a row is first checked against
-        the Exclusion Rules; if not excluded, the Transformation Rules are applied to remap its Library, Device,
-        Package, and/or Value; finally, the Library Settings determine whether the Device, Package, and/or Value
-        fields are ignored for that row's library.
+        the Supplemental Part Rules, which may add extra rows alongside it; every resulting row (the original and
+        any supplements) is then checked against the Exclusion Rules; if not excluded, the Transformation Rules are
+        applied to remap its Library, Device, Package, and/or Value; finally, the Library Settings determine whether
+        the Device, Package, and/or Value fields are ignored for that row's library.
     </p>
 
-    <h2 class="h5 mt-4">1. Exclusion Rules</h2>
+    <h2 class="h5 mt-4">1. Supplemental Part Rules</h2>
+    <p class="text-body-secondary">
+        Some footprints imply a second, separately-stocked part that never gets its own line in the BOM export -
+        e.g. a fuse holder footprint whose Value ("1A", "2A", ...) really means the board also needs a fuse of that
+        rating. A row that matches every non-blank Library/Device/Package/Value field on a rule has an extra row
+        added alongside it, built from the Supplement fields (leave a Supplement field blank to copy the matched
+        row's value for it - this is what lets a fuse holder's Value carry straight through to the generated fuse
+        row without a separate rule per rating). The new row's reference designator is the matched row's reference
+        with Reference Suffix appended (e.g. "-FUSE" turns F1 into F1-FUSE), and it is then excluded/transformed/
+        imported exactly like any other row. <strong>If a Library Setting below has Ignore Value checked for the
+        matched library</strong> (e.g. to collapse a fuse holder to one Part regardless of rating), give
+        Supplement Library a distinct name rather than leaving it blank - otherwise that same setting also blanks
+        the generated row's Value.
+    </p>
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="table-responsive">
+            <table class="table table-striped align-middle">
+                <thead>
+                    <tr class="highlight">
+                        <th colspan="2" class="text-center">Library</th>
+                        <th colspan="2" class="text-center border-start">Device</th>
+                        <th colspan="2" class="text-center border-start">Package</th>
+                        <th colspan="2" class="text-center border-start">Value</th>
+                        <th rowspan="2" class="border-start">Ref Suffix</th>
+                        <th rowspan="2" style="width: 90px;"></th>
+                    </tr>
+                    <tr class="highlight">
+                        <th>Match</th>
+                        <th>Supplement</th>
+                        <th class="border-start">Match</th>
+                        <th>Supplement</th>
+                        <th class="border-start">Match</th>
+                        <th>Supplement</th>
+                        <th class="border-start">Match</th>
+                        <th>Supplement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for supplement_rule in supplement_rules %}
+                        <tr>
+                            <td>{{ supplement_rule.library|default:"(any)" }}</td>
+                            <td>{{ supplement_rule.supplement_library|default:"(copied)" }}</td>
+                            <td class="border-start">{{ supplement_rule.device|default:"(any)" }}</td>
+                            <td>{{ supplement_rule.supplement_device|default:"(copied)" }}</td>
+                            <td class="border-start">{{ supplement_rule.package|default:"(any)" }}</td>
+                            <td>{{ supplement_rule.supplement_package|default:"(copied)" }}</td>
+                            <td class="border-start">{{ supplement_rule.value|default:"(any)" }}</td>
+                            <td>{{ supplement_rule.supplement_value|default:"(copied)" }}</td>
+                            <td class="border-start">{{ supplement_rule.reference_suffix }}</td>
+                            <td class="text-nowrap">
+                                <div class="d-flex gap-1">
+                                    <a href="{% url 'erp:bom_supplement_rule_edit' supplement_rule.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
+                                        <i class="cil-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'erp:bom_supplement_rule_delete' supplement_rule.pk %}" class="btn btn-sm btn-outline-danger" title="Delete">
+                                        <i class="cil-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="10"><i>There are no supplemental part rules yet.</i></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tbody>
+                    <tr>
+                        <form method="post" action="{% url 'erp:bom_supplement_rule_add' %}" class="d-contents">
+                            {% csrf_token %}
+                            <td>{{ supplement_form.library }}</td>
+                            <td>{{ supplement_form.supplement_library }}</td>
+                            <td class="border-start">{{ supplement_form.device }}</td>
+                            <td>{{ supplement_form.supplement_device }}</td>
+                            <td class="border-start">{{ supplement_form.package }}</td>
+                            <td>{{ supplement_form.supplement_package }}</td>
+                            <td class="border-start">{{ supplement_form.value }}</td>
+                            <td>{{ supplement_form.supplement_value }}</td>
+                            <td class="border-start">{{ supplement_form.reference_suffix }}</td>
+                            <td>
+                                <button type="submit" class="btn btn-sm btn-primary">Add</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% if supplement_form.non_field_errors %}
+                        <tr>
+                            <td colspan="10"><div class="text-danger small">{{ supplement_form.non_field_errors }}</div></td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="h5">2. Exclusion Rules</h2>
     <p class="text-body-secondary">
         Rows that match every non-blank field (Library, Device, Package, Value) on a rule are skipped entirely
         and never created as parts. Leave a field blank to match any value for that field.
@@ -80,7 +177,7 @@
         </div>
     </div>
 
-    <h2 class="h5">2. Transformation Rules</h2>
+    <h2 class="h5">3. Transformation Rules</h2>
     <p class="text-body-secondary">
         Rows that match every non-blank "From" field on a rule have their Library, Device, Package, and/or Value
         replaced with the rule's "To" values before being checked for duplicates and imported. Leave a "From" field
@@ -163,7 +260,7 @@
         </div>
     </div>
 
-    <h2 class="h5">3. Library Settings</h2>
+    <h2 class="h5">4. Library Settings</h2>
     <p class="text-body-secondary">
         Per-library behaviour applied last. When "Ignore Device", "Ignore Package", or "Ignore Value" is checked,
         the corresponding field is ignored entirely for parts from that library: it is not used to detect

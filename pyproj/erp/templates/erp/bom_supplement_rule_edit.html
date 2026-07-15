@@ -1,0 +1,111 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Edit Supplemental Part Rule - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Edit Supplemental Part Rule
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 fs-6 mb-0">Library</legend>
+                            <div class="row">
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.library.id_for_label }}" class="form-label">{{ form.library.label }}</label>
+                                    {{ form.library }}
+                                    {% if form.library.help_text %}<div class="form-text">{{ form.library.help_text }}</div>{% endif %}
+                                    {% if form.library.errors %}<div class="text-danger small">{{ form.library.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.supplement_library.id_for_label }}" class="form-label">{{ form.supplement_library.label }}</label>
+                                    {{ form.supplement_library }}
+                                    {% if form.supplement_library.help_text %}<div class="form-text">{{ form.supplement_library.help_text }}</div>{% endif %}
+                                    {% if form.supplement_library.errors %}<div class="text-danger small">{{ form.supplement_library.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 fs-6 mb-0">Device</legend>
+                            <div class="row">
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.device.id_for_label }}" class="form-label">{{ form.device.label }}</label>
+                                    {{ form.device }}
+                                    {% if form.device.help_text %}<div class="form-text">{{ form.device.help_text }}</div>{% endif %}
+                                    {% if form.device.errors %}<div class="text-danger small">{{ form.device.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.supplement_device.id_for_label }}" class="form-label">{{ form.supplement_device.label }}</label>
+                                    {{ form.supplement_device }}
+                                    {% if form.supplement_device.help_text %}<div class="form-text">{{ form.supplement_device.help_text }}</div>{% endif %}
+                                    {% if form.supplement_device.errors %}<div class="text-danger small">{{ form.supplement_device.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 fs-6 mb-0">Package</legend>
+                            <div class="row">
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.package.id_for_label }}" class="form-label">{{ form.package.label }}</label>
+                                    {{ form.package }}
+                                    {% if form.package.help_text %}<div class="form-text">{{ form.package.help_text }}</div>{% endif %}
+                                    {% if form.package.errors %}<div class="text-danger small">{{ form.package.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.supplement_package.id_for_label }}" class="form-label">{{ form.supplement_package.label }}</label>
+                                    {{ form.supplement_package }}
+                                    {% if form.supplement_package.help_text %}<div class="form-text">{{ form.supplement_package.help_text }}</div>{% endif %}
+                                    {% if form.supplement_package.errors %}<div class="text-danger small">{{ form.supplement_package.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <fieldset class="border rounded p-3 mb-3">
+                            <legend class="float-none w-auto px-2 fs-6 mb-0">Value</legend>
+                            <div class="row">
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.value.id_for_label }}" class="form-label">{{ form.value.label }}</label>
+                                    {{ form.value }}
+                                    {% if form.value.help_text %}<div class="form-text">{{ form.value.help_text }}</div>{% endif %}
+                                    {% if form.value.errors %}<div class="text-danger small">{{ form.value.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-6 mb-0">
+                                    <label for="{{ form.supplement_value.id_for_label }}" class="form-label">{{ form.supplement_value.label }}</label>
+                                    {{ form.supplement_value }}
+                                    {% if form.supplement_value.help_text %}<div class="form-text">{{ form.supplement_value.help_text }}</div>{% endif %}
+                                    {% if form.supplement_value.errors %}<div class="text-danger small">{{ form.supplement_value.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </fieldset>
+
+                        <div class="mb-3">
+                            <label for="{{ form.reference_suffix.id_for_label }}" class="form-label">{{ form.reference_suffix.label }}</label>
+                            {{ form.reference_suffix }}
+                            {% if form.reference_suffix.help_text %}<div class="form-text">{{ form.reference_suffix.help_text }}</div>{% endif %}
+                            {% if form.reference_suffix.errors %}<div class="text-danger small">{{ form.reference_suffix.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'erp:part_import_filter_list' %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

@@ -4,7 +4,7 @@ from django.contrib import admin
 
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory, PartSource,
+    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory, PartSource,
     PartSourceStockHistory, PartSourceVariant, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
@@ -127,6 +127,12 @@ class BatchAdmin(admin.ModelAdmin):
     list_display = ['design', 'po', 'quantity', 'created_dt']
     search_fields = ['po', 'design__name', 'design__sku']
     inlines = [BatchProductionStageInline]
+
+
+@admin.register(BomSupplementRule)
+class BomSupplementRuleAdmin(admin.ModelAdmin):
+    list_display = ['library', 'device', 'package', 'value', 'reference_suffix']
+    search_fields = ['library', 'device', 'package', 'value']
 
 
 @admin.register(BomLibrarySetting)

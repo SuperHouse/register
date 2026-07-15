@@ -6,7 +6,7 @@ from django.db.models import Q
 from device.models import Design
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSubstitution, ProductionStage,
+    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSubstitution, ProductionStage,
     ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
@@ -403,6 +403,34 @@ class BomEquivalenceRuleForm(forms.ModelForm):
         if not (cleaned_data.get('to_library') or cleaned_data.get('to_device')
                 or cleaned_data.get('to_package') or cleaned_data.get('to_value')):
             raise forms.ValidationError('At least one of To Library, To Device, To Package, or To Value must be set.')
+        return cleaned_data
+
+
+class BomSupplementRuleForm(forms.ModelForm):
+    class Meta:
+        model = BomSupplementRule
+        fields = [
+            'library', 'device', 'package', 'value',
+            'supplement_library', 'supplement_device', 'supplement_package', 'supplement_value',
+            'reference_suffix',
+        ]
+        widgets = {
+            'library': forms.TextInput(attrs={'class': 'form-control'}),
+            'device': forms.TextInput(attrs={'class': 'form-control'}),
+            'package': forms.TextInput(attrs={'class': 'form-control'}),
+            'value': forms.TextInput(attrs={'class': 'form-control'}),
+            'supplement_library': forms.TextInput(attrs={'class': 'form-control'}),
+            'supplement_device': forms.TextInput(attrs={'class': 'form-control'}),
+            'supplement_package': forms.TextInput(attrs={'class': 'form-control'}),
+            'supplement_value': forms.TextInput(attrs={'class': 'form-control'}),
+            'reference_suffix': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not (cleaned_data.get('library') or cleaned_data.get('device')
+                or cleaned_data.get('package') or cleaned_data.get('value')):
+            raise forms.ValidationError('At least one of Library, Device, Package, or Value must be set.')
         return cleaned_data
 
 
