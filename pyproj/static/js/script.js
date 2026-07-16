@@ -124,6 +124,44 @@ function initStatusButtons(tbodyId) {
     });
 }
 
+// Wires up .category-header rows within the container identified by containerId so
+// clicking one toggles visibility of its .part-row siblings (matched via data-category)
+// and persists the expanded/collapsed state server-side via a POST to toggleUrl. Bound to
+// the container itself (not its rows) via event delegation, so it keeps working after
+// initServerFilter() replaces the container's innerHTML.
+function initCategoryCollapse(containerId, toggleUrl) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    container.addEventListener('click', function (event) {
+        const header = event.target.closest('.category-header');
+        if (!header || !container.contains(header)) return;
+
+        const categoryKey = header.dataset.category;
+        const expanded = !header.classList.contains('expanded');
+        header.classList.toggle('expanded', expanded);
+
+        const caret = header.querySelector('.category-caret');
+        if (caret) {
+            caret.classList.toggle('bi-caret-down-fill', expanded);
+            caret.classList.toggle('bi-caret-right-fill', !expanded);
+        }
+
+        container.querySelectorAll('.part-row[data-category="' + categoryKey + '"]').forEach(function (row) {
+            row.style.display = expanded ? '' : 'none';
+        });
+
+        fetch(toggleUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken'),
+            },
+            body: 'category=' + encodeURIComponent(categoryKey) + '&expanded=' + expanded,
+        });
+    });
+}
+
 function initServerFilter(resultsId) {
     const input = document.getElementById('list-search');
     const clearBtn = document.getElementById('list-search-clear');

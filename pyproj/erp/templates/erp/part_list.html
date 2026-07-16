@@ -80,26 +80,30 @@
                                 <th style="width: 60px;"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="parts-table-body">
                             {% if uncategorised %}
-                                <tr class="table-secondary">
+                                <tr class="table-secondary category-header{% if uncategorised_expanded %} expanded{% endif %}"
+                                    data-category="uncategorised" style="cursor: pointer;">
                                     <td colspan="9" class="fw-semibold text-body-secondary py-2">
-                                        Uncategorised
+                                        <i class="bi {% if uncategorised_expanded %}bi-caret-down-fill{% else %}bi-caret-right-fill{% endif %} category-caret me-2"></i>
+                                        Uncategorised ({{ uncategorised|length }})
                                     </td>
                                 </tr>
                                 {% for part in uncategorised %}
-                                    {% include "erp/part_list_row.html" %}
+                                    {% include "erp/part_list_row.html" with category_key="uncategorised" category_expanded=uncategorised_expanded %}
                                 {% endfor %}
                             {% endif %}
 
                             {% for category in categories_with_parts %}
-                                <tr class="table-secondary">
+                                <tr class="table-secondary category-header{% if category.is_expanded %} expanded{% endif %}"
+                                    data-category="{{ category.pk }}" style="cursor: pointer;">
                                     <td colspan="9" class="fw-semibold py-2">
-                                        {{ category.name }}
+                                        <i class="bi {% if category.is_expanded %}bi-caret-down-fill{% else %}bi-caret-right-fill{% endif %} category-caret me-2"></i>
+                                        {{ category.name }} ({{ category.parts.all|length }})
                                     </td>
                                 </tr>
                                 {% for part in category.parts.all %}
-                                    {% include "erp/part_list_row.html" %}
+                                    {% include "erp/part_list_row.html" with category_key=category.pk category_expanded=category.is_expanded %}
                                 {% endfor %}
                             {% endfor %}
                         </tbody>
@@ -115,5 +119,8 @@
 {% endblock content %}
 
 {% block extra_js %}
-    <script>initServerFilter('parts-results');</script>
+    <script>
+        initServerFilter('parts-results');
+        initCategoryCollapse('parts-results', '{% url 'erp:part_category_toggle_collapse' %}');
+    </script>
 {% endblock extra_js %}

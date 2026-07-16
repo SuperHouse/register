@@ -393,19 +393,43 @@ def part_list(request):
         category_filter = Q(parts__isnull=False)
 
     uncategorised = list(parts_qs.filter(category__isnull=True))
-    categories_with_parts = (
+    categories_with_parts = list(
         PartCategory.objects
         .filter(category_filter)
         .prefetch_related(Prefetch('parts', queryset=parts_qs))
         .distinct()
         .order_by('order', 'name')
     )
+
+    # A filter should reveal its matches even inside a collapsed category, without
+    # actually persisting that category as expanded for the next unfiltered visit.
+    expanded_categories = set(request.session.get('parts_expanded_categories', []))
+    uncategorised_expanded = bool(q) or 'uncategorised' in expanded_categories
+    for category in categories_with_parts:
+        category.is_expanded = bool(q) or str(category.pk) in expanded_categories
+
     ctx = {
         'uncategorised': uncategorised,
+        'uncategorised_expanded': uncategorised_expanded,
         'categories_with_parts': categories_with_parts,
         'q': q,
     }
     return render(request, 'erp/part_list.html', ctx)
+
+
+@staff_member_required
+def part_category_toggle_collapse(request):
+    if request.method == 'POST':
+        category_key = request.POST.get('category', '')
+        expanded = request.POST.get('expanded') == 'true'
+        expanded_categories = set(request.session.get('parts_expanded_categories', []))
+        if expanded:
+            expanded_categories.add(category_key)
+        else:
+            expanded_categories.discard(category_key)
+        request.session['parts_expanded_categories'] = list(expanded_categories)
+
+    return JsonResponse({'status': 'ok'})
 
 
 def _bom_field_matches(rule_value, row_value):

@@ -8,6 +8,7 @@ app_name = 'erp'
 
 urlpatterns = [
     path('parts/', views.part_list, name='part_list'),
+    path('parts/toggle-category/', views.part_category_toggle_collapse, name='part_category_toggle_collapse'),
     path('parts/import-bom/', views.part_import_bom, name='part_import_bom'),
     path('parts/add/', views.part_add, name='part_add'),
     path('parts/<int:part_id>/', views.part_edit, name='part_edit'),
