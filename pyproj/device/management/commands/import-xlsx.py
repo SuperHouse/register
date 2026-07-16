@@ -145,6 +145,7 @@ class Command(BaseCommand):
         tr_list = []
         device_count = 0
         device_updated_count = 0
+        device_skipped_count = 0
         for row in ws_device.iter_rows(min_row=2, max_col=len(col_map.keys()), max_row=9999):
             row = dict(zip(device_keys, (cell.value for cell in row)))
             if row['DeviceTypeSerial'] is None:
@@ -152,6 +153,12 @@ class Command(BaseCommand):
             # self.stdout.write(f'{row=}')
             device_id = int(row['Serial'])
             design_id = int(row['DeviceTypeSerial'])
+            if row['Assembled'] is None:
+                self.stdout.write(self.style.WARNING(
+                    f"Device {device_id}: no Assembled date, skipping row (not yet assembled?)."
+                ))
+                device_skipped_count += 1
+                continue
             batch_id = int(row['Batch']) if row['Batch'] else None
             if batch_id is not None and not Batch.objects.filter(pk=batch_id).exists():
                 self.stdout.write(self.style.WARNING(
@@ -297,6 +304,7 @@ class Command(BaseCommand):
         self.stdout.write(
             f'Imported {design_count} new designs, updated {design_updated_count} existing designs, '
             f'imported {device_count} new devices, updated {device_updated_count} existing devices, '
+            f'skipped {device_skipped_count} devices with no Assembled date, '
             f'created {de_created_count} device events (skipped {de_skipped_count} duplicates), '
             f'and created {tr_created_count} test records (skipped {tr_skipped_count} duplicates).'
         )
