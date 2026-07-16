@@ -171,3 +171,8 @@ cython_debug/
 /pyproj/.digikey/
 /pyproj/localhost-key.pem
 /pyproj/localhost.pem
+
+# Claude Code: personal overrides and runtime state, not shared config
+/.claude/settings.local.json
+/.claude/scheduled_tasks.lock
+/.claude/skills/run-register/.test-account-password

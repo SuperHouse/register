@@ -57,6 +57,10 @@ cd pyproj
 pytest
 ```
 
+## Development Workflow
+
+Never run `git commit` (or any other action that changes committed history) in this repository unless the user has specifically requested a commit in that turn. Making changes and leaving them uncommitted is the default — do not commit "while you're at it" just because a change is complete or tests pass.
+
 ## Documentation
 
 End-user and admin documentation lives in `docs/` and is built with [MkDocs Material](https://squidfunk.github.io/mkdocs-material/). The published site is at `https://superhouse.github.io/register/`.
