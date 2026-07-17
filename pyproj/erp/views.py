@@ -1206,20 +1206,53 @@ def _mouser_price_breaks(p):
     return price_breaks
 
 
-def _propagate_digikey_sibling_data(listing, variations):
-    """Save price breaks and MOQ for every PartSourceVariant under listing found in variations.
+def _sync_digikey_sibling_variants(listing, variations, product_url=''):
+    """Create/update every PartSourceVariant under `listing` from DigiKey's productdetails
+    response.
 
-    DigiKey's productdetails response includes every packaging variation's pricing and
-    MOQ (not just the one that was looked up) in a single call, so one fetch or refresh
-    can backfill this data for sibling SKUs under the same listing too.
+    DigiKey's response includes every packaging variation's pricing and MOQ (not just the
+    one that was looked up) in a single call. Existing sibling variants get their price
+    breaks, MOQ, and last_refreshed updated; variations with no matching variant yet are
+    created too, since the same response already has everything needed for them (issue #88)
+    - so adding or refreshing any one DigiKey SKU keeps the whole packaging family in sync,
+    instead of requiring the same lookup to be repeated once per SKU. DigiKey doesn't return
+    a per-variation product URL, so newly-created siblings share `product_url` (the one
+    product page lets a user pick packaging there anyway). MarketPlace variations
+    (third-party resellers, not genuine DigiKey stock) are only updated if a variant for one
+    already exists - never auto-created.
+
+    Returns (created, updated) - lists of PartSourceVariant - so callers can tell whether any
+    brand-new SKU was added.
     """
-    by_digikey_pn = {v.get('DigiKeyProductNumber', '').lower(): v for v in variations}
-    for sibling in listing.variants.all():
-        variation = by_digikey_pn.get(sibling.supplier_sku.lower())
-        if variation is not None:
-            _save_price_breaks(sibling, _digikey_price_breaks(variation))
-            sibling.moq = variation.get('MinimumOrderQuantity')
-            sibling.save(update_fields=['moq'])
+    now = timezone.now()
+    existing_by_sku = {v.supplier_sku.lower(): v for v in listing.variants.all()}
+    created, updated = [], []
+    for variation in variations:
+        digikey_pn = variation.get('DigiKeyProductNumber', '')
+        if not digikey_pn:
+            continue
+        sibling = existing_by_sku.get(digikey_pn.lower())
+        is_new = sibling is None
+        if is_new:
+            if variation.get('MarketPlace'):
+                continue
+            sibling = PartSourceVariant.objects.create(
+                source=listing, supplier_sku=digikey_pn,
+                packaging=(variation.get('PackageType') or {}).get('Name', ''), url=product_url,
+            )
+
+        _save_price_breaks(sibling, _digikey_price_breaks(variation))
+        sibling.last_refreshed = now
+        update_fields = ['last_refreshed']
+        moq = variation.get('MinimumOrderQuantity')
+        if moq is not None:
+            sibling.moq = moq
+            update_fields.append('moq')
+        sibling.save(update_fields=update_fields)
+
+        (created if is_new else updated).append(sibling)
+
+    return created, updated
 
 
 @staff_member_required
@@ -1712,20 +1745,9 @@ def part_source_fetch_digikey(request):
         source_saved = False
         listing = None
         if part:
-            if not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
-                listing = _get_or_create_supplier_listing(part, 'DigiKey', manufacturer_pn, stock)
-                PartSourceVariant.objects.create(
-                    source=listing, supplier_sku=digi_key_pn, packaging=dk_packaging, url=product_url,
-                    last_refreshed=timezone.now(),
-                )
-                source_saved = True
-            else:
-                listing = PartSource.objects.filter(
-                    part=part, supplier_name__iexact='DigiKey', manufacturer_sku__iexact=manufacturer_pn,
-                ).first()
-
-            if listing:
-                _propagate_digikey_sibling_data(listing, variations)
+            listing = _get_or_create_supplier_listing(part, 'DigiKey', manufacturer_pn, stock)
+            created, _updated = _sync_digikey_sibling_variants(listing, variations, product_url=product_url)
+            source_saved = bool(created)
 
         return JsonResponse({
             'ok': True,
@@ -1812,7 +1834,7 @@ def _refresh_variant(variant):
                     packaging = v.get('PackageType', {}).get('Name', '')
                     break
             supplier_description = (product.get('Description') or {}).get('DetailedDescription', '')
-            _propagate_digikey_sibling_data(listing, variations)
+            _sync_digikey_sibling_variants(listing, variations, product_url=url)
 
         elif supplier == 'mouser':
             import requests as http_requests

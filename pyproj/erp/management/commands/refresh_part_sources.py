@@ -85,9 +85,19 @@ class Command(BaseCommand):
             return
 
         last_call_at = {}
-        refreshed = failed = 0
+        refreshed = failed = skipped = 0
 
         for variant in due:
+            # A DigiKey refresh backfills last_refreshed on sibling SKUs too (see
+            # _sync_digikey_sibling_variants), so a sibling later in this same batch may
+            # already have been freshened as a side effect - re-check rather than repeat
+            # the API call for it.
+            variant.refresh_from_db(fields=['last_refreshed'])
+            if variant.last_refreshed and variant.last_refreshed >= cutoff:
+                skipped += 1
+                self.stdout.write(f'Skipped (already refreshed via a sibling SKU this run): {variant}')
+                continue
+
             bucket = _supplier_bucket(variant.source.supplier_name)
             min_interval = SUPPLIER_MIN_INTERVAL.get(bucket, DEFAULT_MIN_INTERVAL)
             last_at = last_call_at.get(bucket)
@@ -113,6 +123,6 @@ class Command(BaseCommand):
                 self.stderr.write(f'FAILED: {variant}: {result.get("error")}')
 
         self.stdout.write(
-            f'Done: {refreshed} refreshed, {failed} failed '
-            f'({len(due)} of {total_due} due variants attempted, {total_variants} total variants).'
+            f'Done: {refreshed} refreshed, {failed} failed, {skipped} skipped (already fresh via a sibling) '
+            f'({len(due)} of {total_due} due variants selected, {total_variants} total variants).'
         )
