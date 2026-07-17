@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 import pytest
 
-from erp.models import Part, PartSource, PartSourceVariant
+from erp.models import Part, PartCategory, PartSource, PartSourceVariant, parse_component_value
 
 
 @pytest.fixture
@@ -196,3 +196,105 @@ def test_part_edit_form_saves_stock(client, staff_user):
 
     part.refresh_from_db()
     assert part.stock == 15
+
+
+# --- issue #87: numeric sort of Part.value engineering notation ---
+
+@pytest.mark.parametrize('raw, expected', [
+    ('5.1K', 5100.0),
+    ('5K1', 5100.0),
+    ('49R9', 49.9),
+    ('100K', 100000.0),
+    ('100R', 100.0),
+    ('10K', 10000.0),
+    ('10M', 10000000.0),
+    ('10R', 10.0),
+    ('120R', 120.0),
+    ('12K4', 12400.0),
+    ('0R', 0.0),
+    ('0R DNP', 0.0),
+    ('10K DNP', 10000.0),
+    ('220uF 35V', 2.2e-4),
+    ('100uH 2.1A', 1e-4),
+    ('500mA 1206 PTC', 0.5),
+    ('48MHz', 48000000.0),
+    ('15A Mini Blade', 15.0),
+    ('1nF', 1e-9),
+    ('22pF', 22e-12),
+    ('47.5K', 47500.0),
+    ('49', 49.0),
+    ('49.9', 49.9),
+    ('18650', 18650.0),
+])
+def test_parse_component_value_parses(raw, expected):
+    assert parse_component_value(raw) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize('raw', [
+    '1N4004', '2N2222A', '2N2907A', '2N7002', '74HC2G125', '74LVC1G125GV', 'AP2112K-3.3', '', None,
+])
+def test_parse_component_value_unparseable(raw):
+    assert parse_component_value(raw) is None
+
+
+@pytest.mark.django_db
+def test_value_sort_key_orders_by_magnitude():
+    values = ['100K', '100R', '10K', '10M', '10R', '120R', '12K4']
+    parts = [Part.objects.create(name=v, value=v) for v in values]
+    ordered = sorted(parts, key=lambda p: p.value_sort_key)
+    assert [p.value for p in ordered] == ['10R', '100R', '120R', '10K', '12K4', '100K', '10M']
+
+
+@pytest.mark.django_db
+def test_value_sort_key_bare_number_sorts_as_literal_ohms():
+    r44 = Part.objects.create(name='44R', value='44R')
+    bare = Part.objects.create(name='Bare 49', value='49')
+    decimal = Part.objects.create(name='Bare 49.9', value='49.9')
+    r55 = Part.objects.create(name='55R', value='55R')
+    ordered = sorted([r55, decimal, bare, r44], key=lambda p: p.value_sort_key)
+    assert [p.value for p in ordered] == ['44R', '49', '49.9', '55R']
+
+
+@pytest.mark.django_db
+def test_value_sort_key_unparseable_sorts_after_parsed_values():
+    junk = Part.objects.create(name='Diode', value='1N4004')
+    real = Part.objects.create(name='Resistor', value='10K')
+    ordered = sorted([junk, real], key=lambda p: p.value_sort_key)
+    assert [p.name for p in ordered] == ['Resistor', 'Diode']
+
+
+@pytest.mark.django_db
+def test_value_sort_key_ties_on_equal_value_break_on_name():
+    b = Part.objects.create(name='B - 0603', value='10K')
+    a = Part.objects.create(name='A - 0402', value='10K')
+    ordered = sorted([b, a], key=lambda p: p.value_sort_key)
+    assert [p.name for p in ordered] == ['A - 0402', 'B - 0603']
+
+
+@pytest.mark.django_db
+def test_part_list_orders_by_value_magnitude(client, staff_user):
+    category = PartCategory.objects.create(name='Resistors')
+    Part.objects.create(name='R-100K', value='100K', category=category)
+    Part.objects.create(name='R-100R', value='100R', category=category)
+    Part.objects.create(name='R-10K', value='10K', category=category)
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:part_list'))
+    content = response.content.decode()
+
+    assert content.index('R-100R') < content.index('R-10K') < content.index('R-100K')
+
+
+@pytest.mark.django_db
+def test_grouped_part_choice_field_orders_by_value_magnitude():
+    from erp.forms import GroupedPartChoiceField
+
+    category = PartCategory.objects.create(name='Resistors')
+    p100k = Part.objects.create(name='R-100K', value='100K', category=category)
+    p100r = Part.objects.create(name='R-100R', value='100R', category=category)
+    p10k = Part.objects.create(name='R-10K', value='10K', category=category)
+
+    field = GroupedPartChoiceField(queryset=Part.objects.select_related('category'))
+    choices = dict(field.choices)
+
+    assert [pk for pk, _ in choices['Resistors']] == [p100r.pk, p10k.pk, p100k.pk]

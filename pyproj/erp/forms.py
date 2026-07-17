@@ -17,8 +17,10 @@ class DesignChoiceField(forms.ModelChoiceField):
 
 
 class GroupedPartChoiceIterator(forms.models.ModelChoiceIterator):
-    """Yields Part options grouped into <optgroup>s by category name
-    (uncategorised parts last), matching the PartReparentForm dropdown."""
+    """Yields Part options grouped into <optgroup>s by category name (uncategorised parts last),
+    matching the PartReparentForm dropdown. Within each group, options are ordered by
+    value_sort_key (natural magnitude order, e.g. "120R" before "10K") rather than alphabetically
+    by name, so scanning a dropdown falls into the same natural order as the Parts list (#87)."""
 
     def __iter__(self):
         if self.field.empty_label is not None:
@@ -27,23 +29,28 @@ class GroupedPartChoiceIterator(forms.models.ModelChoiceIterator):
         groups = {}
         uncategorised = []
         for part in self.queryset:
-            choice = self.choice(part)
+            entry = (part.value_sort_key, self.choice(part))
             if part.category_id:
-                groups.setdefault(part.category.name, []).append(choice)
+                groups.setdefault(part.category.name, []).append(entry)
             else:
-                uncategorised.append(choice)
+                uncategorised.append(entry)
 
         for cat_name in sorted(groups):
-            yield (cat_name, groups[cat_name])
+            yield (cat_name, _sorted_choices(groups[cat_name]))
         if uncategorised:
-            yield ('(uncategorised)', uncategorised)
+            yield ('(uncategorised)', _sorted_choices(uncategorised))
+
+
+def _sorted_choices(entries):
+    """entries is a list of (value_sort_key, choice) tuples; returns just the choices, ordered."""
+    return [choice for _, choice in sorted(entries, key=lambda entry: entry[0])]
 
 
 class GroupedPartChoiceField(forms.ModelChoiceField):
-    """A ModelChoiceField over Part whose options are grouped into
-    <optgroup>s by category. Set the queryset with
-    ``select_related('category').order_by('category__name', 'name')`` so
-    grouping and per-group ordering are correct without extra queries."""
+    """A ModelChoiceField over Part whose options are grouped into <optgroup>s by category, each
+    group internally ordered by value_sort_key rather than name — see GroupedPartChoiceIterator.
+    Set the queryset with ``select_related('category')`` to avoid an N+1 query on part.category;
+    an explicit .order_by() isn't needed for correctness since the iterator re-sorts anyway."""
 
     iterator = GroupedPartChoiceIterator
 
@@ -284,11 +291,11 @@ class PartReparentForm(forms.Form):
 
         groups = {}
         for part in qs:
-            groups.setdefault(part.category.name, []).append((part.pk, str(part)))
+            groups.setdefault(part.category.name, []).append((part.value_sort_key, (part.pk, str(part))))
 
         choices = [('', '— select target part —')]
         for cat_name in sorted(groups):
-            choices.append((cat_name, groups[cat_name]))
+            choices.append((cat_name, _sorted_choices(groups[cat_name])))
         self.fields['target_part'].choices = choices
 
     def clean_target_part(self):

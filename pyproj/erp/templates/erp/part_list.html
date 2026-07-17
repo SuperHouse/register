@@ -99,10 +99,10 @@
                                     data-category="{{ category.pk }}" style="cursor: pointer;">
                                     <td colspan="9" class="fw-semibold py-2">
                                         <i class="bi {% if category.is_expanded %}bi-caret-down-fill{% else %}bi-caret-right-fill{% endif %} category-caret me-2"></i>
-                                        {{ category.name }} ({{ category.parts.all|length }})
+                                        {{ category.name }} ({{ category.sorted_parts|length }})
                                     </td>
                                 </tr>
-                                {% for part in category.parts.all %}
+                                {% for part in category.sorted_parts %}
                                     {% include "erp/part_list_row.html" with category_key=category.pk category_expanded=category.is_expanded %}
                                 {% endfor %}
                             {% endfor %}

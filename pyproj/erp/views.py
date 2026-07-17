@@ -392,14 +392,20 @@ def part_list(request):
     else:
         category_filter = Q(parts__isnull=False)
 
+    # Parts within each category are sorted by value_sort_key (natural magnitude order, e.g.
+    # "120R" before "10K") rather than plain alphabetical name — see issue #87. Prefetching with
+    # to_attr instead of the default cache gives an ordinary list that's safe to .sort() directly.
     uncategorised = list(parts_qs.filter(category__isnull=True))
+    uncategorised.sort(key=lambda part: part.value_sort_key)
     categories_with_parts = list(
         PartCategory.objects
         .filter(category_filter)
-        .prefetch_related(Prefetch('parts', queryset=parts_qs))
+        .prefetch_related(Prefetch('parts', queryset=parts_qs, to_attr='sorted_parts'))
         .distinct()
         .order_by('order', 'name')
     )
+    for category in categories_with_parts:
+        category.sorted_parts.sort(key=lambda part: part.value_sort_key)
 
     # A filter should reveal its matches even inside a collapsed category, without
     # actually persisting that category as expanded for the next unfiltered visit.

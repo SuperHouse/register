@@ -110,6 +110,53 @@ class Location(models.Model):
         return self.name
 
 
+# Component value notation: a standard form ("5.1K" = 5100 ohms, multiplier suffix after an
+# optional decimal point) and a "point-substitution" form where the multiplier letter stands in
+# for the decimal point ("5K1" = 5100 too; "R" means literal ohms, so "49R9" = 49.9). See
+# parse_component_value() / Part.value_sort_key below (issue #87).
+_VALUE_MULTIPLIERS = {
+    'f': 1e-15, 'p': 1e-12, 'n': 1e-9, 'u': 1e-6, 'm': 1e-3,
+    'k': 1e3, 'K': 1e3, 'M': 1e6, 'G': 1e9, 'R': 1e0,
+}
+_STANDARD_VALUE_RE = re.compile(r'^(\d+(?:\.\d+)?)([A-Za-z]*)$')
+_POINT_SUB_VALUE_RE = re.compile(r'^(\d+)([fpnumkKMGR])(\d+)$')
+
+
+def parse_component_value(raw):
+    """Parse the first token of a Part.value string (e.g. "5.1K", "5K1", "49R9", "100nF 100V")
+    into a normalised numeric magnitude, or None if it can't be confidently parsed as an
+    electrical value (e.g. "1N4004", "AP2112K-3.3" — a part number, not a value).
+
+    Only the first whitespace-delimited token is considered; anything after (a voltage/current
+    rating, package note, "DNP" flag, etc.) is ignored. A bare number with no unit/multiplier at
+    all (e.g. "49", "49.9") is treated as a literal value (multiplier x1), same as an explicit
+    "R" suffix — so it sorts correctly among ohms values (e.g. between "44R" and "55R").
+    """
+    if not raw:
+        return None
+    tokens = raw.split()
+    if not tokens:
+        return None
+    token = tokens[0]
+
+    m = _STANDARD_VALUE_RE.match(token)
+    if m:
+        number_str, letters = m.groups()
+        if not letters:
+            return float(number_str)  # bare number, e.g. "49" or "49.9" - treated as a literal value
+        multiplier = _VALUE_MULTIPLIERS.get(letters[0])
+        if multiplier is not None:
+            return float(number_str) * multiplier
+        return float(number_str)  # leading letter isn't a recognised multiplier - plain unit symbol (e.g. "A" in "10A")
+
+    m = _POINT_SUB_VALUE_RE.match(token)
+    if m:
+        int_part, letter, frac_part = m.groups()
+        return float(f'{int_part}.{frac_part}') * _VALUE_MULTIPLIERS[letter]
+
+    return None
+
+
 class Part(models.Model):
     """A component part that can be used in designs."""
     name = models.CharField(max_length=200)
@@ -144,6 +191,20 @@ class Part(models.Model):
         if self.value:
             return f'{self.name} ({self.value})'
         return self.name
+
+    @property
+    def value_sort_key(self):
+        """Natural sort key for `value` so parts sort by actual magnitude (e.g. "120R" = 120 ohms
+        before "10K" = 10,000 ohms) instead of as opaque text - see parse_component_value() for
+        the notation this understands. Values that can't be confidently parsed (e.g. part numbers
+        that happen to look similar, like "1N4004") sort after every parsed value, in their
+        original alphabetical order. Ties - including within the unparsed group - break on
+        `name`, so e.g. same-valued parts in different packages cluster together (issue #87).
+        """
+        magnitude = parse_component_value(self.value)
+        if magnitude is None:
+            return (1, self.value.upper(), self.name.upper())
+        return (0, magnitude, self.name.upper())
 
     @property
     def total_stock(self):
