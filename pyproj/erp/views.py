@@ -1148,14 +1148,39 @@ def _digikey_base_url():
     return 'https://sandbox-api.digikey.com' if sandbox else 'https://api.digikey.com'
 
 
+def _digikey_locale_currency():
+    """The ISO currency code DigiKey is asked to price in, per DIGIKEY_LOCALE_CURRENCY."""
+    return os.environ.get('DIGIKEY_LOCALE_CURRENCY', 'AUD').strip() or 'AUD'
+
+
+def _digikey_locale_headers():
+    """Locale headers for DigiKey API requests, so ProductUrl and pricing come back for the
+    configured region (DIGIKEY_LOCALE_SITE/_LANGUAGE/_CURRENCY, defaulting to AU/en/AUD to match
+    this deployment — same convention as ELEMENT14_STORE_ID defaulting to au.element14.com)
+    instead of DigiKey's own US default. Without these, ProductUrl is always a www.digikey.com
+    link regardless of the requester's region, which sends users to a site where their regional
+    cart/session doesn't apply (#86).
+    """
+    return {
+        'X-DIGIKEY-Locale-Site': os.environ.get('DIGIKEY_LOCALE_SITE', 'AU').strip() or 'AU',
+        'X-DIGIKEY-Locale-Language': os.environ.get('DIGIKEY_LOCALE_LANGUAGE', 'en').strip() or 'en',
+        'X-DIGIKEY-Locale-Currency': _digikey_locale_currency(),
+    }
+
+
 def _digikey_price_breaks(variation):
-    """Extract price breaks from a DigiKey ProductVariation's StandardPricing list."""
+    """Extract price breaks from a DigiKey ProductVariation's StandardPricing list.
+
+    Unit prices come back in whatever currency was requested via the X-DIGIKEY-Locale-Currency
+    header (see _digikey_locale_headers/_digikey_locale_currency), not always USD.
+    """
+    currency = _digikey_locale_currency()
     price_breaks = []
     for tier in (variation.get('StandardPricing') or []):
         qty = tier.get('BreakQuantity')
         price = tier.get('UnitPrice')
         if qty is not None and price is not None:
-            price_breaks.append({'quantity': qty, 'price': price, 'currency': 'USD'})
+            price_breaks.append({'quantity': qty, 'price': price, 'currency': currency})
     return price_breaks
 
 
@@ -1634,6 +1659,7 @@ def part_source_fetch_digikey(request):
                 'Authorization': f'Bearer {access_token}',
                 'X-DIGIKEY-Client-Id': client_id,
                 'Accept': 'application/json',
+                **_digikey_locale_headers(),
             },
             timeout=15,
         )
@@ -1752,6 +1778,7 @@ def _refresh_variant(variant):
                     'Authorization': f'Bearer {access_token}',
                     'X-DIGIKEY-Client-Id': client_id,
                     'Accept': 'application/json',
+                    **_digikey_locale_headers(),
                 },
                 timeout=15,
             )
