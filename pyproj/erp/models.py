@@ -339,17 +339,23 @@ class PartSource(models.Model):
         return f'{self.part}: {self.supplier_name}'
 
     def save(self, *args, **kwargs):
-        """Save, then append a PartSourceStockHistory snapshot whenever stock changes.
+        """Save, then append a PartSourceStockHistory snapshot whenever stock changes (or
+        there's no history at all yet).
 
         Overridden here (rather than logged at each call site) so every code path that
         writes stock - manual add, supplier refresh, or a direct admin edit - is captured
         for the availability-trend history, without every caller needing to remember to
-        log it themselves.
+        log it themselves. Also self-heals a listing that somehow has no history despite a
+        known stock value - e.g. one whose stock hasn't changed since before this history
+        table existed (see the 0040 data migration, which backfills the common case in bulk)
+        or one created via a path that bypasses save() (e.g. `loaddata`/`import_data`, which
+        call Model.save_base() directly) - the next ordinary save, even a same-value one,
+        seeds a baseline point instead of silently staying historyless forever.
         """
         is_new = self._state.adding
         old_stock = None if is_new else PartSource.objects.filter(pk=self.pk).values_list('stock', flat=True).first()
         super().save(*args, **kwargs)
-        if is_new or old_stock != self.stock:
+        if is_new or old_stock != self.stock or not self.stock_history.exists():
             self.stock_history.create(stock=self.stock)
 
     @property

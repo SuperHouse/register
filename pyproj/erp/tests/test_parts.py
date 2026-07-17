@@ -77,6 +77,53 @@ def test_part_source_has_stale_variant_data():
     assert empty_source.has_stale_variant_data is False
 
 
+# --- PartSource.save() stock history logging ---
+
+@pytest.mark.django_db
+def test_save_logs_history_on_creation():
+    part = Part.objects.create(name='Fresh source', value='1')
+    source = PartSource.objects.create(part=part, supplier_name='LCSC', stock=100)
+    assert list(source.stock_history.values_list('stock', flat=True)) == [100]
+
+
+@pytest.mark.django_db
+def test_save_logs_history_when_stock_changes():
+    part = Part.objects.create(name='Changing stock', value='1')
+    source = PartSource.objects.create(part=part, supplier_name='LCSC', stock=100)
+
+    source.stock = 50
+    source.save(update_fields=['stock'])
+
+    assert list(source.stock_history.order_by('recorded_dt').values_list('stock', flat=True)) == [100, 50]
+
+
+@pytest.mark.django_db
+def test_save_does_not_duplicate_history_on_unchanged_stock():
+    part = Part.objects.create(name='Stable stock', value='1')
+    source = PartSource.objects.create(part=part, supplier_name='LCSC', stock=100)
+
+    source.stock = 100
+    source.save(update_fields=['stock'])
+
+    assert source.stock_history.count() == 1
+
+
+@pytest.mark.django_db
+def test_save_self_heals_missing_history_on_unchanged_stock():
+    # Simulate a listing that predates the stock-history feature (or was created via a
+    # path that bypasses save(), e.g. loaddata/import_data): stock is set, but there's no
+    # PartSourceStockHistory row for it at all.
+    part = Part.objects.create(name='Historyless', value='1')
+    source = PartSource.objects.create(part=part, supplier_name='LCSC', stock=100)
+    source.stock_history.all().delete()
+    assert source.stock_history.count() == 0
+
+    source.stock = 100  # unchanged - a naive "did it change" check alone wouldn't log this
+    source.save(update_fields=['stock'])
+
+    assert list(source.stock_history.values_list('stock', flat=True)) == [100]
+
+
 @pytest.mark.django_db
 def test_part_edit_shows_stale_warning_per_source(client, staff_user):
     STALE_TITLE = 'Stock has never been refreshed, or not refreshed in over 48 hours'
