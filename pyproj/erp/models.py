@@ -181,6 +181,12 @@ class Part(models.Model):
         default=False,
         help_text='Part is placed on the BOM but never physically stocked (e.g. test points, DNP parts)'
     )
+    incoming_stock = models.IntegerField(
+        null=True, blank=True, help_text='Manually-tracked stock on order but not yet received'
+    )
+    committed_stock = models.IntegerField(
+        null=True, blank=True, help_text='Manually-tracked stock already allocated to a build'
+    )
     image = models.ImageField(upload_to='part_images/', null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
 

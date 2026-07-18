@@ -245,6 +245,64 @@ def test_part_edit_form_saves_stock(client, staff_user):
     assert part.stock == 15
 
 
+# --- issue #89: Incoming Stock / Committed Stock ---
+
+@pytest.mark.django_db
+def test_incoming_and_committed_stock_default_to_none():
+    part = Part.objects.create(name='No incoming/committed set', value='1')
+    assert part.incoming_stock is None
+    assert part.committed_stock is None
+
+
+@pytest.mark.django_db
+def test_part_list_shows_incoming_column(client, staff_user):
+    Part.objects.create(name='WithIncoming', value='1', incoming_stock=7)
+    Part.objects.create(name='NoIncoming', value='2')
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:part_list'))
+    content = response.content.decode()
+
+    assert '<th>Incoming</th>' in content
+
+    def row(name):
+        idx = content.find(name)
+        start = content.rfind('<tr', 0, idx)
+        end = content.find('</tr>', idx)
+        return content[start:end]
+
+    assert '<td>7</td>' in row('WithIncoming')
+    assert '<td>-</td>' in row('NoIncoming')
+
+
+@pytest.mark.django_db
+def test_part_edit_shows_incoming_and_committed_fields(client, staff_user):
+    part = Part.objects.create(name='EditFields', value='1')
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:part_edit', args=[part.pk]))
+    content = response.content.decode()
+
+    assert 'Incoming Stock' in content
+    assert 'Committed Stock' in content
+
+
+@pytest.mark.django_db
+def test_part_edit_form_saves_incoming_and_committed_stock(client, staff_user):
+    part = Part.objects.create(name='EditIncomingCommitted', value='1')
+
+    client.force_login(staff_user)
+    response = client.post(reverse('erp:part_edit', args=[part.pk]), {
+        'name': 'EditIncomingCommitted', 'description': '', 'category': '', 'device': '', 'package': '',
+        'value': '1', 'fusion_library': '', 'incoming_stock': '25', 'committed_stock': '10',
+    })
+    assert response.status_code == 302
+
+    part.refresh_from_db()
+    assert part.incoming_stock == 25
+    assert part.committed_stock == 10
+
+
 # --- issue #87: numeric sort of Part.value engineering notation ---
 
 @pytest.mark.parametrize('raw, expected', [
