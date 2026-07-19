@@ -1,0 +1,97 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Parts Order {{ parts_order.supplier_order_number }} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    {{ parts_order.supplier_name }} Order #{{ parts_order.supplier_order_number }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Order Details</strong>
+        </div>
+        <div class="card-body">
+            <table class="table table-sm mb-0">
+                <tbody>
+                    <tr>
+                        <th style="width: 220px;">Supplier</th>
+                        <td>{{ parts_order.supplier_name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Order Number</th>
+                        <td>{{ parts_order.supplier_order_number }}</td>
+                    </tr>
+                    <tr>
+                        <th>Order Date</th>
+                        <td>{{ parts_order.order_dt|date:"j-M-Y H:i"|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Expected Arrival</th>
+                        <td>{{ parts_order.expected_arrival_date|date:"j-M-Y"|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Status</th>
+                        <td>{{ parts_order.status|default:"—" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Last Refreshed</th>
+                        <td>{{ parts_order.last_refreshed|date:"j-M-Y H:i"|default:"—" }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <strong>Line Items</strong>
+        </div>
+        <div class="card-body">
+            {% if parts_order.lines.all %}
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Supplier SKU</th>
+                            <th>Description</th>
+                            <th>Part</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in parts_order.lines.all %}
+                            <tr>
+                                <td>{{ line.supplier_sku|default:"—" }}</td>
+                                <td>{{ line.description|default:"—" }}</td>
+                                <td>
+                                    {% if line.part %}
+                                        <a href="{% url 'erp:part_edit' line.part.pk %}">{{ line.part }}</a>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ line.quantity }}</td>
+                                <td>
+                                    {% if line.unit_price is not None %}
+                                        {{ line.symbol }}{{ line.unit_price }} {{ line.currency }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ line.get_status_display }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic mb-0">No line items.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <a href="{% url 'erp:parts_order_list' %}" class="btn btn-secondary">Back to Parts Orders</a>
+{% endblock content %}

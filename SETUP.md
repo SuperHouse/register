@@ -44,6 +44,26 @@ for the `--max-per-run` and `--dry-run` options.
 > failure modes this causes), restart the relevant uWSGI vassal (above) too, or the
 > cron job and the web app will silently disagree about DigiKey config.
 
+### Scheduled Parts Order Refresh
+
+Supplier order data (`erp.PartsOrder`/`erp.PartsOrderLine`) is kept up to date by the
+`refresh_parts_orders` management command — DigiKey only for now, since it's the only
+integrated supplier with a self-service order-status API. Not run automatically by the
+app itself — add a crontab entry for it on each production host, e.g. every 4 hours:
+
+```bash
+0 */4 * * * cd /path/to/register/pyproj && /path/to/register/pyproj/venv/bin/python manage.py refresh_parts_orders >> /var/log/register/refresh_parts_orders.log 2>&1
+```
+
+Each run checks a rolling lookback window (90 days by default) rather than tracking a
+"last synced" cursor, so a status change on an already-synced order, a missed cron run,
+or a locally-deleted order all self-heal on the next run. See
+`python manage.py refresh_parts_orders --help` for the `--lookback-days` and `--dry-run`
+options. Requires the DigiKey Order Status API product to be subscribed to separately
+from the Product Information API already used for parts lookups (see [DigiKey API
+Integration](README.md#digikey-api-integration)) — until then, the command fails
+gracefully with a logged error rather than crashing.
+
 ## Linux Local Setup (dev)
 
 Todo

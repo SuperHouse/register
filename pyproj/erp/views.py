@@ -8,12 +8,14 @@ import re
 import xml.etree.ElementTree as ET
 from urllib.parse import quote as urlquote
 from collections import Counter
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
-from django.db.models import Count, Prefetch, ProtectedError, Q
+from django.core.paginator import Paginator
+from django.db.models import Count, Prefetch, ProtectedError, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -45,8 +47,8 @@ from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
     BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak,
-    PartPriceBreakHistory, PartSource, PartSourceVariant, PartSubstitution, ProductionStage, ProductionStageTemplate,
-    ProductionStageTemplateStep, STOCK_TREND_PERIOD,
+    PartPriceBreakHistory, PartSource, PartSourceVariant, PartSubstitution, PartsOrder, PartsOrderLine,
+    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep, STOCK_TREND_PERIOD,
 )
 
 
@@ -2027,6 +2029,300 @@ def part_substitution_delete(request, substitution_id):
         messages.success(request, 'Substitution deleted.')
 
     return redirect('erp:part_edit', part_id=part_id)
+
+
+# --- Parts Orders (DigiKey order-status sync, issue #90) ---
+#
+# Named "PartsOrder"/"PartsOrderLine" rather than "Order"/"OrderLine" to leave that name
+# free for a possible future customer-order feature. DigiKey only for now - LCSC/Mouser/
+# Element14 don't have a comparably self-service order-tracking API (see the issue #90
+# plan for the research behind that call). There's no manual "Add Order" UI: every
+# PartsOrder/PartsOrderLine row is created/updated by _sync_digikey_parts_orders(), driven
+# by the refresh_parts_orders management command (or the parts_order_refresh view).
+#
+# NOTE: the DigiKey Order Status API's exact response shape is unconfirmed (it's a
+# separate API product from the Product Information API already used elsewhere in this
+# file, and its docs are gated behind a logged-in developer account) - every field name
+# guessed below is isolated to a small function specifically so it's fast to correct once
+# a real response has been seen. See the issue #90 plan for the full list of assumptions.
+
+# How far back a refresh looks by default - a rolling window rather than a "last synced"
+# cursor, so a status change on an older still-open order, a missed cron run, or a
+# locally-deleted PartsOrder all self-heal on the next run without separate bookkeeping.
+# Shared by the parts_order_refresh view and the refresh_parts_orders management command
+# (which also exposes it as an overridable --lookback-days flag).
+PARTS_ORDER_REFRESH_LOOKBACK_DAYS = 90
+
+
+def _digikey_search_orders(access_token, client_id, from_date, to_date):
+    """List DigiKey order summaries placed within [from_date, to_date] via SearchOrders.
+
+    Returns a list of raw order-summary dicts from the API. May raise (HTTP errors) -
+    it's the caller's job (_sync_digikey_parts_orders) to catch, matching the "fetch may
+    raise, orchestration never does" split used by _get_digikey_access_token/_refresh_variant.
+
+    ASSUMED PATH/PARAMS - see the "Explicitly flagged" section of the issue #90 plan.
+    """
+    import requests as http_requests
+
+    resp = http_requests.get(
+        _digikey_base_url() + '/orderstatus/v3/orders',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'X-DIGIKEY-Client-Id': client_id,
+            'Accept': 'application/json',
+            **_digikey_locale_headers(),
+        },
+        params={'startDate': from_date.isoformat(), 'endDate': to_date.isoformat()},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json().get('Orders', [])
+
+
+def _digikey_retrieve_order(access_token, client_id, salesorder_id):
+    """Fetch full line-item detail for one DigiKey order via RetrieveSalesOrder.
+
+    ASSUMED PATH - see the "Explicitly flagged" section of the issue #90 plan.
+    """
+    import requests as http_requests
+
+    resp = http_requests.get(
+        _digikey_base_url() + f'/orderstatus/v3/orders/{urlquote(str(salesorder_id), safe="")}',
+        headers={
+            'Authorization': f'Bearer {access_token}',
+            'X-DIGIKEY-Client-Id': client_id,
+            'Accept': 'application/json',
+            **_digikey_locale_headers(),
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _parse_digikey_dt(raw):
+    """Parse a DigiKey timestamp/date string into a datetime, or None if missing/
+    unparseable. Format is assumed ISO 8601 - unconfirmed, see plan."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_digikey_date(raw):
+    dt = _parse_digikey_dt(raw)
+    return dt.date() if dt else None
+
+
+def _map_digikey_line_status(raw_status):
+    """Map DigiKey's raw per-line (or per-order, if no per-line status is reported -
+    see plan) status string to PartsOrderLine.STATUS_CHOICES. Falls back to OPEN for
+    anything unrecognised, which is the safe default: an unmapped real status should
+    keep contributing to Part.incoming_stock rather than silently disappear from it.
+
+    ASSUMED VOCABULARY - see the "Explicitly flagged" section of the issue #90 plan.
+    """
+    s = (raw_status or '').strip().lower()
+    if s in ('shipped', 'in transit', 'backorder-shipped'):
+        return PartsOrderLine.SHIPPED
+    if s in ('delivered', 'received', 'complete', 'closed'):
+        return PartsOrderLine.RECEIVED
+    if s in ('cancelled', 'canceled'):
+        return PartsOrderLine.CANCELLED
+    return PartsOrderLine.OPEN
+
+
+def _parse_digikey_order_line(raw_line):
+    """ASSUMED FIELD NAMES - see the "Explicitly flagged" section of the issue #90 plan."""
+    return {
+        'supplier_sku': raw_line.get('DigiKeyProductNumber') or '',
+        'description': raw_line.get('ProductDescription') or '',
+        'quantity': raw_line.get('QuantityOrdered') or 0,
+        'unit_price': raw_line.get('UnitPrice'),
+        'currency': _digikey_locale_currency(),
+        'status': _map_digikey_line_status(raw_line.get('Status') or raw_line.get('LineStatus')),
+    }
+
+
+def _parse_digikey_order(raw_order):
+    """Convert one raw DigiKey order-detail dict (from _digikey_retrieve_order) into the
+    flat shape _upsert_parts_order() needs. Pure/no I/O, so it's unit-testable against
+    hand-built dict fixtures without a mocking library - see
+    erp/tests/test_digikey_parts_order_sync.py.
+
+    ASSUMED FIELD NAMES - see the "Explicitly flagged" section of the issue #90 plan.
+    """
+    return {
+        'supplier_order_number': str(raw_order.get('SalesOrderId') or ''),
+        'order_dt': _parse_digikey_dt(raw_order.get('OrderDate')),
+        'expected_arrival_date': _parse_digikey_date(raw_order.get('ExpectedDeliveryDate')),
+        'status': raw_order.get('Status') or '',
+        'lines': [_parse_digikey_order_line(li) for li in (raw_order.get('LineItems') or [])],
+    }
+
+
+def _match_or_create_part_for_digikey_line(supplier_sku, description):
+    """Resolve a DigiKey order line's SKU to a Part, creating a bare Part (plus a
+    matching PartSource/PartSourceVariant) if nothing matches - per issue #90's "new
+    parts discovered in orders would be created automatically" requirement.
+
+    Matching order:
+      1. Case-insensitive exact match on an existing PartSourceVariant.supplier_sku
+         under a PartSource with supplier_name 'DigiKey' - the same natural key
+         part_source_fetch_digikey/_sync_digikey_sibling_variants already use to
+         identify a DigiKey SKU.
+      2. No match: create a new bare Part (name=supplier_sku - no category/value/etc,
+         same minimal-fields convention as any other auto-created record here), a
+         PartSource (manufacturer_sku='' - unknown until a product lookup separately
+         fills it in via the existing refresh_part_sources path), and a
+         PartSourceVariant with this supplier_sku.
+
+    Deliberately does not reuse _get_or_create_supplier_listing() - that function's merge
+    key is manufacturer_sku (known once a product lookup has run), but here only the
+    supplier SKU is known, so a fresh PartSource is always created for a genuinely new
+    match, same as the manual part_source_add path does.
+
+    Returns (part, part_source_variant); both None if supplier_sku is blank.
+    """
+    if not supplier_sku:
+        return None, None
+
+    variant = PartSourceVariant.objects.filter(
+        supplier_sku__iexact=supplier_sku, source__supplier_name__iexact='DigiKey',
+    ).select_related('source__part').first()
+    if variant:
+        return variant.source.part, variant
+
+    part = Part.objects.create(name=supplier_sku, description=description or '')
+    listing = PartSource.objects.create(part=part, supplier_name='DigiKey', manufacturer_sku='')
+    variant = PartSourceVariant.objects.create(source=listing, supplier_sku=supplier_sku)
+    return part, variant
+
+
+def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
+    """Create/update one PartsOrder and its PartsOrderLines from a _parse_digikey_order()
+    result. Replaces all lines on every call (delete then recreate, same convention as
+    _save_price_breaks) rather than diffing, since a DigiKey order-detail call always
+    returns a complete line list - correct because there's nothing partial to merge.
+
+    May raise - it's the caller's (_sync_digikey_parts_orders) job to catch, matching the
+    "fetch/upsert may raise, orchestration never does" convention used elsewhere in this
+    file (e.g. _refresh_variant).
+    """
+    parts_order, _created = PartsOrder.objects.update_or_create(
+        supplier_name=supplier_name,
+        supplier_order_number=parsed_order['supplier_order_number'],
+        defaults={
+            'order_dt': parsed_order['order_dt'],
+            'expected_arrival_date': parsed_order['expected_arrival_date'],
+            'status': parsed_order['status'],
+            'last_refreshed': timezone.now(),
+        },
+    )
+
+    parts_order.lines.all().delete()
+    for line in parsed_order['lines']:
+        part, variant = _match_or_create_part_for_digikey_line(line['supplier_sku'], line['description'])
+        PartsOrderLine.objects.create(
+            parts_order=parts_order, part=part, part_source_variant=variant,
+            supplier_sku=line['supplier_sku'], description=line['description'],
+            quantity=line['quantity'], unit_price=line['unit_price'], currency=line['currency'],
+            status=line['status'],
+        )
+
+    return parts_order
+
+
+def _recompute_incoming_stock():
+    """Recompute every Part's incoming_stock from currently-open PartsOrderLines, as a
+    single grouped-aggregate query rather than a per-Part loop. Called once per
+    refresh_parts_orders run (not incrementally), so a cancelled/received line, a
+    deleted PartsOrder, or a changed Part match all self-correct without per-event
+    bookkeeping. Mirrors PartSource.stock: "last known truth, silently overwritten on
+    refresh" - a manually-edited incoming_stock value is intentionally clobbered here.
+    """
+    open_totals = dict(
+        PartsOrderLine.objects.filter(status=PartsOrderLine.OPEN, part__isnull=False)
+        .values('part_id').annotate(total=Sum('quantity')).values_list('part_id', 'total')
+    )
+
+    Part.objects.exclude(pk__in=open_totals.keys()).exclude(incoming_stock__isnull=True) \
+        .update(incoming_stock=None)
+    for part_id, total in open_totals.items():
+        Part.objects.filter(pk=part_id).exclude(incoming_stock=total).update(incoming_stock=total)
+
+
+def _sync_digikey_parts_orders(from_date, to_date):
+    """Discover and upsert every DigiKey order placed in [from_date, to_date], then
+    recompute Part.incoming_stock from the result. Never raises - mirrors
+    _refresh_variant's {'ok': True/False, 'error': ...} contract. The single function
+    called by both the refresh_parts_orders management command and the optional
+    parts_order_refresh "Refresh now" view.
+    """
+    try:
+        client_id, access_token = _get_digikey_access_token()
+        raw_orders = _digikey_search_orders(access_token, client_id, from_date, to_date)
+
+        synced = 0
+        for raw_summary in raw_orders:
+            order_id = raw_summary.get('SalesOrderId')
+            if not order_id:
+                continue
+            detail = _digikey_retrieve_order(access_token, client_id, order_id)
+            parsed = _parse_digikey_order(detail)
+            _upsert_parts_order(parsed, supplier_name='DigiKey')
+            synced += 1
+
+        _recompute_incoming_stock()
+        return {'ok': True, 'orders_synced': synced}
+
+    except RuntimeError as e:
+        return {'ok': False, 'error': str(e)}
+    except Exception as e:
+        return {'ok': False, 'error': f'DigiKey order sync failed: {e}'}
+
+
+@staff_member_required
+def parts_order_list(request):
+    """List all supplier orders, newest first, filterable by ?q= against
+    supplier_order_number/supplier_name (same server-side initServerFilter AJAX pattern
+    as Parts/Designs)."""
+    q = request.GET.get('q', '').strip()
+    parts_orders_qs = PartsOrder.objects.prefetch_related('lines__part').order_by('-order_dt')
+    if q:
+        parts_orders_qs = parts_orders_qs.filter(
+            Q(supplier_order_number__icontains=q) | Q(supplier_name__icontains=q)
+        )
+
+    paginator = Paginator(parts_orders_qs, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    return render(request, 'erp/parts_order_list.html', {'parts_orders': page_obj, 'page_obj': page_obj, 'q': q})
+
+
+@staff_member_required
+def parts_order_detail(request, parts_order_id):
+    parts_order = get_object_or_404(
+        PartsOrder.objects.prefetch_related('lines__part', 'lines__part_source_variant'), pk=parts_order_id
+    )
+    return render(request, 'erp/parts_order_detail.html', {'parts_order': parts_order})
+
+
+@staff_member_required
+def parts_order_refresh(request):
+    """POST-only AJAX endpoint: force a DigiKey order sync now (parallels
+    part_source_refresh), using the same rolling lookback window as the
+    refresh_parts_orders management command's default, not a full historical resync."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    to_date = timezone.now().date()
+    from_date = to_date - timedelta(days=PARTS_ORDER_REFRESH_LOOKBACK_DAYS)
+    result = _sync_digikey_parts_orders(from_date, to_date)
+    return JsonResponse(result)
 
 
 # --- Part Category views ---

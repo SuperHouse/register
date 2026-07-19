@@ -3,7 +3,7 @@
     "allow": [
       "Bash(source venv/bin/activate *)",
       "Bash(source venv/bin/activate)",
-      "Bash(python manage.py check *)",
+      "Bash(python manage.py *)",
       "Bash(pytest *)",
       "Bash(git check-ignore *)"
     ]
