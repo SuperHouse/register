@@ -86,7 +86,7 @@ Mouser lookup uses a simple API key — no OAuth flow is needed.
 Add to `pyproj/.env`:
 
 ```env
-MOUSER_API_KEY=your-api-key
+MOUSER_SEARCH_API_KEY=your-api-key
 ```
 
 Restart the server. The Mouser fetch button is active immediately.

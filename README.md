@@ -132,7 +132,7 @@ Mouser lookup requires a free Mouser developer account. Unlike DigiKey, authenti
 Add the following to `pyproj/.env`:
 
 ```
-MOUSER_API_KEY = "your-api-key"
+MOUSER_SEARCH_API_KEY = "your-api-key"
 ```
 
 Restart the development server and the Mouser fetch button will be active immediately — no further setup is required.

@@ -36,7 +36,7 @@ All configuration is done via `pyproj/.env`. Copy `.env.template` as a starting 
 
 | Variable | Description |
 |---|---|
-| `MOUSER_API_KEY` | Search API key from [mouser.com/api-hub](https://www.mouser.com/api-hub/) |
+| `MOUSER_SEARCH_API_KEY` | Search API key from [mouser.com/api-hub](https://www.mouser.com/api-hub/) |
 
 ## Element14 / Farnell / Newark API
 

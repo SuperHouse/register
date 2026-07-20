@@ -47,9 +47,10 @@ for the `--max-per-run` and `--dry-run` options.
 ### Scheduled Parts Order Refresh
 
 Supplier order data (`erp.PartsOrder`/`erp.PartsOrderLine`) is kept up to date by the
-`refresh_parts_orders` management command — DigiKey only for now, since it's the only
-integrated supplier with a self-service order-status API. Not run automatically by the
-app itself — add a crontab entry for it on each production host, e.g. every 4 hours:
+`refresh_parts_orders` management command, which syncs DigiKey and, if configured,
+Mouser — the two integrated suppliers with a self-service order-status API. Not run
+automatically by the app itself — add a crontab entry for it on each production host,
+e.g. every 4 hours:
 
 ```bash
 0 */4 * * * cd /path/to/register/pyproj && /path/to/register/pyproj/venv/bin/python manage.py refresh_parts_orders >> /var/log/register/refresh_parts_orders.log 2>&1
@@ -61,8 +62,17 @@ or a locally-deleted order all self-heal on the next run. See
 `python manage.py refresh_parts_orders --help` for the `--lookback-days` and `--dry-run`
 options. Requires the DigiKey Order Status API product to be subscribed to separately
 from the Product Information API already used for parts lookups (see [DigiKey API
-Integration](README.md#digikey-api-integration)) — until then, the command fails
+Integration](README.md#digikey-api-integration)) — until then, the DigiKey sync fails
 gracefully with a logged error rather than crashing.
+
+Mouser order syncing is opt-in: it's skipped entirely (no error logged) unless
+`MOUSER_ORDER_API_KEY` is set in `.env` — a **separate** key from `MOUSER_SEARCH_API_KEY`,
+generated via My Mouser Account → API management. Mouser's Order History API needs one
+extra call per order in the lookback window (unlike DigiKey's single paginated list
+call), and Mouser's documented rate limit (30 calls/minute, 1000 calls/day, shared
+across its Search/Cart/Order APIs) is tighter than DigiKey's — a busy Mouser account
+may need a coarser cron cadence than the example above, or a shorter
+`--lookback-days`.
 
 ## Linux Local Setup (dev)
 

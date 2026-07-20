@@ -1,26 +1,26 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import os
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from erp.views import PARTS_ORDER_REFRESH_LOOKBACK_DAYS, _sync_digikey_parts_orders
+from erp.views import PARTS_ORDER_REFRESH_LOOKBACK_DAYS, _sync_digikey_parts_orders, _sync_mouser_parts_orders
 
 
 class Command(BaseCommand):
     help = (
         "Refresh PartsOrder/PartsOrderLine data from supplier order-status APIs "
-        "(DigiKey only for now). Part.incoming_stock is read live from PartsOrderLine, "
-        "so there's nothing further to recompute once lines are synced. "
-        "Intended to run on a cron schedule (e.g. every few hours); see SETUP.md. "
-        "Deliberately simpler than refresh_part_sources: this is one supplier making "
-        "one (paginated) date-range list call - SearchOrders returns full line-item "
-        "detail per order already, so no separate per-order detail call multiplies "
-        "request count with order volume, and no per-supplier batching/rate-limit dict "
-        "is needed. Uses a rolling lookback window rather than a 'last synced' cursor, "
-        "so a status change on an already-synced order, a missed cron run, or a "
-        "locally-deleted PartsOrder all self-heal on the next run."
+        "(DigiKey and, if MOUSER_ORDER_API_KEY is configured, Mouser). Part.incoming_stock "
+        "is read live from PartsOrderLine, so there's nothing further to recompute once "
+        "lines are synced. Intended to run on a cron schedule; see SETUP.md - note Mouser's "
+        "Order History API needs one extra call per order (unlike DigiKey's single "
+        "paginated call), so a busy Mouser account may warrant a coarser cron cadence to "
+        "stay within Mouser's 30 calls/minute, 1000 calls/day limit. Uses a rolling "
+        "lookback window rather than a 'last synced' cursor, so a status change on an "
+        "already-synced order, a missed cron run, or a locally-deleted PartsOrder all "
+        "self-heal on the next run."
     )
 
     def add_arguments(self, parser):
@@ -30,7 +30,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--dry-run', action='store_true',
-            help='Report the date range that would be queried without calling the DigiKey API.',
+            help='Report the date range that would be queried without calling any supplier API.',
         )
 
     def handle(self, *args, **options):
@@ -39,11 +39,19 @@ class Command(BaseCommand):
 
         if options['dry_run']:
             self.stdout.write(f'Would sync DigiKey parts orders from {from_date} to {to_date}.')
+            if os.environ.get('MOUSER_ORDER_API_KEY', '').strip():
+                self.stdout.write(f'Would sync Mouser parts orders from {from_date} to {to_date}.')
             return
 
-        result = _sync_digikey_parts_orders(from_date, to_date)
-
-        if result.get('ok'):
-            self.stdout.write(f"OK: synced {result.get('orders_synced', 0)} order(s).")
+        digikey_result = _sync_digikey_parts_orders(from_date, to_date)
+        if digikey_result.get('ok'):
+            self.stdout.write(f"DigiKey OK: synced {digikey_result.get('orders_synced', 0)} order(s).")
         else:
-            self.stderr.write(f"FAILED: {result.get('error')}")
+            self.stderr.write(f"DigiKey FAILED: {digikey_result.get('error')}")
+
+        if os.environ.get('MOUSER_ORDER_API_KEY', '').strip():
+            mouser_result = _sync_mouser_parts_orders(from_date, to_date)
+            if mouser_result.get('ok'):
+                self.stdout.write(f"Mouser OK: synced {mouser_result.get('orders_synced', 0)} order(s).")
+            else:
+                self.stderr.write(f"Mouser FAILED: {mouser_result.get('error')}")

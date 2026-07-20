@@ -130,7 +130,11 @@
                     if (data.ok) {
                         window.location.reload();
                     } else {
-                        alert('Refresh failed: ' + (data.error || 'unknown error'));
+                        const failures = ['digikey', 'mouser']
+                            .map(supplier => data[supplier])
+                            .filter(result => result && !result.ok)
+                            .map(result => result.error || 'unknown error');
+                        alert('Refresh failed: ' + (failures.join('; ') || data.error || 'unknown error'));
                         btn.disabled = false;
                         btn.innerHTML = '<i class="cil-reload"></i> Refresh Now';
                     }

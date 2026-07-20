@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote as urlquote
 from collections import Counter
@@ -1459,9 +1460,9 @@ def part_source_fetch_mouser(request):
         import requests as http_requests
         from django.core.files.base import ContentFile
 
-        api_key = os.environ.get('MOUSER_API_KEY', '').strip()
+        api_key = os.environ.get('MOUSER_SEARCH_API_KEY', '').strip()
         if not api_key:
-            return JsonResponse({'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'})
+            return JsonResponse({'ok': False, 'error': 'MOUSER_SEARCH_API_KEY is not configured in .env.'})
 
         resp = http_requests.post(
             f'https://api.mouser.com/api/v1/search/partnumber?apiKey={api_key}',
@@ -1880,9 +1881,9 @@ def _refresh_variant(variant):
 
         elif supplier == 'mouser':
             import requests as http_requests
-            api_key = os.environ.get('MOUSER_API_KEY', '').strip()
+            api_key = os.environ.get('MOUSER_SEARCH_API_KEY', '').strip()
             if not api_key:
-                return {'ok': False, 'error': 'MOUSER_API_KEY is not configured in .env.'}
+                return {'ok': False, 'error': 'MOUSER_SEARCH_API_KEY is not configured in .env.'}
             resp = http_requests.post(
                 f'https://api.mouser.com/api/v1/search/partnumber?apiKey={api_key}',
                 json={'SearchByPartRequest': {'mouserPartNumber': sku, 'partSearchOptions': ''}},
@@ -2071,14 +2072,15 @@ def part_substitution_delete(request, substitution_id):
     return redirect('erp:part_edit', part_id=part_id)
 
 
-# --- Parts Orders (DigiKey order-status sync, issue #90) ---
+# --- Parts Orders (DigiKey order-status sync, issue #90; Mouser added later) ---
 #
 # Named "PartsOrder"/"PartsOrderLine" rather than "Order"/"OrderLine" to leave that name
-# free for a possible future customer-order feature. DigiKey only for now - LCSC/Mouser/
-# Element14 don't have a comparably self-service order-tracking API (see the issue #90
-# plan for the research behind that call). There's no manual "Add Order" UI: every
-# PartsOrder/PartsOrderLine row is created/updated by _sync_digikey_parts_orders(), driven
-# by the refresh_parts_orders management command (or the parts_order_refresh view).
+# free for a possible future customer-order feature. DigiKey and Mouser both have a
+# self-service order-tracking API and are synced here; LCSC/Element14 don't (see the issue
+# #90 plan for the research behind that call). There's no manual "Add Order" UI: every
+# PartsOrder/PartsOrderLine row is created/updated by _sync_digikey_parts_orders()/
+# _sync_mouser_parts_orders(), driven by the refresh_parts_orders management command (or
+# the parts_order_refresh view).
 #
 # Targets DigiKey's "Order Status" API product (OrderStatus v4 - basePath /orderstatus/v4),
 # NOT the older "Order Support"/OrderDetails product (basePath /OrderDetails/v3), which is
@@ -2297,24 +2299,29 @@ def _match_or_create_part_for_digikey_line(supplier_sku, description):
     return part, variant
 
 
-def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
-    """Create/update one PartsOrder and its PartsOrderLines from a _parse_digikey_order()
-    result.
+def _upsert_parts_order(parsed_order, supplier_name='DigiKey', part_matcher=_match_or_create_part_for_digikey_line):
+    """Create/update one PartsOrder and its PartsOrderLines from a _parse_digikey_order()/
+    _parse_mouser_order() result. Generic across suppliers - supplier_name and part_matcher
+    (a (supplier_sku, description) -> (Part, PartSourceVariant) callable, e.g.
+    _match_or_create_part_for_mouser_line) are the only supplier-specific inputs; everything
+    else operates on the shared flat dict shape both parse layers produce.
 
-    Lines are matched by supplier_line_number (DigiKey's DetailId) and updated in place
-    rather than deleted and recreated wholesale, unlike every other field on PartsOrder/
-    PartsOrderLine, which are simple "last known truth, refresh-overwritten" data (same
-    convention as PartSource.stock) - received/received_dt are this deployment's own record
-    of a line being physically checked into stock, not supplier-reported data, so a resync
-    must never overwrite them. A line missing a supplier_line_number (shouldn't happen with
-    real DigiKey data, but defensively) is always created fresh, since matching several
-    such lines against each other would incorrectly merge them into one. Any existing line
-    not present in this sync (cancelled/removed order-side) is deleted, same end effect as
-    the old delete-then-recreate approach for anything that isn't received.
+    Lines are matched by supplier_line_number (DigiKey's DetailId; a synthetic per-order
+    line index for Mouser, which has no equivalent field - see _parse_mouser_order_line)
+    and updated in place rather than deleted and recreated wholesale, unlike every other
+    field on PartsOrder/PartsOrderLine, which are simple "last known truth, refresh-
+    overwritten" data (same convention as PartSource.stock) - received/received_dt are this
+    deployment's own record of a line being physically checked into stock, not
+    supplier-reported data, so a resync must never overwrite them. A line missing a
+    supplier_line_number (shouldn't happen with real data, but defensively) is always
+    created fresh, since matching several such lines against each other would incorrectly
+    merge them into one. Any existing line not present in this sync (cancelled/removed
+    order-side) is deleted, same end effect as the old delete-then-recreate approach for
+    anything that isn't received.
 
-    May raise - it's the caller's (_sync_digikey_parts_orders) job to catch, matching the
-    "fetch/upsert may raise, orchestration never does" convention used elsewhere in this
-    file (e.g. _refresh_variant).
+    May raise - it's the caller's (_sync_digikey_parts_orders/_sync_mouser_parts_orders)
+    job to catch, matching the "fetch/upsert may raise, orchestration never does"
+    convention used elsewhere in this file (e.g. _refresh_variant).
     """
     parts_order, _created = PartsOrder.objects.update_or_create(
         supplier_name=supplier_name,
@@ -2330,7 +2337,7 @@ def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
 
     seen_line_pks = []
     for line in parsed_order['lines']:
-        part, variant = _match_or_create_part_for_digikey_line(line['supplier_sku'], line['description'])
+        part, variant = part_matcher(line['supplier_sku'], line['description'])
         defaults = {
             'part': part, 'part_source_variant': variant,
             'supplier_sku': line['supplier_sku'], 'description': line['description'],
@@ -2390,6 +2397,218 @@ def _sync_digikey_parts_orders(from_date, to_date):
         return {'ok': False, 'error': f'DigiKey order sync failed: {e}'}
 
 
+# --- Mouser order-history sync ---
+#
+# Targets Mouser's Order History API (basePath /api/v1/orderhistory - confirmed against
+# Mouser's own published swagger spec at https://api.mouser.com/api/docs/V1, definitions
+# OrderHistoryResponseRoot/OrderHistoryBaseObject/OrderDetail/OrderLineItem), which is a
+# separate application/key registration from the Search API used elsewhere in this file
+# (MOUSER_SEARCH_API_KEY) - a MOUSER_ORDER_API_KEY must be generated separately via My Mouser
+# Account -> API management before this sync can do anything.
+#
+# Unlike DigiKey's SearchOrders, which returns full line-item detail for every order in one
+# paginated call, Mouser's ByDateRange list endpoint returns order summaries only (no line
+# items and no pagination parameters at all per the swagger) - a second call per order
+# (orderhistory/salesOrderNumber) is needed to fetch OrderLines. This means a sync makes
+# 1 + N API calls for N orders in range, paced by MOUSER_ORDER_API_MIN_INTERVAL to stay
+# under Mouser's documented 30 calls/minute limit (shared across Search/Cart/Order/Order
+# History), rather than DigiKey's single call per page.
+#
+# Mouser's API also has real gaps DigiKey's doesn't, each a deliberate simplification here
+# rather than a guess: OrderLineItem has no stable per-line id (DigiKey has LineItem.
+# DetailId), so _parse_mouser_order_line uses the line's position within OrderLines as a
+# synthetic supplier_line_number instead - fine for matching across resyncs as long as
+# Mouser returns a placed order's lines in a stable order, which is the reasonable
+# assumption for historical/immutable order data. There's no per-line status field either
+# (only order-level OrderStatus/OrderStatusName, plus a per-line Activities list of invoice
+# records used as a secondary "this line has shipped" signal), and OrderStatusName isn't a
+# documented enum the way DigiKey's SalesOrderStatus is, so _map_mouser_order_status is a
+# best-effort substring match rather than an exact lookup table - worth revisiting once real
+# order data has been seen. Finally, there's no order-detail-page URL or expected-arrival/
+# ship-date field anywhere in the schema, so PartsOrder.supplier_order_url and
+# expected_arrival_date are left blank/None for Mouser orders rather than guessed.
+
+MOUSER_ORDER_API_MIN_INTERVAL = 2.5  # seconds between per-order detail calls; see note above
+
+
+def _mouser_order_history_list(api_key, from_date, to_date):
+    """One call to Mouser's orderhistory/ByDateRange, covering the whole [from_date, to_date]
+    range - no pagination parameters exist for this endpoint per the swagger spec. Returns
+    the raw OrderHistoryResponseRoot dict ({'NumberOfOrders': N, 'OrderHistoryItems': [...]}).
+
+    May raise (HTTP errors) - it's the caller's job to catch, matching the "fetch may raise,
+    orchestration never does" split used elsewhere in this file (e.g. _digikey_search_orders).
+    """
+    import requests as http_requests
+
+    resp = http_requests.get(
+        'https://api.mouser.com/api/v1/orderhistory/ByDateRange',
+        params={
+            'apiKey': api_key,
+            'startDate': from_date.strftime('%m/%d/%Y'),
+            'endDate': to_date.strftime('%m/%d/%Y'),
+        },
+        headers={'Accept': 'application/json'},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _mouser_order_detail(api_key, sales_order_number):
+    """One call to Mouser's orderhistory/salesOrderNumber, returning the raw OrderDetail
+    dict (with its OrderLines) for a single order. May raise - see
+    _mouser_order_history_list."""
+    import requests as http_requests
+
+    resp = http_requests.get(
+        'https://api.mouser.com/api/v1/orderhistory/salesOrderNumber',
+        params={'apiKey': api_key, 'salesOrderNumber': sales_order_number},
+        headers={'Accept': 'application/json'},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _parse_mouser_dt(raw):
+    """Parse a Mouser timestamp string (DateCreated/OrderDate) into a datetime, or None if
+    missing/unparseable."""
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace('Z', '+00:00'))
+    except (ValueError, TypeError):
+        return None
+
+
+def _map_mouser_order_status(status_name):
+    """Best-effort mapping of Mouser's free-text OrderStatusName/OrderStatusDisplay to
+    PartsOrderLine.STATUS_CHOICES. Unlike DigiKey's SalesOrderStatus, Mouser's swagger spec
+    doesn't document a fixed enum of values here, so this is a substring match rather than
+    an exact lookup table - revisit once real order data has been seen. Falls back to OPEN,
+    the safe default for an unmapped/ambiguous status."""
+    s = (status_name or '').strip().lower()
+    if 'cancel' in s:
+        return PartsOrderLine.CANCELLED
+    if 'ship' in s or 'deliver' in s or 'complete' in s:
+        return PartsOrderLine.SHIPPED
+    return PartsOrderLine.OPEN
+
+
+def _parse_mouser_order_line(raw_line, line_index, order_currency, fallback_status):
+    """Parse one OrderLineItem from a Mouser OrderDetail (definitions.OrderLineItem).
+
+    Field names confirmed from Mouser's own published swagger spec: Quantity, UnitPrice,
+    ProductInfo.MouserPartNumber, ProductInfo.PartDescription, Activities. OrderLineItem has
+    no id field of its own, so supplier_line_number is synthesised from the line's position
+    within the order (see the module-level note above for the resync-stability assumption
+    this relies on). There's no per-line status either: a non-empty Activities list (invoice
+    records) is treated as "this line has shipped", overriding fallback_status (the
+    order-level status mapped via _map_mouser_order_status) for that one line.
+    """
+    status = PartsOrderLine.SHIPPED if raw_line.get('Activities') else fallback_status
+    product_info = raw_line.get('ProductInfo') or {}
+    return {
+        'supplier_sku': product_info.get('MouserPartNumber') or '',
+        'supplier_line_number': str(line_index),
+        'description': product_info.get('PartDescription') or '',
+        'quantity': raw_line.get('Quantity') or 0,
+        'unit_price': raw_line.get('UnitPrice'),
+        'currency': order_currency or 'USD',
+        'status': status,
+    }
+
+
+def _parse_mouser_order(history_item, detail):
+    """Combine one orderhistory/ByDateRange list item with its matching orderhistory/
+    salesOrderNumber detail call into the flat shape _upsert_parts_order() needs. Pure/no
+    I/O, so it's unit-testable against hand-built dict fixtures - see
+    erp/tests/test_mouser_parts_order_sync.py.
+
+    supplier_order_url and expected_arrival_date are always blank/None - Mouser's API has
+    no equivalent of either (see the module-level note above).
+    """
+    raw_status = history_item.get('OrderStatusDisplay') or detail.get('OrderStatusName') or ''
+    order_level_status = _map_mouser_order_status(raw_status)
+    currency = detail.get('CurrencyCode')
+    return {
+        'supplier_order_number': str(history_item.get('SalesOrderNumber') or ''),
+        'supplier_order_url': '',
+        'order_dt': _parse_mouser_dt(history_item.get('DateCreated') or detail.get('OrderDate')),
+        'expected_arrival_date': None,
+        'status': raw_status,
+        'lines': [
+            _parse_mouser_order_line(li, index, currency, order_level_status)
+            for index, li in enumerate(detail.get('OrderLines') or [])
+        ],
+    }
+
+
+def _match_or_create_part_for_mouser_line(supplier_sku, description):
+    """Resolve one Mouser order line's SKU to a Part - exact mirror of
+    _match_or_create_part_for_digikey_line, matching against PartSourceVariant.supplier_sku
+    under a 'Mouser' PartSource (consistent with part_source_fetch_mouser, which stores
+    supplier_sku = MouserPartNumber), or creating a bare Part/PartSource/PartSourceVariant if
+    nothing matches. Deliberately doesn't reuse _get_or_create_supplier_listing() (its merge
+    key is manufacturer_sku, unknown here - only the supplier SKU is) - same reasoning as
+    the DigiKey version.
+
+    Returns (part, part_source_variant); both None if supplier_sku is blank.
+    """
+    if not supplier_sku:
+        return None, None
+
+    variant = PartSourceVariant.objects.filter(
+        supplier_sku__iexact=supplier_sku, source__supplier_name__iexact='Mouser',
+    ).select_related('source__part').first()
+    if variant:
+        return variant.source.part, variant
+
+    part = Part.objects.create(name=supplier_sku, description=description or '')
+    listing = PartSource.objects.create(part=part, supplier_name='Mouser', manufacturer_sku='')
+    variant = PartSourceVariant.objects.create(source=listing, supplier_sku=supplier_sku)
+    return part, variant
+
+
+def _sync_mouser_parts_orders(from_date, to_date):
+    """Discover and upsert every Mouser order placed in [from_date, to_date]. Never raises -
+    mirrors _sync_digikey_parts_orders'/_refresh_variant's {'ok': True/False, 'error': ...}
+    contract. Called by both the refresh_parts_orders management command and the optional
+    parts_order_refresh "Refresh now" view, but only when MOUSER_ORDER_API_KEY is actually
+    configured - callers are expected to skip calling this at all otherwise, so a deployment
+    that hasn't set up Mouser order tracking doesn't get a "not configured" error on every
+    refresh; the check here is a defensive fallback for direct/test callers.
+    """
+    api_key = os.environ.get('MOUSER_ORDER_API_KEY', '').strip()
+    if not api_key:
+        return {'ok': False, 'error': 'MOUSER_ORDER_API_KEY is not configured in .env.'}
+
+    try:
+        history = _mouser_order_history_list(api_key, from_date, to_date)
+        errors = history.get('Errors') or []
+        if errors:
+            return {'ok': False, 'error': f'Mouser API error: {errors[0]}'}
+
+        synced = 0
+        items = history.get('OrderHistoryItems') or []
+        for index, item in enumerate(items):
+            order_number = item.get('SalesOrderNumber')
+            if not order_number:
+                continue
+            if index > 0:
+                time.sleep(MOUSER_ORDER_API_MIN_INTERVAL)
+            detail = _mouser_order_detail(api_key, order_number)
+            parsed = _parse_mouser_order(item, detail)
+            _upsert_parts_order(parsed, supplier_name='Mouser', part_matcher=_match_or_create_part_for_mouser_line)
+            synced += 1
+
+        return {'ok': True, 'orders_synced': synced}
+
+    except Exception as e:
+        return {'ok': False, 'error': f'Mouser order sync failed: {e}'}
+
+
 @staff_member_required
 def parts_order_list(request):
     """List all supplier orders, newest first, filterable by ?q= against
@@ -2418,16 +2637,30 @@ def parts_order_detail(request, parts_order_id):
 
 @staff_member_required
 def parts_order_refresh(request):
-    """POST-only AJAX endpoint: force a DigiKey order sync now (parallels
+    """POST-only AJAX endpoint: force a supplier order sync now (parallels
     part_source_refresh), using the same rolling lookback window as the
-    refresh_parts_orders management command's default, not a full historical resync."""
+    refresh_parts_orders management command's default, not a full historical resync.
+
+    Always runs the DigiKey sync. Only attempts the Mouser sync if MOUSER_ORDER_API_KEY is
+    actually configured, so a deployment that hasn't set up Mouser order tracking doesn't
+    get a "not configured" error every time this button is clicked - 'mouser' is simply
+    omitted from the response in that case. Overall ok is True only if every sync that was
+    actually attempted succeeded."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
     to_date = timezone.now().date()
     from_date = to_date - timedelta(days=PARTS_ORDER_REFRESH_LOOKBACK_DAYS)
-    result = _sync_digikey_parts_orders(from_date, to_date)
-    return JsonResponse(result)
+
+    digikey_result = _sync_digikey_parts_orders(from_date, to_date)
+    response = {'ok': digikey_result.get('ok', False), 'digikey': digikey_result}
+
+    if os.environ.get('MOUSER_ORDER_API_KEY', '').strip():
+        mouser_result = _sync_mouser_parts_orders(from_date, to_date)
+        response['mouser'] = mouser_result
+        response['ok'] = response['ok'] and mouser_result.get('ok', False)
+
+    return JsonResponse(response)
 
 
 def _apply_part_stock_deltas(deltas):
