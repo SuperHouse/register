@@ -22,7 +22,13 @@
                     </tr>
                     <tr>
                         <th>Order Number</th>
-                        <td>{{ parts_order.supplier_order_number }}</td>
+                        <td>
+                            {% if parts_order.supplier_order_url %}
+                                <a href="{{ parts_order.supplier_order_url }}" target="_blank" rel="noopener">{{ parts_order.supplier_order_number }}</a>
+                            {% else %}
+                                {{ parts_order.supplier_order_number }}
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <th>Order Date</th>

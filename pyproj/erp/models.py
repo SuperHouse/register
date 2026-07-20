@@ -521,6 +521,18 @@ class PartsOrder(models.Model):
     order_dt = models.DateTimeField(null=True, blank=True, help_text='When the order was placed, per the supplier')
     expected_arrival_date = models.DateField(null=True, blank=True, help_text='Leave blank if unknown/not reported')
     status = models.CharField(max_length=100, blank=True, help_text='Raw status string as reported by the supplier')
+    supplier_order_url = models.URLField(
+        blank=True,
+        help_text=(
+            "Link to this order on the supplier's own website, if known. Populated at sync "
+            'time (see erp.views._digikey_order_url) rather than computed on read, since it '
+            "needs a field DigiKey's own docs don't flag as the important one: the website's "
+            'OrderHistory/ReviewOrder page keys off OrderNumber, not the Sales Order ID that '
+            'supplier_order_number stores (confirmed by comparing a real order - DigiKey\'s '
+            "order LIST page and API both surface \"Sales Order ID\" as the order's number, "
+            'but the review PAGE URL uses the separate, longer OrderNumber value instead).'
+        ),
+    )
     last_refreshed = models.DateTimeField(null=True, blank=True)
 
     class Meta:

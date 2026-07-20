@@ -32,12 +32,16 @@ def _raw_line(sku='ABC123-CT-ND', description='Widget', qty=10, price=0.5, qty_s
     }
 
 
-def _raw_sales_order(order_id='SO123', currency='USD', status='Shipped', lines=None):
+def _raw_sales_order(order_id='SO123', order_number=9910000373735576, currency='USD',
+                      status='Shipped', lines=None):
     """Fixture using real DigiKey OrderStatus v4 SalesOrder field names, per the published
     OrderStatus.json swagger spec (definitions.SalesOrder) - as nested under an Order's
-    SalesOrders list in a SearchOrders response."""
+    SalesOrders list in a SearchOrders response. order_id (SalesOrderId) and order_number
+    (OrderNumber) are deliberately different-shaped defaults - they're distinct DigiKey
+    identifiers, not two names for the same value (see _digikey_order_url)."""
     return {
         'SalesOrderId': order_id,
+        'OrderNumber': order_number,
         'DateEntered': '2026-06-01T10:00:00Z',
         'Currency': currency,
         'Status': {'SalesOrderStatus': status},
@@ -147,9 +151,15 @@ def test_digikey_expected_arrival_date_none_when_no_schedules():
 
 # --- _parse_digikey_order ---
 
-def test_parse_digikey_order_maps_top_level_fields():
-    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO999', status='Shipped'))
+def test_parse_digikey_order_maps_top_level_fields(monkeypatch):
+    monkeypatch.setenv('DIGIKEY_LOCALE_SITE', 'AU')
+    parsed = _parse_digikey_order(
+        _raw_sales_order(order_id='SO999', order_number=9910000373735576, status='Shipped'),
+    )
     assert parsed['supplier_order_number'] == 'SO999'
+    assert parsed['supplier_order_url'] == (
+        'https://www.digikey.com.au/OrderHistory/ReviewOrder/9910000373735576'
+    )
     assert parsed['order_dt'] == datetime(2026, 6, 1, 10, 0, 0, tzinfo=dt_timezone.utc)
     assert parsed['status'] == 'Shipped'
     assert len(parsed['lines']) == 1

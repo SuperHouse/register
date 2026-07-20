@@ -1176,6 +1176,44 @@ def _digikey_locale_headers():
     }
 
 
+# Confirmed DigiKey regional domains only - DigiKey doesn't publish a full mapping from
+# X-DIGIKEY-Locale-Site codes to domains, and the pattern isn't consistent enough to guess
+# (AU is "com.au", UK is "co.uk", not just "digikey.<site>"). Deliberately a plain lookup
+# with a fixed default (not, say, reading a hostname off an already-fetched
+# PartSourceVariant.url) so _digikey_order_history_host()/_digikey_order_url() stay pure/
+# no-I/O like the rest of the parse layer (_parse_digikey_order calls this) - and because a
+# stored URL can itself be stale (e.g. fetched before #86 added locale headers - one was
+# observed still reading www.digikey.com on this AU deployment), which isn't an improvement
+# over just defaulting to the US site for a locale this table doesn't know about yet.
+DIGIKEY_ORDER_HISTORY_HOSTS_BY_LOCALE_SITE = {
+    'US': 'www.digikey.com',
+    'AU': 'www.digikey.com.au',
+    'UK': 'www.digikey.co.uk',
+}
+
+
+def _digikey_order_history_host():
+    """Hostname for DigiKey's OrderHistory pages, matching this deployment's locale
+    (DIGIKEY_LOCALE_SITE). Defaults to the US site for a locale outside the confirmed
+    DIGIKEY_ORDER_HISTORY_HOSTS_BY_LOCALE_SITE table."""
+    site = os.environ.get('DIGIKEY_LOCALE_SITE', 'AU').strip().upper()
+    return DIGIKEY_ORDER_HISTORY_HOSTS_BY_LOCALE_SITE.get(site, 'www.digikey.com')
+
+
+def _digikey_order_url(order_number):
+    """Link to a DigiKey order on DigiKey's own website, given its OrderNumber (from
+    SalesOrder.OrderNumber in the OrderStatus v4 response - NOT SalesOrderId, which is what
+    PartsOrder.supplier_order_number stores and what DigiKey's order list UI/API surface as
+    the order's number. Confirmed by comparing a real order: DigiKey's OrderHistory/
+    ReviewOrder page 404s on the Sales Order ID and only resolves with this separate,
+    longer OrderNumber value). Returns '' if order_number is blank.
+    """
+    if not order_number:
+        return ''
+    host = _digikey_order_history_host()
+    return f'https://{host}/OrderHistory/ReviewOrder/{urlquote(str(order_number), safe="")}'
+
+
 def _digikey_price_breaks(variation):
     """Extract price breaks from a DigiKey ProductVariation's StandardPricing list.
 
@@ -2191,13 +2229,20 @@ def _parse_digikey_order(raw_sales_order):
     erp/tests/test_digikey_parts_order_sync.py.
 
     Field names confirmed from DigiKey's own OrderStatus.json spec (definitions.SalesOrder):
-    SalesOrderId, DateEntered, Currency, Status.SalesOrderStatus, LineItems.
+    SalesOrderId, OrderNumber, DateEntered, Currency, Status.SalesOrderStatus, LineItems.
+    Confirmed live (by comparing a real order against what actually resolves on DigiKey's
+    website) that SalesOrderId and OrderNumber are two distinct values, not two names for the
+    same one - DigiKey's order list UI and this API both surface SalesOrderId as "the" order
+    number (supplier_order_number below), but the website's OrderHistory/ReviewOrder page
+    404s on that and only resolves with the separate, longer OrderNumber value - see
+    _digikey_order_url().
     """
     order_id = raw_sales_order.get('SalesOrderId') or ''
     raw_status = (raw_sales_order.get('Status') or {}).get('SalesOrderStatus') or ''
     currency = raw_sales_order.get('Currency')
     return {
         'supplier_order_number': str(order_id),
+        'supplier_order_url': _digikey_order_url(raw_sales_order.get('OrderNumber')),
         'order_dt': _parse_digikey_dt(raw_sales_order.get('DateEntered')),
         'expected_arrival_date': _digikey_expected_arrival_date(raw_sales_order),
         'status': raw_status,
@@ -2261,6 +2306,7 @@ def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
         supplier_order_number=parsed_order['supplier_order_number'],
         defaults={
             'order_dt': parsed_order['order_dt'],
+            'supplier_order_url': parsed_order['supplier_order_url'],
             'expected_arrival_date': parsed_order['expected_arrival_date'],
             'status': parsed_order['status'],
             'last_refreshed': timezone.now(),
