@@ -544,6 +544,23 @@ class PartsOrder(models.Model):
     def __str__(self):
         return f'{self.supplier_name} #{self.supplier_order_number}'
 
+    def get_receiving_status_color_class(self):
+        """Bootstrap background colour class for the small coloured-square receiving
+        indicator on the Parts Orders list - same convention as
+        BatchProductionStage.get_status_color_class(). Grey if no lines are received yet
+        (including an order with no lines at all), blue if some but not all lines are
+        received, green once every line is received."""
+        lines = list(self.lines.all())
+        if not lines:
+            return 'bg-secondary'
+
+        received_count = sum(1 for line in lines if line.received)
+        if received_count == 0:
+            return 'bg-secondary'
+        if received_count == len(lines):
+            return 'bg-success'
+        return 'bg-info'
+
 
 class PartsOrderLine(models.Model):
     """One line item within a PartsOrder: a quantity of a specific supplier SKU.

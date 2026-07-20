@@ -31,6 +31,7 @@
                     <table class="table table-striped align-middle mb-0">
                         <thead>
                             <tr class="highlight">
+                                <th></th>
                                 <th>Supplier</th>
                                 <th>Order #</th>
                                 <th>Order Date</th>
@@ -43,6 +44,11 @@
                             {% for parts_order in parts_orders %}
                                 <tr style="cursor: pointer;"
                                     onclick="window.location='{% url 'erp:parts_order_detail' parts_order.pk %}'">
+                                    <td style="width: 20px;">
+                                        <span class="rounded-circle d-inline-block {{ parts_order.get_receiving_status_color_class }}"
+                                              style="width: 12px; height: 12px;"
+                                              title="Receiving status"></span>
+                                    </td>
                                     <td>{{ parts_order.supplier_name }}</td>
                                     <td>{{ parts_order.supplier_order_number }}</td>
                                     <td>{{ parts_order.order_dt|date:"j-M-Y"|default:"—" }}</td>
