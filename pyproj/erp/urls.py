@@ -29,6 +29,10 @@ urlpatterns = [
     path('parts/<int:part_id>/add-substitution/', views.part_substitution_add, name='part_substitution_add'),
     path('parts/substitution/<int:substitution_id>/delete/', views.part_substitution_delete, name='part_substitution_delete'),
 
+    path('parts-orders/', views.parts_order_list, name='parts_order_list'),
+    path('parts-orders/<int:parts_order_id>/', views.parts_order_detail, name='parts_order_detail'),
+    path('parts-orders/refresh/', views.parts_order_refresh, name='parts_order_refresh'),
+
     path('settings/', views.settings_index, name='settings_index'),
     path('settings/assembly-costs/', views.assembly_cost_settings_edit, name='assembly_cost_settings_edit'),
     path('settings/production-stages/', views.production_stage_list, name='production_stage_list'),

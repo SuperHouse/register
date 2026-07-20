@@ -75,6 +75,7 @@
                                 <th>Package</th>
                                 <th>Device</th>
                                 <th>Stock</th>
+                                <th>Incoming</th>
                                 <th>Available</th>
                                 <th title="Number of Design BOM entries referencing this part">BOM Refs</th>
                                 <th style="width: 60px;"></th>
@@ -84,7 +85,7 @@
                             {% if uncategorised %}
                                 <tr class="table-secondary category-header{% if uncategorised_expanded %} expanded{% endif %}"
                                     data-category="uncategorised" style="cursor: pointer;">
-                                    <td colspan="9" class="fw-semibold text-body-secondary py-2">
+                                    <td colspan="10" class="fw-semibold text-body-secondary py-2">
                                         <i class="bi {% if uncategorised_expanded %}bi-caret-down-fill{% else %}bi-caret-right-fill{% endif %} category-caret me-2"></i>
                                         Uncategorised ({{ uncategorised|length }})
                                     </td>
@@ -97,7 +98,7 @@
                             {% for category in categories_with_parts %}
                                 <tr class="table-secondary category-header{% if category.is_expanded %} expanded{% endif %}"
                                     data-category="{{ category.pk }}" style="cursor: pointer;">
-                                    <td colspan="9" class="fw-semibold py-2">
+                                    <td colspan="10" class="fw-semibold py-2">
                                         <i class="bi {% if category.is_expanded %}bi-caret-down-fill{% else %}bi-caret-right-fill{% endif %} category-caret me-2"></i>
                                         {{ category.name }} ({{ category.sorted_parts|length }})
                                     </td>

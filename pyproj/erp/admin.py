@@ -5,7 +5,8 @@ from django.contrib import admin
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
     BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory, PartSource,
-    PartSourceStockHistory, PartSourceVariant, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    PartSourceStockHistory, PartSourceVariant, PartsOrder, PartsOrderLine, ProductionStage, ProductionStageTemplate,
+    ProductionStageTemplateStep,
 )
 
 
@@ -164,3 +165,15 @@ class DesignBomEntryAdmin(admin.ModelAdmin):
     list_display = ['design', 'reference', 'part', 'side']
     list_select_related = ['design', 'part']
     search_fields = ['design__name', 'design__sku', 'reference', 'part__name']
+
+
+class PartsOrderLineInline(admin.TabularInline):
+    model = PartsOrderLine
+    extra = 0
+
+
+@admin.register(PartsOrder)
+class PartsOrderAdmin(admin.ModelAdmin):
+    list_display = ['supplier_name', 'supplier_order_number', 'order_dt', 'status']
+    search_fields = ['supplier_name', 'supplier_order_number']
+    inlines = [PartsOrderLineInline]

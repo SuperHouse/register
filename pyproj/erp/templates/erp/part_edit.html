@@ -96,6 +96,16 @@
                                 </div>
                                 {% if form.no_stock_required.errors %}<div class="text-danger small mt-1">{{ form.no_stock_required.errors }}</div>{% endif %}
                             </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.incoming_stock.id_for_label }}" class="form-label fw-semibold">Incoming Stock</label>
+                                {{ form.incoming_stock }}
+                                {% if form.incoming_stock.errors %}<div class="text-danger small mt-1">{{ form.incoming_stock.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label for="{{ form.committed_stock.id_for_label }}" class="form-label fw-semibold">Committed Stock</label>
+                                {{ form.committed_stock }}
+                                {% if form.committed_stock.errors %}<div class="text-danger small mt-1">{{ form.committed_stock.errors }}</div>{% endif %}
+                            </div>
                             <div class="col-12">
                                 <label for="{{ form.description.id_for_label }}" class="form-label fw-semibold">Description</label>
                                 {{ form.description }}

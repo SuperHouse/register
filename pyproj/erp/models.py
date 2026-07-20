@@ -181,6 +181,12 @@ class Part(models.Model):
         default=False,
         help_text='Part is placed on the BOM but never physically stocked (e.g. test points, DNP parts)'
     )
+    incoming_stock = models.IntegerField(
+        null=True, blank=True, help_text='Manually-tracked stock on order but not yet received'
+    )
+    committed_stock = models.IntegerField(
+        null=True, blank=True, help_text='Manually-tracked stock already allocated to a build'
+    )
     image = models.ImageField(upload_to='part_images/', null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
 
@@ -211,6 +217,15 @@ class Part(models.Model):
         """Sum of stock across all supplier listings, or None if none have a known stock level."""
         known = [source.stock for source in self.sources.all() if source.stock is not None]
         return sum(known) if known else None
+
+    def open_order_quantity(self):
+        """Sum of quantities across this part's still-open PartsOrderLines - the value
+        Part.incoming_stock is recomputed to on every parts-order refresh (see
+        erp.views._recompute_incoming_stock, which does this as a single grouped-aggregate
+        query rather than calling this per-Part)."""
+        total = self.parts_order_lines.filter(status=PartsOrderLine.OPEN).aggregate(
+            total=models.Sum('quantity'))['total']
+        return total or 0
 
     @property
     def has_stale_source_data(self):
@@ -492,6 +507,81 @@ class PartAsset(models.Model):
             '.csv': 'bi-file-earmark-spreadsheet',
         }
         return icons.get(ext, 'bi-paperclip')
+
+
+class PartsOrder(models.Model):
+    """A purchase order placed with a supplier, auto-discovered via that supplier's
+    order-status API (see erp.views._sync_digikey_parts_orders - DigiKey only for now).
+    There's no manual "Add Order" UI - every row here is created/updated by a
+    refresh_parts_orders run. Named "PartsOrder" rather than "Order" to leave that name
+    free for a possible future customer-order feature.
+    """
+    supplier_name = models.CharField(max_length=200)
+    supplier_order_number = models.CharField(max_length=200)
+    order_dt = models.DateTimeField(null=True, blank=True, help_text='When the order was placed, per the supplier')
+    expected_arrival_date = models.DateField(null=True, blank=True, help_text='Leave blank if unknown/not reported')
+    status = models.CharField(max_length=100, blank=True, help_text='Raw status string as reported by the supplier')
+    last_refreshed = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-order_dt']
+        unique_together = [('supplier_name', 'supplier_order_number')]
+
+    def __str__(self):
+        return f'{self.supplier_name} #{self.supplier_order_number}'
+
+
+class PartsOrderLine(models.Model):
+    """One line item within a PartsOrder: a quantity of a specific supplier SKU.
+
+    part/part_source_variant are nullable + SET_NULL rather than PROTECT (unlike e.g.
+    DesignBomEntry.part) - a line's history (raw supplier_sku/description/quantity/price)
+    stands alone even if the matched Part or listing is later deleted or reparented; order
+    history shouldn't block a deletion or vanish because of one.
+
+    unit_price/currency are snapshotted at parse time (plain fields, not read live from
+    PartPriceBreak) since price breaks change over time but what was actually paid needs
+    to stay historically accurate - part/part_source_variant stay live FKs since matching
+    against the current Part/PartSourceVariant is the whole point.
+    """
+    OPEN = 'OPEN'
+    SHIPPED = 'SHIPPED'
+    RECEIVED = 'RECEIVED'
+    CANCELLED = 'CANCELLED'
+
+    STATUS_CHOICES = [
+        (OPEN, 'Open'),
+        (SHIPPED, 'Shipped'),
+        (RECEIVED, 'Received'),
+        (CANCELLED, 'Cancelled'),
+    ]
+
+    parts_order = models.ForeignKey(PartsOrder, on_delete=models.CASCADE, related_name='lines')
+    part = models.ForeignKey(
+        Part, null=True, blank=True, on_delete=models.SET_NULL, related_name='parts_order_lines'
+    )
+    part_source_variant = models.ForeignKey(
+        PartSourceVariant, null=True, blank=True, on_delete=models.SET_NULL, related_name='parts_order_lines'
+    )
+    supplier_sku = models.CharField(
+        max_length=200, blank=True,
+        help_text='Raw supplier SKU as ordered, kept even if matching fails or the listing is later deleted'
+    )
+    description = models.CharField(max_length=500, blank=True)
+    quantity = models.PositiveIntegerField()
+    unit_price = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
+    currency = models.CharField(max_length=10, default='USD')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=OPEN)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.parts_order}: {self.supplier_sku} x{self.quantity}'
+
+    @property
+    def symbol(self):
+        return PartPriceBreak.CURRENCY_SYMBOLS.get(self.currency, '')
 
 
 class PartCategory(models.Model):

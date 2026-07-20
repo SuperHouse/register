@@ -203,7 +203,7 @@ class PartForm(forms.ModelForm):
         model = Part
         fields = [
             'name', 'description', 'category', 'device', 'package', 'value', 'smt_joints', 'pth_joints',
-            'fusion_library', 'stock', 'no_stock_required', 'image',
+            'fusion_library', 'stock', 'no_stock_required', 'incoming_stock', 'committed_stock', 'image',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -217,6 +217,8 @@ class PartForm(forms.ModelForm):
             'fusion_library': forms.TextInput(attrs={'class': 'form-control'}),
             'stock': forms.NumberInput(attrs={'class': 'form-control'}),
             'no_stock_required': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'incoming_stock': forms.NumberInput(attrs={'class': 'form-control'}),
+            'committed_stock': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
 
