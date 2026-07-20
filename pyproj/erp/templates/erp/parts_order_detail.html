@@ -60,9 +60,9 @@
                 <table class="table table-sm align-middle mb-0">
                     <thead>
                         <tr class="highlight">
-                            <th>Supplier SKU</th>
-                            <th>Description</th>
+                            <th style="width: 70px;"></th>
                             <th>Part</th>
+                            <th>Supplier SKU</th>
                             <th>Quantity</th>
                             <th>Unit Price</th>
                             <th>Status</th>
@@ -71,8 +71,12 @@
                     <tbody>
                         {% for line in parts_order.lines.all %}
                             <tr>
-                                <td>{{ line.supplier_sku|default:"—" }}</td>
-                                <td>{{ line.description|default:"—" }}</td>
+                                <td>
+                                    {% if line.part.image %}
+                                        <img src="{{ line.part.image.url }}" alt="{{ line.part.name }}"
+                                             style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                    {% endif %}
+                                </td>
                                 <td>
                                     {% if line.part %}
                                         <a href="{% url 'erp:part_edit' line.part.pk %}">{{ line.part }}</a>
@@ -80,6 +84,7 @@
                                         —
                                     {% endif %}
                                 </td>
+                                <td>{{ line.supplier_sku|default:"—" }}</td>
                                 <td>{{ line.quantity }}</td>
                                 <td>
                                     {% if line.unit_price is not None %}
