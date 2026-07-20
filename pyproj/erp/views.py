@@ -2040,11 +2040,12 @@ def part_substitution_delete(request, substitution_id):
 # PartsOrder/PartsOrderLine row is created/updated by _sync_digikey_parts_orders(), driven
 # by the refresh_parts_orders management command (or the parts_order_refresh view).
 #
-# NOTE: the DigiKey Order Status API's exact response shape is unconfirmed (it's a
-# separate API product from the Product Information API already used elsewhere in this
-# file, and its docs are gated behind a logged-in developer account) - every field name
-# guessed below is isolated to a small function specifically so it's fast to correct once
-# a real response has been seen. See the issue #90 plan for the full list of assumptions.
+# Targets DigiKey's "Order Status" API product (OrderStatus v4 - basePath /orderstatus/v4),
+# NOT the older "Order Support"/OrderDetails product (basePath /OrderDetails/v3), which is
+# a separate, deprecated subscription - an app authorised for one is not automatically
+# authorised for the other, and calling the wrong one 401s even with a valid token. Field
+# names below are confirmed against DigiKey's own published OrderStatus.json swagger spec
+# (definitions: OrderResponse/Order/SalesOrder/LineItem), not guessed.
 
 # How far back a refresh looks by default - a rolling window rather than a "last synced"
 # cursor, so a status change on an older still-open order, a missed cron run, or a
@@ -2054,46 +2055,45 @@ def part_substitution_delete(request, substitution_id):
 PARTS_ORDER_REFRESH_LOOKBACK_DAYS = 90
 
 
-def _digikey_search_orders(access_token, client_id, from_date, to_date):
-    """List DigiKey order summaries placed within [from_date, to_date] via SearchOrders.
+DIGIKEY_ORDER_SEARCH_PAGE_SIZE = 25  # API-enforced maximum for PageSize
 
-    Returns a list of raw order-summary dicts from the API. May raise (HTTP errors) -
-    it's the caller's job (_sync_digikey_parts_orders) to catch, matching the "fetch may
-    raise, orchestration never does" split used by _get_digikey_access_token/_refresh_variant.
 
-    ASSUMED PATH/PARAMS - see the "Explicitly flagged" section of the issue #90 plan.
+def _digikey_search_orders(access_token, client_id, from_date, to_date, page_number=1,
+                            page_size=DIGIKEY_ORDER_SEARCH_PAGE_SIZE):
+    """One page of DigiKey orders placed within [from_date, to_date], via OrderStatus v4's
+    SearchOrders operation (GET /orderstatus/v4/orders).
+
+    Returns the raw OrderResponse dict ({'TotalOrders': N, 'Orders': [...]}) - pagination
+    across the full date range is driven by the caller (_sync_digikey_parts_orders), since
+    PageSize is capped at 25 by the API. Passes Shared=true so a company's full order
+    history is returned regardless of which staff member's login the stored OAuth token
+    belongs to, not just that one user's own orders (the API's default).
+
+    Each returned Order nests a SalesOrders list, and each of those already carries its own
+    full LineItems - DigiKey's own docs for this operation confirm it "will return the same
+    information [as RetrieveSalesOrder] for every Order placed during that time period", so
+    no separate per-order detail call is needed (unlike the deprecated OrderDetails product,
+    whose /History endpoint returned summaries only).
+
+    May raise (HTTP errors) - it's the caller's job to catch, matching the "fetch may raise,
+    orchestration never does" split used by _get_digikey_access_token/_refresh_variant.
     """
     import requests as http_requests
 
     resp = http_requests.get(
-        _digikey_base_url() + '/orderstatus/v3/orders',
+        _digikey_base_url() + '/orderstatus/v4/orders',
         headers={
             'Authorization': f'Bearer {access_token}',
             'X-DIGIKEY-Client-Id': client_id,
             'Accept': 'application/json',
             **_digikey_locale_headers(),
         },
-        params={'startDate': from_date.isoformat(), 'endDate': to_date.isoformat()},
-        timeout=20,
-    )
-    resp.raise_for_status()
-    return resp.json().get('Orders', [])
-
-
-def _digikey_retrieve_order(access_token, client_id, salesorder_id):
-    """Fetch full line-item detail for one DigiKey order via RetrieveSalesOrder.
-
-    ASSUMED PATH - see the "Explicitly flagged" section of the issue #90 plan.
-    """
-    import requests as http_requests
-
-    resp = http_requests.get(
-        _digikey_base_url() + f'/orderstatus/v3/orders/{urlquote(str(salesorder_id), safe="")}',
-        headers={
-            'Authorization': f'Bearer {access_token}',
-            'X-DIGIKEY-Client-Id': client_id,
-            'Accept': 'application/json',
-            **_digikey_locale_headers(),
+        params={
+            'Shared': 'true',
+            'StartDate': from_date.isoformat(),
+            'EndDate': to_date.isoformat(),
+            'PageNumber': page_number,
+            'PageSize': page_size,
         },
         timeout=20,
     )
@@ -2103,7 +2103,9 @@ def _digikey_retrieve_order(access_token, client_id, salesorder_id):
 
 def _parse_digikey_dt(raw):
     """Parse a DigiKey timestamp/date string into a datetime, or None if missing/
-    unparseable. Format is assumed ISO 8601 - unconfirmed, see plan."""
+    unparseable. Confirmed ISO 8601 format per the OrderStatus.json spec's examples (e.g.
+    "2019-05-30T21:16:13.7526329Z" - datetime.fromisoformat happily truncates the
+    sub-microsecond digits, no special handling needed)."""
     if not raw:
         return None
     try:
@@ -2118,49 +2120,91 @@ def _parse_digikey_date(raw):
 
 
 def _map_digikey_line_status(raw_status):
-    """Map DigiKey's raw per-line (or per-order, if no per-line status is reported -
-    see plan) status string to PartsOrderLine.STATUS_CHOICES. Falls back to OPEN for
-    anything unrecognised, which is the safe default: an unmapped real status should
-    keep contributing to Part.incoming_stock rather than silently disappear from it.
-
-    ASSUMED VOCABULARY - see the "Explicitly flagged" section of the issue #90 plan.
+    """Map DigiKey's SalesOrder-level SalesOrderStatus enum (OrderStatus v4 swagger:
+    Unknown/Received/Processing*/Shipped/Delivered/GenericDelay/Canceled/Proforma/
+    ActionRequiredWireTransfer - see definitions.SalesOrderStatusInfo) to
+    PartsOrderLine.STATUS_CHOICES. Falls back to OPEN for anything unrecognised - the safe
+    default, since an unmapped/ambiguous status should keep contributing to
+    Part.incoming_stock rather than silently disappear from it. Deliberately does NOT map
+    "Received" to RECEIVED: per the enum's position right after "Unknown" (i.e. an early
+    processing stage, alongside Processing/GenericDelay/Proforma), it reads as "DigiKey has
+    received the order", not "the customer has received the goods" - the ambiguity isn't
+    worth risking a falsely-cleared incoming_stock over.
     """
     s = (raw_status or '').strip().lower()
-    if s in ('shipped', 'in transit', 'backorder-shipped'):
+    if s == 'shipped':
         return PartsOrderLine.SHIPPED
-    if s in ('delivered', 'received', 'complete', 'closed'):
+    if s == 'delivered':
         return PartsOrderLine.RECEIVED
-    if s in ('cancelled', 'canceled'):
+    if s == 'canceled':  # American spelling only - confirmed enum value, no "cancelled"
         return PartsOrderLine.CANCELLED
     return PartsOrderLine.OPEN
 
 
-def _parse_digikey_order_line(raw_line):
-    """ASSUMED FIELD NAMES - see the "Explicitly flagged" section of the issue #90 plan."""
+def _parse_digikey_order_line(raw_line, order_status='', currency=None):
+    """Parse one LineItem from a SalesOrder (OrderStatus v4 swagger: definitions.LineItem).
+
+    Field names confirmed from DigiKey's own OrderStatus.json spec: DigiKeyProductNumber,
+    Description, QuantityOrdered, QuantityShipped, UnitPrice. LineItem carries no status of
+    its own, so status is derived from the parent SalesOrder's status first (a
+    Delivered/Canceled order applies uniformly to every one of its lines - there's no such
+    thing as "partially cancelled" in this data), falling back to a quantity-based check
+    (QuantityShipped >= QuantityOrdered) for lines on an order that's still in some
+    processing/shipped state - this intentionally treats a partially-shipped line as still
+    OPEN (some quantity remains outstanding), matching what incoming_stock should count.
+    """
+    order_level_status = _map_digikey_line_status(order_status)
+    if order_level_status in (PartsOrderLine.CANCELLED, PartsOrderLine.RECEIVED):
+        inferred_status = order_level_status
+    else:
+        qty = raw_line.get('QuantityOrdered') or 0
+        qty_shipped = raw_line.get('QuantityShipped') or 0
+        inferred_status = PartsOrderLine.SHIPPED if qty > 0 and qty_shipped >= qty else PartsOrderLine.OPEN
     return {
         'supplier_sku': raw_line.get('DigiKeyProductNumber') or '',
-        'description': raw_line.get('ProductDescription') or '',
+        'description': raw_line.get('Description') or '',
         'quantity': raw_line.get('QuantityOrdered') or 0,
         'unit_price': raw_line.get('UnitPrice'),
-        'currency': _digikey_locale_currency(),
-        'status': _map_digikey_line_status(raw_line.get('Status') or raw_line.get('LineStatus')),
+        'currency': currency or _digikey_locale_currency(),
+        'status': inferred_status,
     }
 
 
-def _parse_digikey_order(raw_order):
-    """Convert one raw DigiKey order-detail dict (from _digikey_retrieve_order) into the
-    flat shape _upsert_parts_order() needs. Pure/no I/O, so it's unit-testable against
-    hand-built dict fixtures without a mocking library - see
+def _digikey_expected_arrival_date(raw_sales_order):
+    """SalesOrder has no single "expected arrival" field of its own - the closest
+    equivalent is the soonest still-pending Schedule.ScheduledDate across every line item
+    (definitions.Schedule). A fully-shipped/delivered order has no Schedules left, so this
+    correctly returns None for it - there's nothing left to arrive."""
+    dates = [
+        d for line in (raw_sales_order.get('LineItems') or [])
+        for sched in (line.get('Schedules') or [])
+        for d in [_parse_digikey_date(sched.get('ScheduledDate'))]
+        if d
+    ]
+    return min(dates) if dates else None
+
+
+def _parse_digikey_order(raw_sales_order):
+    """Convert one raw SalesOrder dict (nested under an Order's SalesOrders list in a
+    SearchOrders response) into the flat shape _upsert_parts_order() needs. Pure/no I/O, so
+    it's unit-testable against hand-built dict fixtures without a mocking library - see
     erp/tests/test_digikey_parts_order_sync.py.
 
-    ASSUMED FIELD NAMES - see the "Explicitly flagged" section of the issue #90 plan.
+    Field names confirmed from DigiKey's own OrderStatus.json spec (definitions.SalesOrder):
+    SalesOrderId, DateEntered, Currency, Status.SalesOrderStatus, LineItems.
     """
+    order_id = raw_sales_order.get('SalesOrderId') or ''
+    raw_status = (raw_sales_order.get('Status') or {}).get('SalesOrderStatus') or ''
+    currency = raw_sales_order.get('Currency')
     return {
-        'supplier_order_number': str(raw_order.get('SalesOrderId') or ''),
-        'order_dt': _parse_digikey_dt(raw_order.get('OrderDate')),
-        'expected_arrival_date': _parse_digikey_date(raw_order.get('ExpectedDeliveryDate')),
-        'status': raw_order.get('Status') or '',
-        'lines': [_parse_digikey_order_line(li) for li in (raw_order.get('LineItems') or [])],
+        'supplier_order_number': str(order_id),
+        'order_dt': _parse_digikey_dt(raw_sales_order.get('DateEntered')),
+        'expected_arrival_date': _digikey_expected_arrival_date(raw_sales_order),
+        'status': raw_status,
+        'lines': [
+            _parse_digikey_order_line(li, order_status=raw_status, currency=currency)
+            for li in (raw_sales_order.get('LineItems') or [])
+        ],
     }
 
 
@@ -2264,17 +2308,27 @@ def _sync_digikey_parts_orders(from_date, to_date):
     """
     try:
         client_id, access_token = _get_digikey_access_token()
-        raw_orders = _digikey_search_orders(access_token, client_id, from_date, to_date)
 
         synced = 0
-        for raw_summary in raw_orders:
-            order_id = raw_summary.get('SalesOrderId')
-            if not order_id:
-                continue
-            detail = _digikey_retrieve_order(access_token, client_id, order_id)
-            parsed = _parse_digikey_order(detail)
-            _upsert_parts_order(parsed, supplier_name='DigiKey')
-            synced += 1
+        page_number = 1
+        while True:
+            response = _digikey_search_orders(access_token, client_id, from_date, to_date,
+                                               page_number=page_number)
+            orders = response.get('Orders') or []
+            for raw_order in orders:
+                for raw_sales_order in raw_order.get('SalesOrders') or []:
+                    parsed = _parse_digikey_order(raw_sales_order)
+                    if not parsed['supplier_order_number']:
+                        continue
+                    _upsert_parts_order(parsed, supplier_name='DigiKey')
+                    synced += 1
+
+            total_orders = response.get('TotalOrders') or 0
+            # An empty page always stops the loop, regardless of what TotalOrders claims -
+            # guards against an infinite loop if the API ever misreports it.
+            if not orders or page_number * DIGIKEY_ORDER_SEARCH_PAGE_SIZE >= total_orders:
+                break
+            page_number += 1
 
         _recompute_incoming_stock()
         return {'ok': True, 'orders_synced': synced}

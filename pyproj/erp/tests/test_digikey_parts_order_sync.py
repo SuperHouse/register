@@ -6,6 +6,7 @@ import pytest
 
 from erp.models import Part, PartSource, PartSourceVariant, PartsOrder, PartsOrderLine
 from erp.views import (
+    _digikey_expected_arrival_date,
     _map_digikey_line_status,
     _match_or_create_part_for_digikey_line,
     _parse_digikey_date,
@@ -17,23 +18,29 @@ from erp.views import (
 )
 
 
-def _raw_line(sku='ABC123-CT-ND', description='Widget', qty=10, price=0.5, status='Open'):
+def _raw_line(sku='ABC123-CT-ND', description='Widget', qty=10, price=0.5, qty_shipped=0,
+              schedules=None):
+    """Fixture using real DigiKey OrderStatus v4 LineItem field names, per the published
+    OrderStatus.json swagger spec (definitions.LineItem)."""
     return {
         'DigiKeyProductNumber': sku,
-        'ProductDescription': description,
+        'Description': description,
         'QuantityOrdered': qty,
         'UnitPrice': price,
-        'Status': status,
+        'QuantityShipped': qty_shipped,
+        'Schedules': schedules if schedules is not None else [],
     }
 
 
-def _raw_order(order_id='SO123', order_date='2026-06-01T10:00:00Z', expected='2026-06-10',
-                status='Open', lines=None):
+def _raw_sales_order(order_id='SO123', currency='USD', status='Shipped', lines=None):
+    """Fixture using real DigiKey OrderStatus v4 SalesOrder field names, per the published
+    OrderStatus.json swagger spec (definitions.SalesOrder) - as nested under an Order's
+    SalesOrders list in a SearchOrders response."""
     return {
         'SalesOrderId': order_id,
-        'OrderDate': order_date,
-        'ExpectedDeliveryDate': expected,
-        'Status': status,
+        'DateEntered': '2026-06-01T10:00:00Z',
+        'Currency': currency,
+        'Status': {'SalesOrderStatus': status},
         'LineItems': lines if lines is not None else [_raw_line()],
     }
 
@@ -43,6 +50,13 @@ def _raw_order(order_id='SO123', order_date='2026-06-01T10:00:00Z', expected='20
 def test_parse_digikey_dt_parses_iso_with_z_suffix():
     result = _parse_digikey_dt('2026-06-01T10:00:00Z')
     assert result == datetime(2026, 6, 1, 10, 0, 0, tzinfo=dt_timezone.utc)
+
+
+def test_parse_digikey_dt_parses_sub_microsecond_fraction():
+    # DigiKey's own spec example uses 7 fractional digits - fromisoformat truncates to
+    # microseconds rather than erroring.
+    result = _parse_digikey_dt('2019-05-30T21:16:13.7526329Z')
+    assert result == datetime(2019, 5, 30, 21, 16, 13, 752632, tzinfo=dt_timezone.utc)
 
 
 def test_parse_digikey_dt_returns_none_for_missing():
@@ -63,12 +77,15 @@ def test_parse_digikey_date_extracts_date_part():
 @pytest.mark.parametrize('raw, expected', [
     ('Shipped', PartsOrderLine.SHIPPED),
     ('shipped', PartsOrderLine.SHIPPED),
-    ('In Transit', PartsOrderLine.SHIPPED),
     ('Delivered', PartsOrderLine.RECEIVED),
-    ('Received', PartsOrderLine.RECEIVED),
-    ('Cancelled', PartsOrderLine.CANCELLED),
     ('Canceled', PartsOrderLine.CANCELLED),
-    ('Open', PartsOrderLine.OPEN),
+    ('canceled', PartsOrderLine.CANCELLED),
+    ('Cancelled', PartsOrderLine.OPEN),  # British spelling isn't the real enum value
+    ('Received', PartsOrderLine.OPEN),  # deliberately not RECEIVED - see docstring
+    ('Processing', PartsOrderLine.OPEN),
+    ('GenericDelay', PartsOrderLine.OPEN),
+    ('Proforma', PartsOrderLine.OPEN),
+    ('ActionRequiredWireTransfer', PartsOrderLine.OPEN),
     ('', PartsOrderLine.OPEN),
     (None, PartsOrderLine.OPEN),
     ('SomeUnknownStatus', PartsOrderLine.OPEN),
@@ -77,28 +94,74 @@ def test_map_digikey_line_status(raw, expected):
     assert _map_digikey_line_status(raw) == expected
 
 
-# --- _parse_digikey_order / _parse_digikey_order_line ---
+# --- _parse_digikey_order_line ---
 
 def test_parse_digikey_order_line_maps_fields():
-    parsed = _parse_digikey_order_line(_raw_line(sku='SKU1', description='Desc', qty=5, price=1.25, status='Shipped'))
+    parsed = _parse_digikey_order_line(
+        _raw_line(sku='SKU1', description='Desc', qty=5, price=1.25, qty_shipped=5),
+        order_status='', currency='USD',
+    )
     assert parsed['supplier_sku'] == 'SKU1'
     assert parsed['description'] == 'Desc'
     assert parsed['quantity'] == 5
     assert parsed['unit_price'] == 1.25
+    assert parsed['currency'] == 'USD'
     assert parsed['status'] == PartsOrderLine.SHIPPED
 
 
+def test_parse_digikey_order_line_open_when_not_fully_shipped():
+    parsed = _parse_digikey_order_line(_raw_line(qty=10, qty_shipped=3), order_status='')
+    assert parsed['status'] == PartsOrderLine.OPEN
+
+
+def test_parse_digikey_order_line_order_status_cancelled_overrides_quantities():
+    # Fully shipped by quantity, but the order itself was cancelled - cancellation wins.
+    parsed = _parse_digikey_order_line(_raw_line(qty=10, qty_shipped=10), order_status='Canceled')
+    assert parsed['status'] == PartsOrderLine.CANCELLED
+
+
+def test_parse_digikey_order_line_order_status_delivered_overrides_partial_quantities():
+    parsed = _parse_digikey_order_line(_raw_line(qty=10, qty_shipped=3), order_status='Delivered')
+    assert parsed['status'] == PartsOrderLine.RECEIVED
+
+
+def test_parse_digikey_order_line_falls_back_to_locale_currency_when_none_given():
+    parsed = _parse_digikey_order_line(_raw_line(), order_status='')
+    assert parsed['currency']  # whatever _digikey_locale_currency() resolves to, non-blank
+
+
+# --- _digikey_expected_arrival_date ---
+
+def test_digikey_expected_arrival_date_picks_earliest_schedule_across_lines():
+    order = _raw_sales_order(lines=[
+        _raw_line(sku='A', schedules=[{'ScheduledDate': '2026-07-15T00:00:00Z'}]),
+        _raw_line(sku='B', schedules=[{'ScheduledDate': '2026-07-01T00:00:00Z'}]),
+    ])
+    assert _digikey_expected_arrival_date(order) == date(2026, 7, 1)
+
+
+def test_digikey_expected_arrival_date_none_when_no_schedules():
+    order = _raw_sales_order(lines=[_raw_line(schedules=[])])
+    assert _digikey_expected_arrival_date(order) is None
+
+
+# --- _parse_digikey_order ---
+
 def test_parse_digikey_order_maps_top_level_fields():
-    parsed = _parse_digikey_order(_raw_order(order_id='SO999', status='Open'))
+    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO999', status='Shipped'))
     assert parsed['supplier_order_number'] == 'SO999'
     assert parsed['order_dt'] == datetime(2026, 6, 1, 10, 0, 0, tzinfo=dt_timezone.utc)
-    assert parsed['expected_arrival_date'] == date(2026, 6, 10)
-    assert parsed['status'] == 'Open'
+    assert parsed['status'] == 'Shipped'
     assert len(parsed['lines']) == 1
 
 
+def test_parse_digikey_order_lines_inherit_order_currency():
+    parsed = _parse_digikey_order(_raw_sales_order(currency='AUD', lines=[_raw_line()]))
+    assert parsed['lines'][0]['currency'] == 'AUD'
+
+
 def test_parse_digikey_order_handles_missing_line_items():
-    parsed = _parse_digikey_order(_raw_order(lines=[]))
+    parsed = _parse_digikey_order(_raw_sales_order(lines=[]))
     assert parsed['lines'] == []
 
 
@@ -152,7 +215,7 @@ def test_match_or_create_part_returns_none_for_blank_sku():
 
 @pytest.mark.django_db
 def test_upsert_parts_order_creates_order_and_lines():
-    parsed = _parse_digikey_order(_raw_order(order_id='SO1', lines=[_raw_line(sku='SKU-A', qty=3)]))
+    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO1', lines=[_raw_line(sku='SKU-A', qty=3)]))
 
     parts_order = _upsert_parts_order(parsed)
 
@@ -165,10 +228,10 @@ def test_upsert_parts_order_creates_order_and_lines():
 
 @pytest.mark.django_db
 def test_upsert_parts_order_replaces_lines_on_resync_not_duplicate():
-    first = _parse_digikey_order(_raw_order(order_id='SO2', lines=[_raw_line(sku='SKU-A', qty=3)]))
+    first = _parse_digikey_order(_raw_sales_order(order_id='SO2', lines=[_raw_line(sku='SKU-A', qty=3)]))
     _upsert_parts_order(first)
 
-    second = _parse_digikey_order(_raw_order(order_id='SO2', lines=[_raw_line(sku='SKU-B', qty=7)]))
+    second = _parse_digikey_order(_raw_sales_order(order_id='SO2', lines=[_raw_line(sku='SKU-B', qty=7)]))
     parts_order = _upsert_parts_order(second)
 
     assert PartsOrder.objects.filter(supplier_name='DigiKey', supplier_order_number='SO2').count() == 1
@@ -178,7 +241,7 @@ def test_upsert_parts_order_replaces_lines_on_resync_not_duplicate():
 
 @pytest.mark.django_db
 def test_upsert_parts_order_unique_together_prevents_duplicates():
-    parsed = _parse_digikey_order(_raw_order(order_id='SO3'))
+    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO3'))
     _upsert_parts_order(parsed)
     _upsert_parts_order(parsed)
 
