@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 import pytest
 
-from erp.models import Part, PartCategory, PartSource, PartSourceVariant, parse_component_value
+from erp.models import Part, PartCategory, PartsOrder, PartsOrderLine, PartSource, PartSourceVariant, parse_component_value
 
 
 @pytest.fixture
@@ -248,16 +248,44 @@ def test_part_edit_form_saves_stock(client, staff_user):
 # --- issue #89: Incoming Stock / Committed Stock ---
 
 @pytest.mark.django_db
-def test_incoming_and_committed_stock_default_to_none():
+def test_incoming_stock_zero_and_committed_stock_none_with_no_orders():
     part = Part.objects.create(name='No incoming/committed set', value='1')
-    assert part.incoming_stock is None
+    assert part.incoming_stock == 0
     assert part.committed_stock is None
 
 
 @pytest.mark.django_db
+def test_incoming_stock_sums_not_received_lines_excludes_received_and_cancelled():
+    part = Part.objects.create(name='Tracked Part', value='1')
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=5, received=False)
+    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=3, received=True)
+    PartsOrderLine.objects.create(
+        parts_order=parts_order, part=part, quantity=2, received=False, status=PartsOrderLine.CANCELLED,
+    )
+
+    assert part.incoming_stock == 5
+
+
+@pytest.mark.django_db
+def test_incoming_stock_counts_shipped_lines_not_yet_received():
+    # A SHIPPED line is still "incoming" until someone marks it received - status alone
+    # doesn't clear it, only the received flag does.
+    part = Part.objects.create(name='In Transit Part', value='1')
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    PartsOrderLine.objects.create(
+        parts_order=parts_order, part=part, quantity=10, received=False, status=PartsOrderLine.SHIPPED,
+    )
+
+    assert part.incoming_stock == 10
+
+
+@pytest.mark.django_db
 def test_part_list_shows_incoming_column(client, staff_user):
-    Part.objects.create(name='WithIncoming', value='1', incoming_stock=7)
+    with_incoming = Part.objects.create(name='WithIncoming', value='1')
     Part.objects.create(name='NoIncoming', value='2')
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    PartsOrderLine.objects.create(parts_order=parts_order, part=with_incoming, quantity=7, received=False)
 
     client.force_login(staff_user)
     response = client.get(reverse('erp:part_list'))
@@ -272,23 +300,28 @@ def test_part_list_shows_incoming_column(client, staff_user):
         return content[start:end]
 
     assert '<td>7</td>' in row('WithIncoming')
-    assert '<td>-</td>' in row('NoIncoming')
+    assert '<td>0</td>' in row('NoIncoming')
 
 
 @pytest.mark.django_db
-def test_part_edit_shows_incoming_and_committed_fields(client, staff_user):
+def test_part_edit_shows_incoming_stock_read_only_and_committed_field(client, staff_user):
     part = Part.objects.create(name='EditFields', value='1')
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=4, received=False)
 
     client.force_login(staff_user)
     response = client.get(reverse('erp:part_edit', args=[part.pk]))
     content = response.content.decode()
 
     assert 'Incoming Stock' in content
+    assert '<p class="form-control-plaintext" title="Sum of quantities on order but not yet marked received, across all known supplier orders">4</p>' in content
     assert 'Committed Stock' in content
+    # No editable Incoming Stock input - only Committed Stock should be a number input in the form.
+    assert 'name="incoming_stock"' not in content
 
 
 @pytest.mark.django_db
-def test_part_edit_form_saves_incoming_and_committed_stock(client, staff_user):
+def test_part_edit_form_saves_committed_stock_and_ignores_incoming_stock_post_data(client, staff_user):
     part = Part.objects.create(name='EditIncomingCommitted', value='1')
 
     client.force_login(staff_user)
@@ -299,8 +332,8 @@ def test_part_edit_form_saves_incoming_and_committed_stock(client, staff_user):
     assert response.status_code == 302
 
     part.refresh_from_db()
-    assert part.incoming_stock == 25
     assert part.committed_stock == 10
+    assert part.incoming_stock == 0
 
 
 # --- issue #87: numeric sort of Part.value engineering notation ---

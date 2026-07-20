@@ -181,9 +181,6 @@ class Part(models.Model):
         default=False,
         help_text='Part is placed on the BOM but never physically stocked (e.g. test points, DNP parts)'
     )
-    incoming_stock = models.IntegerField(
-        null=True, blank=True, help_text='Manually-tracked stock on order but not yet received'
-    )
     committed_stock = models.IntegerField(
         null=True, blank=True, help_text='Manually-tracked stock already allocated to a build'
     )
@@ -218,14 +215,19 @@ class Part(models.Model):
         known = [source.stock for source in self.sources.all() if source.stock is not None]
         return sum(known) if known else None
 
-    def open_order_quantity(self):
-        """Sum of quantities across this part's still-open PartsOrderLines - the value
-        Part.incoming_stock is recomputed to on every parts-order refresh (see
-        erp.views._recompute_incoming_stock, which does this as a single grouped-aggregate
-        query rather than calling this per-Part)."""
-        total = self.parts_order_lines.filter(status=PartsOrderLine.OPEN).aggregate(
-            total=models.Sum('quantity'))['total']
-        return total or 0
+    @property
+    def incoming_stock(self):
+        """Sum of quantities across this part's PartsOrderLines that haven't been manually
+        confirmed received yet (PartsOrderLine.received=False - see that model's docstring
+        for why this is deliberately independent of the supplier-reported `status` field),
+        excluding CANCELLED lines - those will never turn into stock regardless of their
+        received flag, so counting them would permanently inflate this number with no way
+        to clear it short of someone incorrectly marking a cancelled line "received".
+        Computed live rather than stored: no longer a plain field (and no longer needs a
+        refresh step to stay correct, unlike the old stored version this replaced)."""
+        return self.parts_order_lines.filter(received=False).exclude(
+            status=PartsOrderLine.CANCELLED,
+        ).aggregate(total=models.Sum('quantity'))['total'] or 0
 
     @property
     def has_stale_source_data(self):
@@ -555,6 +557,18 @@ class PartsOrderLine(models.Model):
     PartPriceBreak) since price breaks change over time but what was actually paid needs
     to stay historically accurate - part/part_source_variant stay live FKs since matching
     against the current Part/PartSourceVariant is the whole point.
+
+    received/received_dt are deliberately separate from `status` - status is the supplier's
+    own report of shipment progress (open/shipped/delivered/cancelled), overwritten wholesale
+    on every sync; received is this deployment's own record of a line having been physically
+    checked into stock, set only by a person clicking "Receive"/"Receive All" and otherwise
+    left alone. supplier_line_number (DigiKey's LineItem.DetailId - a stable per-line ID
+    within one SalesOrder, distinct from supplier_sku, which isn't unique within an order:
+    the same SKU can appear as more than one line) is what makes that possible at all -
+    erp.views._upsert_parts_order() matches against it to update/preserve an existing line
+    across a resync instead of blindly deleting and recreating every line every time (which
+    is what it did before this field existed, and would otherwise silently wipe received on
+    every refresh).
     """
     OPEN = 'OPEN'
     SHIPPED = 'SHIPPED'
@@ -579,11 +593,20 @@ class PartsOrderLine(models.Model):
         max_length=200, blank=True,
         help_text='Raw supplier SKU as ordered, kept even if matching fails or the listing is later deleted'
     )
+    supplier_line_number = models.CharField(
+        max_length=50, blank=True,
+        help_text="Supplier's own per-line identifier within the order (DigiKey's DetailId), "
+                   'used to match this line across resyncs so received survives a refresh',
+    )
     description = models.CharField(max_length=500, blank=True)
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
     currency = models.CharField(max_length=10, default='USD')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=OPEN)
+    received = models.BooleanField(
+        default=False, help_text='Manually confirmed as physically received into stock (not from the supplier feed)'
+    )
+    received_dt = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['id']

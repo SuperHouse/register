@@ -52,8 +52,14 @@
     </div>
 
     <div class="card mb-4">
-        <div class="card-header">
+        <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Line Items</strong>
+            {% if parts_order.lines.all %}
+                <button type="button" id="receive-all-btn" class="btn btn-sm btn-outline-secondary"
+                        data-url="{% url 'erp:parts_order_receive_all' parts_order.pk %}">
+                    <i class="bi bi-box-seam"></i> Receive All
+                </button>
+            {% endif %}
         </div>
         <div class="card-body">
             {% if parts_order.lines.all %}
@@ -66,11 +72,12 @@
                             <th>Quantity</th>
                             <th>Unit Price</th>
                             <th>Status</th>
+                            <th style="width: 50px;"></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="line-items-body">
                         {% for line in parts_order.lines.all %}
-                            <tr>
+                            <tr data-line-id="{{ line.pk }}">
                                 <td>
                                     {% if line.part.image %}
                                         <img src="{{ line.part.image.url }}" alt="{{ line.part.name }}"
@@ -94,6 +101,13 @@
                                     {% endif %}
                                 </td>
                                 <td>{{ line.get_status_display }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-link p-0 received-toggle-btn"
+                                            data-url="{% url 'erp:parts_order_line_toggle_received' line.pk %}"
+                                            title="{% if line.received %}Received {{ line.received_dt|date:'j-M-Y H:i' }} - click to unmark{% else %}Mark as received{% endif %}">
+                                        <i class="bi {% if line.received %}bi-check-circle-fill text-success{% else %}bi-check-circle{% endif %}"></i>
+                                    </button>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -106,3 +120,54 @@
 
     <a href="{% url 'erp:parts_order_list' %}" class="btn btn-secondary">Back to Parts Orders</a>
 {% endblock content %}
+
+{% block extra_js %}
+    <script>
+        document.querySelectorAll('.received-toggle-btn').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const icon = btn.querySelector('i');
+                btn.disabled = true;
+                try {
+                    const resp = await fetch(btn.dataset.url, {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': getCookie('csrftoken')},
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        icon.classList.toggle('bi-check-circle', !data.received);
+                        icon.classList.toggle('bi-check-circle-fill', data.received);
+                        icon.classList.toggle('text-success', data.received);
+                        btn.title = data.received ? 'Received - click to unmark' : 'Mark as received';
+                    } else {
+                        alert(data.error || 'Failed to update.');
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        document.getElementById('receive-all-btn')?.addEventListener('click', async function () {
+            const btn = this;
+            btn.disabled = true;
+            try {
+                const resp = await fetch(btn.dataset.url, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')},
+                });
+                const data = await resp.json();
+                if (data.ok) {
+                    window.location.reload();
+                } else {
+                    alert(data.error || 'Failed to receive all.');
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                alert('Network error.');
+                btn.disabled = false;
+            }
+        });
+    </script>
+{% endblock extra_js %}

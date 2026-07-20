@@ -15,7 +15,9 @@ from pathlib import Path
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, ProtectedError, Q, Sum
+from django.db import transaction
+from django.db.models import Count, F, Prefetch, ProtectedError, Q, Sum
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -2161,13 +2163,13 @@ def _map_digikey_line_status(raw_status):
     """Map DigiKey's SalesOrder-level SalesOrderStatus enum (OrderStatus v4 swagger:
     Unknown/Received/Processing*/Shipped/Delivered/GenericDelay/Canceled/Proforma/
     ActionRequiredWireTransfer - see definitions.SalesOrderStatusInfo) to
-    PartsOrderLine.STATUS_CHOICES. Falls back to OPEN for anything unrecognised - the safe
-    default, since an unmapped/ambiguous status should keep contributing to
-    Part.incoming_stock rather than silently disappear from it. Deliberately does NOT map
-    "Received" to RECEIVED: per the enum's position right after "Unknown" (i.e. an early
-    processing stage, alongside Processing/GenericDelay/Proforma), it reads as "DigiKey has
-    received the order", not "the customer has received the goods" - the ambiguity isn't
-    worth risking a falsely-cleared incoming_stock over.
+    PartsOrderLine.STATUS_CHOICES. Falls back to OPEN for anything unrecognised, the safe
+    default for an unmapped/ambiguous status (`status` is supplier-reported/display-only -
+    see Part.incoming_stock and PartsOrderLine.received for what actually drives incoming
+    stock accounting now). Deliberately does NOT map "Received" to RECEIVED: per the enum's
+    position right after "Unknown" (i.e. an early processing stage, alongside Processing/
+    GenericDelay/Proforma), it reads as "DigiKey has received the order", not "the customer
+    has received the goods".
     """
     s = (raw_status or '').strip().lower()
     if s == 'shipped':
@@ -2183,13 +2185,16 @@ def _parse_digikey_order_line(raw_line, order_status='', currency=None):
     """Parse one LineItem from a SalesOrder (OrderStatus v4 swagger: definitions.LineItem).
 
     Field names confirmed from DigiKey's own OrderStatus.json spec: DigiKeyProductNumber,
-    Description, QuantityOrdered, QuantityShipped, UnitPrice. LineItem carries no status of
-    its own, so status is derived from the parent SalesOrder's status first (a
+    Description, QuantityOrdered, QuantityShipped, UnitPrice, DetailId. LineItem carries no
+    status of its own, so status is derived from the parent SalesOrder's status first (a
     Delivered/Canceled order applies uniformly to every one of its lines - there's no such
     thing as "partially cancelled" in this data), falling back to a quantity-based check
     (QuantityShipped >= QuantityOrdered) for lines on an order that's still in some
     processing/shipped state - this intentionally treats a partially-shipped line as still
-    OPEN (some quantity remains outstanding), matching what incoming_stock should count.
+    OPEN (some quantity remains outstanding). This status is purely the supplier's own
+    report, shown as-is in the Status column; it doesn't drive incoming-stock accounting
+    (see PartsOrderLine.received/Part.incoming_stock) except that a CANCELLED line is always
+    excluded there regardless of received.
     """
     order_level_status = _map_digikey_line_status(order_status)
     if order_level_status in (PartsOrderLine.CANCELLED, PartsOrderLine.RECEIVED):
@@ -2200,6 +2205,7 @@ def _parse_digikey_order_line(raw_line, order_status='', currency=None):
         inferred_status = PartsOrderLine.SHIPPED if qty > 0 and qty_shipped >= qty else PartsOrderLine.OPEN
     return {
         'supplier_sku': raw_line.get('DigiKeyProductNumber') or '',
+        'supplier_line_number': str(raw_line.get('DetailId') or ''),
         'description': raw_line.get('Description') or '',
         'quantity': raw_line.get('QuantityOrdered') or 0,
         'unit_price': raw_line.get('UnitPrice'),
@@ -2293,9 +2299,18 @@ def _match_or_create_part_for_digikey_line(supplier_sku, description):
 
 def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
     """Create/update one PartsOrder and its PartsOrderLines from a _parse_digikey_order()
-    result. Replaces all lines on every call (delete then recreate, same convention as
-    _save_price_breaks) rather than diffing, since a DigiKey order-detail call always
-    returns a complete line list - correct because there's nothing partial to merge.
+    result.
+
+    Lines are matched by supplier_line_number (DigiKey's DetailId) and updated in place
+    rather than deleted and recreated wholesale, unlike every other field on PartsOrder/
+    PartsOrderLine, which are simple "last known truth, refresh-overwritten" data (same
+    convention as PartSource.stock) - received/received_dt are this deployment's own record
+    of a line being physically checked into stock, not supplier-reported data, so a resync
+    must never overwrite them. A line missing a supplier_line_number (shouldn't happen with
+    real DigiKey data, but defensively) is always created fresh, since matching several
+    such lines against each other would incorrectly merge them into one. Any existing line
+    not present in this sync (cancelled/removed order-side) is deleted, same end effect as
+    the old delete-then-recreate approach for anything that isn't received.
 
     May raise - it's the caller's (_sync_digikey_parts_orders) job to catch, matching the
     "fetch/upsert may raise, orchestration never does" convention used elsewhere in this
@@ -2313,44 +2328,35 @@ def _upsert_parts_order(parsed_order, supplier_name='DigiKey'):
         },
     )
 
-    parts_order.lines.all().delete()
+    seen_line_pks = []
     for line in parsed_order['lines']:
         part, variant = _match_or_create_part_for_digikey_line(line['supplier_sku'], line['description'])
-        PartsOrderLine.objects.create(
-            parts_order=parts_order, part=part, part_source_variant=variant,
-            supplier_sku=line['supplier_sku'], description=line['description'],
-            quantity=line['quantity'], unit_price=line['unit_price'], currency=line['currency'],
-            status=line['status'],
-        )
+        defaults = {
+            'part': part, 'part_source_variant': variant,
+            'supplier_sku': line['supplier_sku'], 'description': line['description'],
+            'quantity': line['quantity'], 'unit_price': line['unit_price'], 'currency': line['currency'],
+            'status': line['status'],
+        }
+        if line['supplier_line_number']:
+            line_obj, _created = parts_order.lines.update_or_create(
+                supplier_line_number=line['supplier_line_number'], defaults=defaults,
+            )
+        else:
+            line_obj = parts_order.lines.create(supplier_line_number='', **defaults)
+        seen_line_pks.append(line_obj.pk)
+
+    parts_order.lines.exclude(pk__in=seen_line_pks).delete()
 
     return parts_order
 
 
-def _recompute_incoming_stock():
-    """Recompute every Part's incoming_stock from currently-open PartsOrderLines, as a
-    single grouped-aggregate query rather than a per-Part loop. Called once per
-    refresh_parts_orders run (not incrementally), so a cancelled/received line, a
-    deleted PartsOrder, or a changed Part match all self-correct without per-event
-    bookkeeping. Mirrors PartSource.stock: "last known truth, silently overwritten on
-    refresh" - a manually-edited incoming_stock value is intentionally clobbered here.
-    """
-    open_totals = dict(
-        PartsOrderLine.objects.filter(status=PartsOrderLine.OPEN, part__isnull=False)
-        .values('part_id').annotate(total=Sum('quantity')).values_list('part_id', 'total')
-    )
-
-    Part.objects.exclude(pk__in=open_totals.keys()).exclude(incoming_stock__isnull=True) \
-        .update(incoming_stock=None)
-    for part_id, total in open_totals.items():
-        Part.objects.filter(pk=part_id).exclude(incoming_stock=total).update(incoming_stock=total)
-
-
 def _sync_digikey_parts_orders(from_date, to_date):
-    """Discover and upsert every DigiKey order placed in [from_date, to_date], then
-    recompute Part.incoming_stock from the result. Never raises - mirrors
-    _refresh_variant's {'ok': True/False, 'error': ...} contract. The single function
+    """Discover and upsert every DigiKey order placed in [from_date, to_date]. Never raises -
+    mirrors _refresh_variant's {'ok': True/False, 'error': ...} contract. The single function
     called by both the refresh_parts_orders management command and the optional
-    parts_order_refresh "Refresh now" view.
+    parts_order_refresh "Refresh now" view. Part.incoming_stock is a computed property read
+    live from PartsOrderLine (see erp.models.Part.incoming_stock), so unlike before, there's
+    nothing to recompute here once the lines themselves are synced.
     """
     try:
         client_id, access_token = _get_digikey_access_token()
@@ -2376,7 +2382,6 @@ def _sync_digikey_parts_orders(from_date, to_date):
                 break
             page_number += 1
 
-        _recompute_incoming_stock()
         return {'ok': True, 'orders_synced': synced}
 
     except RuntimeError as e:
@@ -2423,6 +2428,79 @@ def parts_order_refresh(request):
     from_date = to_date - timedelta(days=PARTS_ORDER_REFRESH_LOOKBACK_DAYS)
     result = _sync_digikey_parts_orders(from_date, to_date)
     return JsonResponse(result)
+
+
+def _apply_part_stock_deltas(deltas):
+    """Apply {part_id: delta} to Part.stock, one UPDATE per part. A null stock is treated as
+    0 for the purposes of the delta (via Coalesce) rather than left null, so a part with no
+    manually-tracked count yet still ends up with a sensible value instead of staying
+    unknown. Deltas are applied as given, including negative ones - un-receiving a line
+    intentionally allows stock to go negative rather than clamping at 0, since that's a
+    signal worth surfacing (stock was already consumed - e.g. built into a batch - between
+    it being received and un-received) rather than silently hiding.
+    """
+    for part_id, delta in deltas.items():
+        if delta:
+            Part.objects.filter(pk=part_id).update(stock=Coalesce(F('stock'), 0) + delta)
+
+
+@staff_member_required
+def parts_order_line_toggle_received(request, line_id):
+    """POST-only AJAX endpoint: toggles one PartsOrderLine's received flag (the "Receive"
+    icon on the parts order detail page). Deliberately a toggle rather than a one-way
+    action, so a line marked received by mistake can be un-marked the same way - matches
+    the click-to-toggle convention already used by the Batch production stage status
+    buttons. Survives the next DigiKey resync because _upsert_parts_order() matches
+    existing lines by supplier_line_number rather than deleting and recreating them.
+
+    Marking a line received adds its quantity to the matched Part's stock; un-marking it
+    subtracts the same quantity back out (see _apply_part_stock_deltas) - a line with no
+    matched Part has nothing to adjust.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    with transaction.atomic():
+        line = get_object_or_404(PartsOrderLine, pk=line_id)
+        line.received = not line.received
+        line.received_dt = timezone.now() if line.received else None
+        line.save(update_fields=['received', 'received_dt'])
+
+        if line.part_id:
+            delta = line.quantity if line.received else -line.quantity
+            _apply_part_stock_deltas({line.part_id: delta})
+
+    return JsonResponse({'ok': True, 'received': line.received})
+
+
+@staff_member_required
+def parts_order_receive_all(request, parts_order_id):
+    """POST-only AJAX endpoint: marks every not-yet-received line on this order as received
+    (the "Receive All" button above the Line Items table). Only touches lines where
+    received is currently False, so an already-received line keeps its original
+    received_dt rather than being bumped to now, and its Part.stock isn't double-counted.
+
+    Adds each newly-received line's quantity to its matched Part's stock (see
+    _apply_part_stock_deltas), aggregated per part first so an order with more than one
+    line for the same part (a SKU can legitimately appear as more than one line - see
+    PartsOrderLine.supplier_line_number) only issues one UPDATE per part.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    with transaction.atomic():
+        parts_order = get_object_or_404(PartsOrder, pk=parts_order_id)
+        lines_to_receive = list(parts_order.lines.filter(received=False))
+
+        deltas = {}
+        for line in lines_to_receive:
+            if line.part_id:
+                deltas[line.part_id] = deltas.get(line.part_id, 0) + line.quantity
+
+        count = parts_order.lines.filter(received=False).update(received=True, received_dt=timezone.now())
+        _apply_part_stock_deltas(deltas)
+
+    return JsonResponse({'ok': True, 'count': count})
 
 
 # --- Part Category views ---

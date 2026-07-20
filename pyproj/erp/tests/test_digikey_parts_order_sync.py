@@ -3,6 +3,7 @@
 from datetime import date, datetime, timezone as dt_timezone
 
 import pytest
+from django.utils import timezone
 
 from erp.models import Part, PartSource, PartSourceVariant, PartsOrder, PartsOrderLine
 from erp.views import (
@@ -13,16 +14,15 @@ from erp.views import (
     _parse_digikey_dt,
     _parse_digikey_order,
     _parse_digikey_order_line,
-    _recompute_incoming_stock,
     _upsert_parts_order,
 )
 
 
 def _raw_line(sku='ABC123-CT-ND', description='Widget', qty=10, price=0.5, qty_shipped=0,
-              schedules=None):
+              schedules=None, detail_id=None):
     """Fixture using real DigiKey OrderStatus v4 LineItem field names, per the published
     OrderStatus.json swagger spec (definitions.LineItem)."""
-    return {
+    line = {
         'DigiKeyProductNumber': sku,
         'Description': description,
         'QuantityOrdered': qty,
@@ -30,6 +30,9 @@ def _raw_line(sku='ABC123-CT-ND', description='Widget', qty=10, price=0.5, qty_s
         'QuantityShipped': qty_shipped,
         'Schedules': schedules if schedules is not None else [],
     }
+    if detail_id is not None:
+        line['DetailId'] = detail_id
+    return line
 
 
 def _raw_sales_order(order_id='SO123', order_number=9910000373735576, currency='USD',
@@ -102,15 +105,21 @@ def test_map_digikey_line_status(raw, expected):
 
 def test_parse_digikey_order_line_maps_fields():
     parsed = _parse_digikey_order_line(
-        _raw_line(sku='SKU1', description='Desc', qty=5, price=1.25, qty_shipped=5),
+        _raw_line(sku='SKU1', description='Desc', qty=5, price=1.25, qty_shipped=5, detail_id=3),
         order_status='', currency='USD',
     )
     assert parsed['supplier_sku'] == 'SKU1'
+    assert parsed['supplier_line_number'] == '3'
     assert parsed['description'] == 'Desc'
     assert parsed['quantity'] == 5
     assert parsed['unit_price'] == 1.25
     assert parsed['currency'] == 'USD'
     assert parsed['status'] == PartsOrderLine.SHIPPED
+
+
+def test_parse_digikey_order_line_blank_supplier_line_number_when_missing():
+    parsed = _parse_digikey_order_line(_raw_line(detail_id=None), order_status='')
+    assert parsed['supplier_line_number'] == ''
 
 
 def test_parse_digikey_order_line_open_when_not_fully_shipped():
@@ -258,38 +267,54 @@ def test_upsert_parts_order_unique_together_prevents_duplicates():
     assert PartsOrder.objects.filter(supplier_name='DigiKey', supplier_order_number='SO3').count() == 1
 
 
-# --- _recompute_incoming_stock ---
+@pytest.mark.django_db
+def test_upsert_parts_order_preserves_received_across_resync_via_supplier_line_number():
+    parsed = _parse_digikey_order(
+        _raw_sales_order(order_id='SO4', lines=[_raw_line(sku='SKU-A', qty=3, detail_id=1)]),
+    )
+    parts_order = _upsert_parts_order(parsed)
+    line = parts_order.lines.get()
+    line.received = True
+    line.received_dt = timezone.now()
+    line.save(update_fields=['received', 'received_dt'])
+
+    # Resync: same DetailId, but quantity/status changed - should update in place, not
+    # replace the row, so the manually-set received flag survives.
+    resynced = _parse_digikey_order(
+        _raw_sales_order(order_id='SO4', lines=[_raw_line(sku='SKU-A', qty=5, detail_id=1)]),
+    )
+    parts_order = _upsert_parts_order(resynced)
+
+    line.refresh_from_db()
+    assert parts_order.lines.count() == 1
+    assert line.received is True
+    assert line.received_dt is not None
+    assert line.quantity == 5
+
 
 @pytest.mark.django_db
-def test_recompute_incoming_stock_sums_open_lines_excludes_received_and_cancelled():
-    part = Part.objects.create(name='Tracked Part')
-    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO10')
-    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=5, status=PartsOrderLine.OPEN)
-    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=3, status=PartsOrderLine.RECEIVED)
-    PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=2, status=PartsOrderLine.CANCELLED)
+def test_upsert_parts_order_deletes_line_no_longer_present_in_resync():
+    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO5', lines=[
+        _raw_line(sku='SKU-A', detail_id=1), _raw_line(sku='SKU-B', detail_id=2),
+    ]))
+    parts_order = _upsert_parts_order(parsed)
+    assert parts_order.lines.count() == 2
 
-    _recompute_incoming_stock()
+    resynced = _parse_digikey_order(_raw_sales_order(order_id='SO5', lines=[_raw_line(sku='SKU-A', detail_id=1)]))
+    parts_order = _upsert_parts_order(resynced)
 
-    part.refresh_from_db()
-    assert part.incoming_stock == 5
-
-
-@pytest.mark.django_db
-def test_recompute_incoming_stock_clears_stale_manual_value_when_no_open_lines():
-    part = Part.objects.create(name='Manually Set Part', incoming_stock=99)
-
-    _recompute_incoming_stock()
-
-    part.refresh_from_db()
-    assert part.incoming_stock is None
+    assert parts_order.lines.count() == 1
+    assert parts_order.lines.first().supplier_sku == 'SKU-A'
 
 
 @pytest.mark.django_db
-def test_recompute_incoming_stock_leaves_untouched_part_alone():
-    part = Part.objects.create(name='Untouched Part')
-    assert part.incoming_stock is None
+def test_upsert_parts_order_blank_supplier_line_number_always_creates_fresh_row():
+    # Defensive fallback path - shouldn't happen with real DigiKey data (DetailId is always
+    # present), but a blank supplier_line_number must never merge two different lines.
+    parsed = _parse_digikey_order(_raw_sales_order(order_id='SO6', lines=[
+        _raw_line(sku='SKU-A', detail_id=None), _raw_line(sku='SKU-B', detail_id=None),
+    ]))
+    parts_order = _upsert_parts_order(parsed)
 
-    _recompute_incoming_stock()
-
-    part.refresh_from_db()
-    assert part.incoming_stock is None
+    assert parts_order.lines.count() == 2
+    assert set(parts_order.lines.values_list('supplier_sku', flat=True)) == {'SKU-A', 'SKU-B'}

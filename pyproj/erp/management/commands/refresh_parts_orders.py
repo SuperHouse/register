@@ -11,11 +11,13 @@ from erp.views import PARTS_ORDER_REFRESH_LOOKBACK_DAYS, _sync_digikey_parts_ord
 class Command(BaseCommand):
     help = (
         "Refresh PartsOrder/PartsOrderLine data from supplier order-status APIs "
-        "(DigiKey only for now) and recompute Part.incoming_stock from the result. "
+        "(DigiKey only for now). Part.incoming_stock is read live from PartsOrderLine, "
+        "so there's nothing further to recompute once lines are synced. "
         "Intended to run on a cron schedule (e.g. every few hours); see SETUP.md. "
         "Deliberately simpler than refresh_part_sources: this is one supplier making "
-        "one date-range list call plus one detail call per order, bounded by order "
-        "volume rather than catalog size, so no per-supplier batching/rate-limit dict "
+        "one (paginated) date-range list call - SearchOrders returns full line-item "
+        "detail per order already, so no separate per-order detail call multiplies "
+        "request count with order volume, and no per-supplier batching/rate-limit dict "
         "is needed. Uses a rolling lookback window rather than a 'last synced' cursor, "
         "so a status change on an already-synced order, a missed cron run, or a "
         "locally-deleted PartsOrder all self-heal on the next run."

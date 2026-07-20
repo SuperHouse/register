@@ -32,6 +32,8 @@ urlpatterns = [
     path('parts-orders/', views.parts_order_list, name='parts_order_list'),
     path('parts-orders/<int:parts_order_id>/', views.parts_order_detail, name='parts_order_detail'),
     path('parts-orders/refresh/', views.parts_order_refresh, name='parts_order_refresh'),
+    path('parts-orders/<int:parts_order_id>/receive-all/', views.parts_order_receive_all, name='parts_order_receive_all'),
+    path('parts-orders/line/<int:line_id>/toggle-received/', views.parts_order_line_toggle_received, name='parts_order_line_toggle_received'),
 
     path('settings/', views.settings_index, name='settings_index'),
     path('settings/assembly-costs/', views.assembly_cost_settings_edit, name='assembly_cost_settings_edit'),
