@@ -24,6 +24,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
+from lcsc_toolkit.errors import LcscApiError
+
 from .forms import (
     AssemblyCostSettingsForm,
     BatchApplyTemplateForm,
@@ -1032,93 +1034,14 @@ def part_source_add(request, part_id):
     return redirect('erp:part_edit', part_id=part.pk)
 
 
-_LCSC_HEADERS = {
-    'accept': 'application/json, text/plain, */*',
-    'accept-language': 'en',
-    'content-type': 'application/json;charset=UTF-8',
-    'origin': 'https://www.lcsc.com',
-    'referer': 'https://www.lcsc.com/',
-    'user-agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    ),
-}
-
-
-def _lcsc_search(sku):
-    """Look up a part by SKU on LCSC's unofficial JSON API.
-
-    Replicates the relevant slice of the `lcsc` PyPI client's behaviour directly via
-    `requests`, since that package requires Python >=3.13. Returns a dict with
-    product_code/product_model/product_arrange/stock_number/product_intro_en/
-    product_images, or None if no matching product was found.
-    """
-    import re
-
-    import requests as http_requests
-
-    body = {
-        'keyword': sku,
-        'secondKeyword': '',
-        'brandIdList': [],
-        'catalogIdList': [],
-        'isStock': False,
-        'isAsianBrand': False,
-        'isDeals': False,
-        'isEnvironment': False,
-    }
-    resp = http_requests.post(
-        'https://wmsc.lcsc.com/ftps/wm/search/v3/global',
-        json=body, headers=_LCSC_HEADERS, timeout=15,
-    )
-    resp.raise_for_status()
-    envelope = resp.json()
-    if envelope.get('code') != 200:
-        raise RuntimeError(envelope.get('msg') or f'LCSC API error {envelope.get("code")}')
-    result = envelope.get('result') or {}
-    scene = result.get('scene')
-
-    product = None
-    if scene == 'FULL_MATCH' and result.get('exactMatchResult'):
-        product = result['exactMatchResult'][0]
-    elif scene == 'REDIRECT_PRODUCT_DETAIL' and result.get('tipProductDetailUrlVO'):
-        tip = result['tipProductDetailUrlVO']
-        detail_resp = http_requests.get(
-            f'https://www.lcsc.com/product-detail/{tip["productCode"]}.html',
-            headers={**_LCSC_HEADERS, 'accept': 'text/html'}, timeout=15,
-        )
-        detail_resp.raise_for_status()
-        match = re.search(
-            r'<script[^>]*id="__NEXT_DATA__"[^>]*>(.*?)</script>', detail_resp.text, re.DOTALL,
-        )
-        page_props = json.loads(match.group(1)).get('props', {}).get('pageProps', {}) if match else {}
-        if page_props.get('webData') and not page_props.get('dataIsNull'):
-            product = page_props['webData']
-        else:
-            product = tip
-
-    if product is None:
-        return None
-
-    price_breaks = []
-    for item in (product.get('productPriceList') or []):
-        qty = item.get('ladder')
-        price = item.get('discountPrice')
-        if qty is not None and price is not None:
-            # LCSC's API only ever returns a "$" symbol, not an ISO code, so the
-            # currency is assumed to be USD here like every other supplier.
-            price_breaks.append({'quantity': qty, 'price': price, 'currency': 'USD'})
-
-    return {
-        'product_code': product.get('productCode', ''),
-        'product_model': product.get('productModel') or '',
-        'product_arrange': product.get('productArrange') or '',
-        'stock_number': product.get('stockNumber') or 0,
-        'product_intro_en': product.get('productIntroEn') or '',
-        'product_images': product.get('productImages') or [],
-        'price_breaks': price_breaks,
-        'moq': product.get('minBuyNumber'),
-    }
+def _lcsc_price_break_dicts(price_breaks):
+    """Convert lcsc_toolkit's list of PriceBreak objects to the plain dict
+    shape _save_price_breaks() expects - the same shape every other
+    supplier's own _xxx_price_breaks() helper already returns."""
+    return [
+        {'quantity': pb.quantity, 'price': pb.price, 'currency': pb.currency}
+        for pb in price_breaks
+    ]
 
 
 def _save_price_breaks(variant, price_breaks):
@@ -1388,50 +1311,52 @@ def part_source_fetch_lcsc(request):
 
     try:
         import os
+
         import requests as http_requests
         from django.core.files.base import ContentFile
+        from lcsc_toolkit.search import SearchClient
 
-        p = _lcsc_search(sku)
+        p = SearchClient().search(sku)
         if p is None:
             return JsonResponse({'ok': False, 'error': f'No product found for "{sku}"'})
 
         image_url = None
-        if part and not part.image and p['product_images']:
-            remote_url = p['product_images'][0]
+        if part and not part.image and p.product_images:
+            remote_url = p.product_images[0]
             img_resp = http_requests.get(remote_url, timeout=10)
             img_resp.raise_for_status()
             ext = os.path.splitext(remote_url)[1] or '.jpg'
-            part.image.save(f'lcsc_{p["product_code"]}{ext}', ContentFile(img_resp.content), save=True)
+            part.image.save(f'lcsc_{p.product_code}{ext}', ContentFile(img_resp.content), save=True)
             image_url = part.image.url
 
-        lcsc_packaging = p['product_arrange']
+        lcsc_packaging = p.product_arrange
 
-        if part and not part.description and p['product_intro_en']:
-            part.description = p['product_intro_en']
+        if part and not part.description and p.product_intro_en:
+            part.description = p.product_intro_en
             part.save(update_fields=['description'])
 
         source_saved = False
         if part and not PartSourceVariant.objects.filter(source__part=part, supplier_sku__iexact=sku).exists():
-            listing = _get_or_create_supplier_listing(part, 'LCSC', p['product_model'], p['stock_number'])
+            listing = _get_or_create_supplier_listing(part, 'LCSC', p.product_model, p.stock_number)
             variant = PartSourceVariant.objects.create(
                 source=listing,
-                supplier_sku=p['product_code'],
+                supplier_sku=p.product_code,
                 packaging=lcsc_packaging,
-                url=f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
-                moq=p['moq'],
+                url=p.detail_url,
+                moq=p.moq,
                 last_refreshed=timezone.now(),
             )
-            _save_price_breaks(variant, p['price_breaks'])
+            _save_price_breaks(variant, _lcsc_price_break_dicts(p.price_breaks))
             source_saved = True
 
         return JsonResponse({
             'ok': True,
             'supplier_name': 'LCSC',
-            'manufacturer_sku': p['product_model'],
+            'manufacturer_sku': p.product_model,
             'packaging': lcsc_packaging,
-            'url': f'https://www.lcsc.com/product-detail/{p["product_code"]}.html',
-            'stock': p['stock_number'],
-            'moq': p['moq'],
+            'url': p.detail_url,
+            'stock': p.stock_number,
+            'moq': p.moq,
             'image_url': image_url,
             'source_saved': source_saved,
         })
@@ -1827,19 +1752,21 @@ def _refresh_variant(variant):
         moq = None
 
         if supplier == 'lcsc':
-            p = _lcsc_search(sku)
+            from lcsc_toolkit.search import SearchClient
+
+            p = SearchClient().search(sku)
             if p is None:
                 return {'ok': False, 'error': f'No product found for "{sku}" on LCSC'}
-            manufacturer_sku = p['product_model']
-            packaging = p['product_arrange']
-            url = f'https://www.lcsc.com/product-detail/{p["product_code"]}.html'
-            stock = p['stock_number']
-            moq = p['moq']
-            supplier_description = p['product_intro_en']
-            if p['product_images']:
-                image_remote_url = p['product_images'][0]
-            image_filename_prefix = f'lcsc_{p["product_code"]}'
-            _save_price_breaks(variant, p['price_breaks'])
+            manufacturer_sku = p.product_model
+            packaging = p.product_arrange
+            url = p.detail_url
+            stock = p.stock_number
+            moq = p.moq
+            supplier_description = p.product_intro_en
+            if p.product_images:
+                image_remote_url = p.product_images[0]
+            image_filename_prefix = f'lcsc_{p.product_code}'
+            _save_price_breaks(variant, _lcsc_price_break_dicts(p.price_breaks))
 
         elif 'digikey' in supplier:
             client_id, access_token = _get_digikey_access_token()
@@ -1996,7 +1923,7 @@ def _refresh_variant(variant):
 
         return {'ok': True}
 
-    except RuntimeError as e:
+    except (RuntimeError, LcscApiError) as e:
         return {'ok': False, 'error': str(e)}
     except Exception as e:
         return {'ok': False, 'error': f'Refresh failed: {e}'}
