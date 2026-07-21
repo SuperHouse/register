@@ -44,7 +44,29 @@ The Parts library can look up component data from LCSC, DigiKey, and Mouser to a
 
 ## LCSC API Integration
 
-LCSC lookup uses the [`lcsc`](https://pypi.org/project/lcsc/) Python library and requires no API key or account. It works out of the box.
+LCSC integration is via [`lcsc-toolkit`](https://pypi.org/project/lcsc-toolkit/), a standalone package (not the third-party `lcsc` library) split out of this project. It covers two, separately-authenticated things:
+
+### Product search
+
+Requires no API key or account - works out of the box.
+
+### Order history
+
+Requires a captured LCSC login session, since LCSC has no API key/OAuth flow for this - only a normal, logged-in-user session. Order sync is **manual-trigger-only** (the Parts Orders "Refresh Now" button), not part of the scheduled cron sync, pending more confidence in the risk profile of automated access to a logged-in LCSC account (see `lcsc-toolkit`'s own README for details).
+
+1. On a machine with a display (your desktop - **not** the production server, which can't open a browser window), with `register`'s virtualenv active and `lcsc-toolkit[auth]` installed (`pip install lcsc-toolkit[auth] && playwright install chromium`):
+   ```bash
+   python manage.py lcsc_capture_session
+   ```
+   A real browser window opens - log in to LCSC yourself, including any CAPTCHA/2FA. The command saves the resulting session to `LCSC_SESSION_FILE` and confirms it works.
+2. Add to `pyproj/.env`:
+   ```
+   LCSC_SESSION_FILE = "/absolute/path/to/pyproj/.lcsc/session.json"
+   ```
+   (`mkdir pyproj/.lcsc` first if it doesn't exist.)
+3. If you captured the session on a different machine from the server, copy the saved file to that same path on the server.
+
+There's no automatic renewal - when the session eventually expires (how long it lasts hasn't been established yet), LCSC order syncs will fail until someone re-runs step 1 and re-copies the file.
 
 ## DigiKey API Integration
 

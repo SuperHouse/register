@@ -169,6 +169,7 @@ cython_debug/
 /media
 /static
 /pyproj/.digikey/
+/pyproj/.lcsc/
 /pyproj/localhost-key.pem
 /pyproj/localhost.pem
 

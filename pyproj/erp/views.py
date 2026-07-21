@@ -10,6 +10,7 @@ import xml.etree.ElementTree as ET
 from urllib.parse import quote as urlquote
 from collections import Counter
 from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -2003,11 +2004,14 @@ def part_substitution_delete(request, substitution_id):
 #
 # Named "PartsOrder"/"PartsOrderLine" rather than "Order"/"OrderLine" to leave that name
 # free for a possible future customer-order feature. DigiKey and Mouser both have a
-# self-service order-tracking API and are synced here; LCSC/Element14 don't (see the issue
-# #90 plan for the research behind that call). There's no manual "Add Order" UI: every
-# PartsOrder/PartsOrderLine row is created/updated by _sync_digikey_parts_orders()/
-# _sync_mouser_parts_orders(), driven by the refresh_parts_orders management command (or
-# the parts_order_refresh view).
+# self-service order-tracking API and are synced automatically (scheduled, via the
+# refresh_parts_orders management command); LCSC also now syncs, via the separate
+# lcsc-toolkit package's authenticated order-history client, but manual-trigger-only for
+# now (parts_order_refresh view only, not the scheduled command) pending more confidence in
+# the ToS/account-risk profile of automated access to a logged-in LCSC account - see the
+# LCSC section below. Element14 has no order-tracking API at all. There's no manual "Add
+# Order" UI: every PartsOrder/PartsOrderLine row is created/updated by
+# _sync_digikey_parts_orders()/_sync_mouser_parts_orders()/_sync_lcsc_parts_orders().
 #
 # Targets DigiKey's "Order Status" API product (OrderStatus v4 - basePath /orderstatus/v4),
 # NOT the older "Order Support"/OrderDetails product (basePath /OrderDetails/v3), which is
@@ -2536,6 +2540,174 @@ def _sync_mouser_parts_orders(from_date, to_date):
         return {'ok': False, 'error': f'Mouser order sync failed: {e}'}
 
 
+# --- LCSC order-history sync (manual-trigger-only for now, see the module comment above) ---
+#
+# LCSC has no documented order-history API. lcsc_toolkit.orders.OrdersClient (a separate,
+# standalone PyPI package - see Key Dependencies in CLAUDE.md) replays LCSC's own
+# personalCenter/order/list JSON calls, authenticated via a long-lived captured browser
+# session (LcscSession) rather than an OAuth token (DigiKey) or a static API key (Mouser) -
+# there's no programmatic way to refresh it; expiry requires re-running
+# `manage.py lcsc_capture_session` on a machine with a display and copying the resulting
+# file to wherever LCSC_SESSION_FILE points on this server.
+#
+# Two real differences from both existing suppliers, driven entirely by what LCSC's API
+# actually looks like:
+#
+# - No confirmed date-range filter. LCSC's list endpoint accepts createStartTime/
+#   createEndTime params, but their expected date-string format has never been tested, and
+#   guessing wrong would silently return the wrong window rather than erroring loudly - so
+#   _sync_lcsc_parts_orders doesn't use them at all. Instead it pages through
+#   OrdersClient.iter_orders() (sortType='timeDesc', LCSC's own default - confirmed newest
+#   first) and stops client-side once an order's create_time falls before the lookback
+#   cutoff - the same bounded-rolling-window effect DigiKey/Mouser get from a server-side
+#   date filter, without depending on unverified API behaviour.
+# - No manual pacing needed between requests. OrdersClient self-throttles every request
+#   internally (3s minimum interval), unlike Mouser's per-order detail calls, which the
+#   orchestrator itself has to space out with time.sleep().
+#
+# LCSC's createTime timestamps ("YYYY-MM-DD HH:MM:SS") carry no timezone indicator; UTC is
+# assumed (see _parse_lcsc_dt) - an explicit, flagged assumption, not a confirmed fact, the
+# same kind of documented gap as LCSC's price data always being treated as USD elsewhere in
+# this file (LCSC's API only ever returns a "$" symbol, never an ISO currency code).
+
+def _parse_lcsc_dt(raw):
+    """Parse LCSC's "YYYY-MM-DD HH:MM:SS" timestamp format (not ISO8601, unlike DigiKey/
+    Mouser) into a timezone-aware datetime. No timezone is ever reported by the API - UTC
+    is assumed, an explicit, flagged assumption, not a confirmed fact (see the module
+    comment above). Returns None for missing/unparseable input, same convention as
+    _parse_digikey_dt/_parse_mouser_dt."""
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, '%Y-%m-%d %H:%M:%S').replace(tzinfo=dt_timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _map_lcsc_order_status(raw_status):
+    """Map LCSC's webOrderStatus string to PartsOrderLine.STATUS_CHOICES. No documented
+    enum exists (unlike DigiKey's confirmed SalesOrderStatus) - only "Delivered" has been
+    directly observed against real data, so this is a best-effort substring match, same
+    spirit as _map_mouser_order_status, to revisit once more real values are seen."""
+    status = (raw_status or '').lower()
+    if 'cancel' in status:
+        return PartsOrderLine.CANCELLED
+    if 'deliver' in status:
+        return PartsOrderLine.RECEIVED
+    if 'ship' in status:
+        return PartsOrderLine.SHIPPED
+    return PartsOrderLine.OPEN
+
+
+def _parse_lcsc_order_line(line_item, order_status, currency):
+    """Pure: convert one lcsc_toolkit OrderLineItem into the flat line dict
+    _upsert_parts_order() expects. supplier_line_number comes from the line's own uuid - a
+    stable per-line identifier (added to lcsc_toolkit specifically for this), unlike
+    Mouser's synthetic positional index, and on par with DigiKey's LineItem.DetailId.
+    unit_price is real_price (the actual per-unit price paid), not unit_price (LCSC's
+    pre-discount list price) - matches what DigiKey/Mouser's own unit_price fields
+    represent. status is inherited uniformly from the order-level mapped status - LCSC line
+    items don't currently expose a per-line shipped quantity in this library (see
+    lcsc_toolkit.orders.types.OrderLineItem), so there's no finer-grained signal to use,
+    same simplification Mouser's line parser makes."""
+    return {
+        'supplier_sku': line_item.product_code or '',
+        'supplier_line_number': line_item.uuid or '',
+        'description': line_item.description or '',
+        'quantity': line_item.purchase_quantity,
+        'unit_price': line_item.real_price,
+        'currency': currency,
+        'status': order_status,
+    }
+
+
+def _parse_lcsc_order(summary, detail):
+    """Pure: combine an OrderSummary (from the list call) and OrderDetail (from the detail
+    call) for the same order into the flat dict shape _upsert_parts_order() expects - same
+    two-input-object precedent as _parse_mouser_order(history_item, detail). currency comes
+    from summary, not detail - OrderDetail deliberately has no currency field of its own
+    (see lcsc_toolkit.orders.types.OrderDetail's docstring), since a consumer that already
+    has the OrderSummary for this order doesn't need it duplicated."""
+    order_status = _map_lcsc_order_status(detail.web_order_status)
+    return {
+        'supplier_order_number': detail.order_code or '',
+        'supplier_order_url': detail.detail_url,
+        'order_dt': _parse_lcsc_dt(detail.create_time),
+        'expected_arrival_date': None,  # no confirmed LCSC equivalent - see lcsc-toolkit's README "Open questions"
+        'status': detail.web_order_status or '',
+        'lines': [
+            _parse_lcsc_order_line(line_item, order_status, summary.currency_type or 'USD')
+            for line_item in detail.line_items
+        ],
+    }
+
+
+def _match_or_create_part_for_lcsc_line(supplier_sku, description):
+    """Resolve an LCSC order line's SKU to a Part - exact mirror of
+    _match_or_create_part_for_digikey_line/_mouser_line. Matches against the same
+    PartSourceVariant.supplier_sku that part_source_fetch_lcsc already writes (=
+    Product.product_code), so existing LCSC-sourced parts resolve correctly."""
+    if not supplier_sku:
+        return None, None
+
+    variant = (
+        PartSourceVariant.objects
+        .filter(supplier_sku__iexact=supplier_sku, source__supplier_name__iexact='LCSC')
+        .select_related('source__part')
+        .first()
+    )
+    if variant:
+        return variant.source.part, variant
+
+    part = Part.objects.create(name=supplier_sku, description=description or '')
+    listing = PartSource.objects.create(part=part, supplier_name='LCSC', manufacturer_sku='')
+    variant = PartSourceVariant.objects.create(source=listing, supplier_sku=supplier_sku)
+    return part, variant
+
+
+def _sync_lcsc_parts_orders(from_date, to_date):
+    """Discover and upsert every LCSC order placed on or after from_date. Never raises -
+    same {'ok': True/False, 'error'/'orders_synced': ...} contract as
+    _sync_digikey_parts_orders/_sync_mouser_parts_orders. Called only by the
+    parts_order_refresh "Refresh now" view for now (see the module comment above) - not the
+    scheduled refresh_parts_orders command - but only when LCSC_SESSION_FILE is actually
+    configured and the file exists; callers are expected to gate on that before calling at
+    all, the check here is a defensive fallback for direct/test callers (same convention as
+    _sync_mouser_parts_orders' own MOUSER_ORDER_API_KEY re-check).
+
+    to_date is accepted for signature parity with the other two suppliers' sync functions
+    but unused - LCSC's list endpoint has no confirmed way to filter by date at all (see the
+    module comment above), so there's nothing to bound the upper end with; every order is
+    already returned newest-first regardless.
+    """
+    session_file = os.environ.get('LCSC_SESSION_FILE', '').strip()
+    if not session_file or not Path(session_file).exists():
+        return {'ok': False, 'error': 'LCSC_SESSION_FILE is not configured or the file does not exist.'}
+
+    try:
+        from lcsc_toolkit.orders import LcscSession, OrdersClient
+
+        session = LcscSession.load(session_file)
+        client = OrdersClient(session)
+
+        synced = 0
+        for summary in client.iter_orders(sort_type='timeDesc'):
+            order_dt = _parse_lcsc_dt(summary.create_time)
+            if order_dt is not None and order_dt.date() < from_date:
+                break
+            if not summary.order_code:
+                continue
+            detail = client.get_order_detail(summary.uuid)
+            parsed = _parse_lcsc_order(summary, detail)
+            _upsert_parts_order(parsed, supplier_name='LCSC', part_matcher=_match_or_create_part_for_lcsc_line)
+            synced += 1
+
+        return {'ok': True, 'orders_synced': synced}
+
+    except Exception as e:
+        return {'ok': False, 'error': f'LCSC order sync failed: {e}'}
+
+
 @staff_member_required
 def parts_order_list(request):
     """List all supplier orders, newest first, filterable by ?q= against
@@ -2571,8 +2743,10 @@ def parts_order_refresh(request):
     Always runs the DigiKey sync. Only attempts the Mouser sync if MOUSER_ORDER_API_KEY is
     actually configured, so a deployment that hasn't set up Mouser order tracking doesn't
     get a "not configured" error every time this button is clicked - 'mouser' is simply
-    omitted from the response in that case. Overall ok is True only if every sync that was
-    actually attempted succeeded."""
+    omitted from the response in that case. Same opt-in gating for LCSC, on
+    LCSC_SESSION_FILE - and LCSC is only ever synced from here, never from the scheduled
+    refresh_parts_orders command (see the module comment above). Overall ok is True only if
+    every sync that was actually attempted succeeded."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
@@ -2586,6 +2760,12 @@ def parts_order_refresh(request):
         mouser_result = _sync_mouser_parts_orders(from_date, to_date)
         response['mouser'] = mouser_result
         response['ok'] = response['ok'] and mouser_result.get('ok', False)
+
+    lcsc_session_file = os.environ.get('LCSC_SESSION_FILE', '').strip()
+    if lcsc_session_file and Path(lcsc_session_file).exists():
+        lcsc_result = _sync_lcsc_parts_orders(from_date, to_date)
+        response['lcsc'] = lcsc_result
+        response['ok'] = response['ok'] and lcsc_result.get('ok', False)
 
     return JsonResponse(response)
 

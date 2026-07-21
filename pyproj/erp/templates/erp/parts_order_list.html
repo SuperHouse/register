@@ -130,7 +130,7 @@
                     if (data.ok) {
                         window.location.reload();
                     } else {
-                        const failures = ['digikey', 'mouser']
+                        const failures = ['digikey', 'mouser', 'lcsc']
                             .map(supplier => data[supplier])
                             .filter(result => result && !result.ok)
                             .map(result => result.error || 'unknown error');
