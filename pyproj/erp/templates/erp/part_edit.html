@@ -133,6 +133,24 @@
                     {% endif %}
                 </div>
             </form>
+
+            {% if part %}
+                <form method="post" action="{% url 'erp:parts_cart_add_from_part' part.pk %}"
+                      class="d-flex flex-wrap align-items-end gap-2 mt-3 pt-3 border-top">
+                    {% csrf_token %}
+                    <div>
+                        <label for="{{ cart_add_form.quantity.id_for_label }}" class="form-label form-label-sm mb-1">Quantity</label>
+                        {{ cart_add_form.quantity }}
+                    </div>
+                    <div>
+                        <label for="{{ cart_add_form.notes.id_for_label }}" class="form-label form-label-sm mb-1">Notes</label>
+                        {{ cart_add_form.notes }}
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary">
+                        <i class="bi bi-cart-plus"></i> Add to Parts Cart
+                    </button>
+                </form>
+            {% endif %}
         </div>
     </div>
 

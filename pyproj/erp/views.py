@@ -44,6 +44,8 @@ from .forms import (
     PartForm,
     PartReparentForm,
     PartSourceForm,
+    PartsCartAddFromPartForm,
+    PartsCartLineAddForm,
     PartSubstitutionForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
@@ -53,8 +55,8 @@ from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
     BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak,
-    PartPriceBreakHistory, PartSource, PartSourceVariant, PartSubstitution, PartsOrder, PartsOrderLine,
-    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep, STOCK_TREND_PERIOD,
+    PartPriceBreakHistory, PartSource, PartSourceVariant, PartsCartLine, PartSubstitution, PartsOrder,
+    PartsOrderLine, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep, STOCK_TREND_PERIOD,
 )
 
 
@@ -921,6 +923,7 @@ def part_edit(request, part_id):
         'asset_form': PartAssetForm(),
         'substitution_form': PartSubstitutionForm(exclude_pk=part.pk),
         'reparent_form': PartReparentForm(exclude_pk=part.pk),
+        'cart_add_form': PartsCartAddFromPartForm(),
         'bom_refs': bom_refs,
         'stock_chart_data': _part_stock_chart_data(part),
     }
@@ -2841,6 +2844,158 @@ def parts_order_receive_all(request, parts_order_id):
         _apply_part_stock_deltas(deltas)
 
     return JsonResponse({'ok': True, 'count': count})
+
+
+# --- Parts Cart views (issue #93) ---
+#
+# An intermediate accumulator between a Batch's Parts Required list and an actual order -
+# deliberately NOT linked to PartsOrder/PartsOrderLine (those are populated exclusively by
+# supplier-sync code). "ordered" here is a purely manual, standalone flag - see
+# PartsCartLine's docstring in models.py.
+
+@staff_member_required
+def parts_cart_list(request):
+    """The Parts Cart list, split into a "queued" tab (default) and an "ordered" tab via
+    ?show=ordered - a cart line moves to the Ordered tab once someone clicks its ordered
+    icon, rather than disappearing, so in-progress orders stay visible."""
+    show = request.GET.get('show', 'queued')
+    lines_qs = PartsCartLine.objects.filter(ordered=(show == 'ordered')).select_related(
+        'part__category', 'batch__design'
+    ).prefetch_related('part__sources__variants')
+
+    if show == 'ordered':
+        lines_qs = lines_qs.order_by('-ordered_dt')
+
+    return render(request, 'erp/parts_cart_list.html', {
+        'lines': lines_qs,
+        'show': show,
+        'add_form': PartsCartLineAddForm(),
+    })
+
+
+@staff_member_required
+def parts_cart_add(request):
+    """POST-only: the Parts Cart list's inline "add a part manually" row, for arbitrary
+    R&D/general-stock adds with no batch (issue #93). Always creates a new line - no dedup
+    against existing lines for the same part, since two manual entries for the same part
+    with different notes (e.g. "R&D" vs "general stock") are legitimately distinct asks."""
+    if request.method == 'POST':
+        form = PartsCartLineAddForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Part added to cart.')
+        else:
+            messages.warning(request, 'Please correct the errors below.')
+
+    return redirect('erp:parts_cart_list')
+
+
+@staff_member_required
+def parts_cart_add_from_part(request, part_id):
+    """POST-only: the Part edit page's own compact "Add to Parts Cart" widget - lets staff
+    queue an arbitrary quantity of the part they're already looking at without navigating to
+    the Parts Cart page and re-selecting it from its dropdown. Same no-dedup policy as
+    parts_cart_add (the Parts Cart list's own manual add-row): always creates a new line,
+    since two manual entries for the same part with different notes are legitimately
+    distinct asks."""
+    if request.method != 'POST':
+        return redirect('erp:part_edit', part_id=part_id)
+
+    part = get_object_or_404(Part, pk=part_id)
+    form = PartsCartAddFromPartForm(request.POST)
+    if form.is_valid():
+        line = form.save(commit=False)
+        line.part = part
+        line.save()
+        messages.success(request, 'Part added to Parts Cart.')
+    else:
+        messages.warning(request, 'Please correct the errors below.')
+
+    return redirect('erp:part_edit', part_id=part.pk)
+
+
+@staff_member_required
+def parts_cart_add_from_batch(request, batch_id, part_id):
+    """POST-only: adds (or refreshes) a Batch Parts Required row's part+quantity as a cart
+    line tagged to that batch. Reuses _batch_parts_required()'s own `required` figure - the
+    same number already shown on screen - rather than recomputing it a second way.
+
+    If a queued (not yet ordered) line already exists for this exact (part, batch) pair,
+    its quantity is overwritten with the freshly-computed `required` value rather than
+    summed - `required` is an absolute "what's needed now" figure, not a delta, so summing
+    would double-count if the batch quantity changes and this is clicked again. An
+    already-ordered line for the same part/batch is left alone and a fresh queued line is
+    created instead, so re-opening it isn't done silently.
+    """
+    if request.method != 'POST':
+        return redirect('erp:batch_edit', batch_id=batch_id)
+
+    batch = get_object_or_404(Batch, pk=batch_id)
+    part = get_object_or_404(Part, pk=part_id)
+
+    required = next(
+        (row['required'] for row in _batch_parts_required(batch) if row['part'].pk == part.pk), None
+    )
+    if required is None:
+        messages.warning(request, f'{part.name} is not on {batch.design}\'s Bill of Materials.')
+        return redirect('erp:batch_edit', batch_id=batch.pk)
+
+    line, created = PartsCartLine.objects.get_or_create(
+        part=part, batch=batch, ordered=False, defaults={'quantity': required}
+    )
+    if not created:
+        line.quantity = required
+        line.save(update_fields=['quantity'])
+
+    messages.success(request, f'{part.name} {"added to" if created else "updated in"} Parts Cart.')
+    return redirect('erp:batch_edit', batch_id=batch.pk)
+
+
+@staff_member_required
+def parts_cart_line_update_quantity(request, line_id):
+    """POST-only AJAX endpoint backing the Parts Cart list's inline quantity field."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        quantity = int(request.POST.get('quantity', ''))
+        if quantity <= 0:
+            raise ValueError
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Quantity must be a positive whole number.'}, status=400)
+
+    line = get_object_or_404(PartsCartLine, pk=line_id)
+    line.quantity = quantity
+    line.save(update_fields=['quantity'])
+    return JsonResponse({'ok': True, 'quantity': line.quantity})
+
+
+@staff_member_required
+def parts_cart_line_toggle_ordered(request, line_id):
+    """POST-only AJAX endpoint: toggles one PartsCartLine's ordered flag - same shape as
+    parts_order_line_toggle_received, but deliberately does not touch Part.stock or
+    incoming_stock, since this flag has no connection to PartsOrder/PartsOrderLine at all
+    (see the module comment above)."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    line = get_object_or_404(PartsCartLine, pk=line_id)
+    line.ordered = not line.ordered
+    line.ordered_dt = timezone.now() if line.ordered else None
+    line.save(update_fields=['ordered', 'ordered_dt'])
+    return JsonResponse({'ok': True, 'ordered': line.ordered})
+
+
+@staff_member_required
+def parts_cart_line_delete(request, line_id):
+    if request.method != 'POST':
+        return redirect('erp:parts_cart_list')
+
+    line = get_object_or_404(PartsCartLine, pk=line_id)
+    line.delete()
+    messages.success(request, 'Removed from Parts Cart.')
+    show = request.POST.get('show', 'queued')
+    return redirect(f"{reverse('erp:parts_cart_list')}?show={show}")
 
 
 # --- Part Category views ---

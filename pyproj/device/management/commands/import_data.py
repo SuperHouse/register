@@ -15,7 +15,7 @@ from django.db import transaction
 
 def _flush_app_data():
     """Delete all app data in reverse FK dependency order."""
-    from erp.models import BatchProductionStage, Batch, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartsOrder, PartsOrderLine, PartSource, ProductionStageTemplateStep, ProductionStageTemplate, ProductionStage
+    from erp.models import BatchProductionStage, Batch, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartsCartLine, PartsOrder, PartsOrderLine, PartSource, ProductionStageTemplateStep, ProductionStageTemplate, ProductionStage
     from device.models import DeviceEvent, DeviceAsset, DeviceImage, TestImage, TestRecord, Device, DesignAsset, Design
     from crm.models import Org
     from easy_thumbnails.models import Source, Thumbnail
@@ -24,6 +24,7 @@ def _flush_app_data():
     TestModule.objects.all().delete()
     TestModuleType.objects.all().delete()
     Tester.objects.all().delete()
+    PartsCartLine.objects.all().delete()
     PartsOrderLine.objects.all().delete()
     PartsOrder.objects.all().delete()
     BatchProductionStage.objects.all().delete()

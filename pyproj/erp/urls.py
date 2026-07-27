@@ -28,12 +28,20 @@ urlpatterns = [
     path('parts/source/digikey-callback/', views.digikey_callback, name='digikey_callback'),
     path('parts/<int:part_id>/add-substitution/', views.part_substitution_add, name='part_substitution_add'),
     path('parts/substitution/<int:substitution_id>/delete/', views.part_substitution_delete, name='part_substitution_delete'),
+    path('parts/<int:part_id>/add-to-cart/', views.parts_cart_add_from_part, name='parts_cart_add_from_part'),
 
     path('parts-orders/', views.parts_order_list, name='parts_order_list'),
     path('parts-orders/<int:parts_order_id>/', views.parts_order_detail, name='parts_order_detail'),
     path('parts-orders/refresh/', views.parts_order_refresh, name='parts_order_refresh'),
     path('parts-orders/<int:parts_order_id>/receive-all/', views.parts_order_receive_all, name='parts_order_receive_all'),
     path('parts-orders/line/<int:line_id>/toggle-received/', views.parts_order_line_toggle_received, name='parts_order_line_toggle_received'),
+
+    path('parts-cart/', views.parts_cart_list, name='parts_cart_list'),
+    path('parts-cart/add/', views.parts_cart_add, name='parts_cart_add'),
+    path('parts-cart/add-from-batch/<int:batch_id>/<int:part_id>/', views.parts_cart_add_from_batch, name='parts_cart_add_from_batch'),
+    path('parts-cart/line/<int:line_id>/update-quantity/', views.parts_cart_line_update_quantity, name='parts_cart_line_update_quantity'),
+    path('parts-cart/line/<int:line_id>/toggle-ordered/', views.parts_cart_line_toggle_ordered, name='parts_cart_line_toggle_ordered'),
+    path('parts-cart/line/<int:line_id>/delete/', views.parts_cart_line_delete, name='parts_cart_line_delete'),
 
     path('settings/', views.settings_index, name='settings_index'),
     path('settings/assembly-costs/', views.assembly_cost_settings_edit, name='assembly_cost_settings_edit'),

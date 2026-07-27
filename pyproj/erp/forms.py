@@ -6,8 +6,8 @@ from django.db.models import Q
 from device.models import Design
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartSubstitution, ProductionStage,
-    ProductionStageTemplate, ProductionStageTemplateStep,
+    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartsCartLine, PartSubstitution,
+    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -320,6 +320,41 @@ class DesignBomEntryForm(forms.ModelForm):
         fields = ['reference', 'part']
         widgets = {
             'reference': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
+        }
+
+
+class PartsCartLineAddForm(forms.ModelForm):
+    part = GroupedPartChoiceField(
+        queryset=Part.objects.select_related('category').order_by('category__name', 'name'),
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}),
+    )
+
+    class Meta:
+        model = PartsCartLine
+        fields = ['part', 'quantity', 'notes']
+        widgets = {
+            'quantity': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'min': 1}),
+            'notes': forms.TextInput(
+                attrs={'class': 'form-control form-control-sm', 'placeholder': 'e.g. R&D, general stock'}
+            ),
+        }
+
+
+class PartsCartAddFromPartForm(forms.ModelForm):
+    """Same fields as PartsCartLineAddForm minus `part` - used by the Part edit page's own
+    compact "Add to Parts Cart" widget, where the part is already fixed by the page itself
+    (see erp.views.parts_cart_add_from_part)."""
+
+    class Meta:
+        model = PartsCartLine
+        fields = ['quantity', 'notes']
+        widgets = {
+            'quantity': forms.NumberInput(
+                attrs={'class': 'form-control form-control-sm', 'min': 1, 'style': 'width: 90px;'}
+            ),
+            'notes': forms.TextInput(
+                attrs={'class': 'form-control form-control-sm', 'placeholder': 'e.g. R&D, general stock'}
+            ),
         }
 
 

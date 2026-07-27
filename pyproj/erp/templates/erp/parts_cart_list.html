@@ -1,0 +1,205 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Parts Cart - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Parts Cart
+{% endblock h1 %}
+
+{% block content %}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if show == 'queued' %}active{% endif %}" href="{% url 'erp:parts_cart_list' %}">Queued</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if show == 'ordered' %}active{% endif %}" href="{% url 'erp:parts_cart_list' %}?show=ordered">Ordered</a>
+        </li>
+    </ul>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            {% if lines %}
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+                        <tr class="highlight">
+                            <th style="width: 70px;"></th>
+                            <th>Part</th>
+                            <th style="width: 110px;">Quantity</th>
+                            <th>Batch</th>
+                            <th>Sources</th>
+                            <th>Added</th>
+                            <th style="width: 40px;"></th>
+                            <th style="width: 40px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in lines %}
+                            <tr data-line-id="{{ line.pk }}">
+                                <td>
+                                    {% if line.part.image %}
+                                        <img src="{{ line.part.image.url }}" alt="{{ line.part.name }}"
+                                             style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if line.part.has_no_sources or line.part.missing_joint_data %}
+                                        <i class="bi bi-exclamation-triangle-fill text-warning me-1"
+                                           title="{% if line.part.has_no_sources and line.part.missing_joint_data %}No sources listed, and SMT/PTH joint counts not set{% elif line.part.has_no_sources %}No sources listed{% else %}SMT/PTH joint counts not set{% endif %}"></i>
+                                    {% endif %}
+                                    <a href="{% url 'erp:part_edit' line.part.pk %}">{{ line.part.name }}</a>
+                                    {% if line.notes %}
+                                        <div class="text-body-secondary small">{{ line.notes }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="input-group input-group-sm quantity-edit" style="max-width: 100px;">
+                                        <input type="number" min="1" class="form-control form-control-sm quantity-input"
+                                               value="{{ line.quantity }}" data-original-value="{{ line.quantity }}">
+                                        <button type="button" class="btn btn-outline-secondary quantity-save-btn"
+                                                data-url="{% url 'erp:parts_cart_line_update_quantity' line.pk %}"
+                                                title="Save quantity" style="display:none;">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if line.batch %}
+                                        <a href="{% url 'erp:batch_edit' line.batch.pk %}">#{{ line.batch.pk }}</a>
+                                    {% else %}
+                                        <span class="fst-italic text-body-secondary">Manual</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% for source in line.part.sources.all %}
+                                        {% with variant=source.variants.first %}
+                                            {% if variant.url %}
+                                                <a href="{{ variant.url }}" target="_blank" rel="noopener">{{ source.supplier_name }}</a>{% if not forloop.last %}, {% endif %}
+                                            {% else %}
+                                                {{ source.supplier_name }}{% if not forloop.last %}, {% endif %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% empty %}
+                                        <span class="text-body-secondary">—</span>
+                                    {% endfor %}
+                                </td>
+                                <td>{{ line.added_dt|date:"j-M-Y" }}</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-link p-0 ordered-toggle-btn"
+                                            data-url="{% url 'erp:parts_cart_line_toggle_ordered' line.pk %}"
+                                            title="{% if line.ordered %}Ordered {{ line.ordered_dt|date:'j-M-Y H:i' }} - click to unmark{% else %}Mark as ordered{% endif %}">
+                                        <i class="bi {% if line.ordered %}bi-cart-check-fill text-success{% else %}bi-cart-check{% endif %}"></i>
+                                    </button>
+                                </td>
+                                <td>
+                                    <form method="post" action="{% url 'erp:parts_cart_line_delete' line.pk %}"
+                                          onsubmit="return confirm('Remove this part from the cart?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="show" value="{{ show }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove from cart">
+                                            <i class="cil-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic mb-0">
+                    {% if show == 'ordered' %}No parts have been marked as ordered yet.{% else %}The cart is empty.{% endif %}
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <strong>Add a Part</strong>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'erp:parts_cart_add' %}">
+                {% csrf_token %}
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-md-5">
+                        <label class="form-label form-label-sm">Part</label>
+                        {{ add_form.part }}
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label form-label-sm">Quantity</label>
+                        {{ add_form.quantity }}
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label form-label-sm">Notes</label>
+                        {{ add_form.notes }}
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-cart-plus"></i> Add
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+    <script>
+        document.querySelectorAll('.quantity-input').forEach(function (input) {
+            const btn = input.closest('.quantity-edit').querySelector('.quantity-save-btn');
+            input.addEventListener('input', function () {
+                btn.style.display = (input.value !== input.dataset.originalValue) ? '' : 'none';
+            });
+        });
+
+        document.querySelectorAll('.quantity-save-btn').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const input = btn.closest('.quantity-edit').querySelector('.quantity-input');
+                btn.disabled = true;
+                try {
+                    const resp = await fetch(btn.dataset.url, {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: 'quantity=' + encodeURIComponent(input.value),
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        input.value = data.quantity;
+                        input.dataset.originalValue = data.quantity;
+                        btn.style.display = 'none';
+                    } else {
+                        alert(data.error || 'Failed to update quantity.');
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                } finally {
+                    btn.disabled = false;
+                }
+            });
+        });
+
+        document.querySelectorAll('.ordered-toggle-btn').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                btn.disabled = true;
+                try {
+                    const resp = await fetch(btn.dataset.url, {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': getCookie('csrftoken')},
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        window.location.reload();
+                    } else {
+                        alert(data.error || 'Failed to update.');
+                        btn.disabled = false;
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                    btn.disabled = false;
+                }
+            });
+        });
+    </script>
+{% endblock extra_js %}

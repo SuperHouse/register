@@ -185,6 +185,7 @@
                                         <th>Qty</th>
                                         <th>Stock</th>
                                         <th>Available</th>
+                                        <th style="width: 40px;"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -209,6 +210,14 @@
                                                            title="Stock has never been refreshed, or not refreshed in over 48 hours"></i>
                                                     {% endif %}
                                                 {% endif %}
+                                            </td>
+                                            <td onclick="event.stopPropagation()">
+                                                <form method="post" action="{% url 'erp:parts_cart_add_from_batch' batch.pk row.part.pk %}" class="d-inline">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-sm btn-link p-0" title="Add to Parts Cart">
+                                                        <i class="bi bi-cart-plus"></i>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     {% endfor %}

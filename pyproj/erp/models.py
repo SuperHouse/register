@@ -511,6 +511,35 @@ class PartAsset(models.Model):
         return icons.get(ext, 'bi-paperclip')
 
 
+class PartsCartLine(models.Model):
+    """One line in the Parts Cart: a quantity of a Part accumulated for a future order,
+    either tagged to the production batch that needs it or added manually (batch=None)
+    for R&D/general stock (issue #93). An intermediate accumulator between a Batch's
+    Parts Required list and an actual order - deliberately NOT linked to
+    PartsOrder/PartsOrderLine in any way; those models are populated exclusively by
+    supplier-sync code and stay untouched by this feature.
+    """
+    part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name='cart_lines')
+    batch = models.ForeignKey(
+        Batch, null=True, blank=True, on_delete=models.SET_NULL, related_name='cart_lines',
+        help_text='The batch this quantity is required for, if any; blank for manual R&D/stock adds',
+    )
+    quantity = models.PositiveIntegerField()
+    notes = models.TextField(null=True, blank=True, help_text='e.g. "R&D", "general stock"')
+    ordered = models.BooleanField(
+        default=False,
+        help_text='Manually marked as ordered - purely local bookkeeping, not linked to any PartsOrder',
+    )
+    ordered_dt = models.DateTimeField(null=True, blank=True)
+    added_dt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['-added_dt']
+
+    def __str__(self):
+        return f'{self.part} x{self.quantity}'
+
+
 class PartsOrder(models.Model):
     """A purchase order placed with a supplier, auto-discovered via that supplier's
     order-status API (see erp.views._sync_digikey_parts_orders - DigiKey only for now).
