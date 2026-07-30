@@ -1,19 +1,19 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import PasswordResetForm
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from authuser.forms import InvitePasswordResetForm
 from crm.forms import UserForm
 
 User = get_user_model()
 
 
 def _send_set_password_email(request, user):
-    reset_form = PasswordResetForm(data={'email': user.email})
+    reset_form = InvitePasswordResetForm(data={'email': user.email})
     if reset_form.is_valid():
         reset_form.save(
             request=request,

@@ -9,12 +9,13 @@ from django.contrib.auth.views import (
     PasswordResetView,
 )
 
-from .forms import UserSettingsForm
+from .forms import InvitePasswordResetForm, UserSettingsForm
 
 
 # /accounts/password_reset/	authuser.views.SuperHousePasswordResetView	password_reset
 class SuperHousePasswordResetView(PasswordResetView):
     from_email = 'noreply@superhouse.tv'
+    form_class = InvitePasswordResetForm
     template_name = 'registration/superhouse_password_reset_form.html'
     email_template_name = 'registration/superhouse_password_reset_email.html'
     subject_template_name = 'registration/superhouse_password_reset_subject.txt'

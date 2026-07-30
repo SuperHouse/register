@@ -1,6 +1,10 @@
+from django.contrib.auth import get_user_model
+from django.core import mail
 from django.urls import reverse
 
 from device.tests.test_clients_only_see_own_data import create_users_and_user_data
+
+User = get_user_model()
 
 
 def test_non_staff_cant_use_user_management_views(create_users_and_user_data, client):
@@ -45,3 +49,24 @@ def test_staff_can_use_user_management_views(django_user_model, create_users_and
     other_user.refresh_from_db()
     assert other_user.api_key is not None
     assert other_user.api_key != old_api_key
+
+
+def test_user_add_sends_set_password_email(django_user_model, create_users_and_user_data, client):
+    staff = django_user_model.objects.create_user(email='staff2@example.com', password='staffy', is_staff=True)
+    client.force_login(staff)
+
+    response = client.post(reverse('user_add'), data={
+        'email': 'newbie@example.com',
+        'full_name': 'New Bie',
+        'preferred_name': '',
+        'is_staff': False,
+        'is_active': True,
+        'orgs': [],
+    })
+    assert response.status_code == 302
+
+    new_user = User.objects.get(email='newbie@example.com')
+    assert not new_user.has_usable_password()
+
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == ['newbie@example.com']
