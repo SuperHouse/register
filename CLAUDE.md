@@ -21,6 +21,7 @@ register/
 │   ├── user-guide/     # Dashboard, Boards, Designs, Organisations, Parts, Batches
 │   ├── admin/          # Setup, deployment, configuration, supplier APIs, data export/import
 │   └── api/            # REST API reference
+├── scripts/            # Standalone utility scripts, own deps, own READMEs — see Scripts below
 ├── .github/
 │   └── workflows/
 │       └── docs.yml    # GitHub Actions: builds and deploys docs to GitHub Pages on push to main
@@ -446,6 +447,13 @@ Pages that need a clean, A4-friendly printout (e.g. handing a Batch's details to
 - **[device/qr.py](pyproj/device/qr.py)** — `generate_qr_data_uri(value, *, box_size=8, border=2)`: renders any string (a URL or other value) to a QR code PNG and returns it as a `data:image/png;base64,...` URI, ready to drop straight into an `<img src="...">` with no extra view, endpoint, or static file.
 - **[device/templatetags/qr_tags.py](pyproj/device/templatetags/qr_tags.py)** — `{% load qr_tags %}` then `{{ value|qr_code }}` wraps `generate_qr_data_uri()` as a template filter; returns `''` for a falsy value.
 - First use: the Batch print page (see Printable Pages above) renders a QR code of the batch's own detail-page URL in the header.
+
+## Scripts
+
+Standalone scripts in `scripts/`, run outside Django. Each has its own dependencies (not in `pyproj/requirements.txt`) and its own README; install their dependencies into a separate venv from `pyproj/venv`.
+
+- **[scripts/find_barcodes.py](scripts/find_barcodes.py)** ([README](scripts/README_find_barcodes.md)) — first stage of the board-photo pipeline. Reads photos from `IncomingImages/`, locates the board in frame (OpenCV: Otsu threshold, then largest-contour bounding box), decodes its QR code or barcode (`zxing-cpp`), and saves a cropped copy to `ProcessedImages/<serial>-<timestamp>.jpg` (original moved to `ImageBackups/`). A QR code must start with one of a configured list of URL prefixes (currently `d.superlab.au/`, `d.superhouse.tv/`); a Code 128 barcode's value is used as-is. Either way the candidate value must then be digits-only and within a configured numeric range — this rejects false reads from an unrelated code elsewhere in frame (e.g. a microcontroller's own ID label, or a component's Data Matrix code), which previously caused boards to be silently mislabeled. Barcode/QR detection runs against a copy of the crop downscaled to fit within `detection_max_dimension` (2000px on the longest side), not the full-resolution crop itself — on some boards, dense silkscreen detail (small repeated pad grids, fine print) sends `zxing-cpp`'s finder-pattern search into a pathological, effectively non-terminating slowdown at full resolution; downscaling avoids it while the file saved to `ProcessedImages/` is still built from the untouched full-resolution crop, so output image quality is unaffected. Depends on `opencv-python`, `zxing-cpp`, `numpy`; `zxing-cpp` bundles its own decoder with no system library needed (unlike the `pyzbar`/`libzbar` combination it replaced).
+- **[scripts/upload_device_images.py](scripts/upload_device_images.py)** ([README](scripts/README_upload_device_images.md)) — second stage of the pipeline. Reads the cropped images `find_barcodes.py` left in `ProcessedImages/`, extracts the device ID from the filename, and uploads each to the Register API (`REGISTER_API_URL`/`REGISTER_API_KEY`), moving uploaded images to `UploadedImages/`. Depends only on `requests`.
 
 ## Version Number
 

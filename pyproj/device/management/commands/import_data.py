@@ -13,13 +13,17 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 
-def _flush_app_data():
+def _flush_app_data(include_users=False):
     """Delete all app data in reverse FK dependency order."""
     from erp.models import BatchProductionStage, Batch, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting, BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartsCartLine, PartsOrder, PartsOrderLine, PartSource, ProductionStageTemplateStep, ProductionStageTemplate, ProductionStage
     from device.models import DeviceEvent, DeviceAsset, DeviceImage, TestImage, TestRecord, Device, DesignAsset, Design
     from crm.models import Org
     from easy_thumbnails.models import Source, Thumbnail
     from testing.models import Tester, TestModule, TestModuleType
+
+    if include_users:
+        from django.contrib.auth import get_user_model
+        get_user_model().objects.all().delete()
 
     TestModule.objects.all().delete()
     TestModuleType.objects.all().delete()
@@ -65,6 +69,12 @@ class Command(BaseCommand):
             action='store_true',
             help='Skip the confirmation prompt',
         )
+        parser.add_argument(
+            '--exclude-users',
+            action='store_true',
+            help='Do not import user accounts, even if the archive contains them — '
+                 'existing user accounts on this system are left untouched',
+        )
 
     def handle(self, *args, **options):
         input_path = options['input']
@@ -80,6 +90,8 @@ class Command(BaseCommand):
                 )
             manifest = json.loads(zf.read('manifest.json'))
 
+        include_users = manifest.get('includes_users', False) and not options['exclude_users']
+
         if not options['yes']:
             self.stdout.write(self.style.WARNING(
                 '\nWARNING: This will permanently delete ALL existing application data and\n'
@@ -88,21 +100,38 @@ class Command(BaseCommand):
             self.stdout.write(f"  Archive date: {manifest['export_dt']}")
             self.stdout.write(f"  App version:  {manifest['app_version']}")
             self.stdout.write(f"  Records:      {manifest['record_count']}\n")
+            if include_users:
+                self.stdout.write(self.style.WARNING(
+                    '  This archive includes user accounts — ALL existing user accounts on\n'
+                    '  this system (including yours) will also be deleted and replaced.\n'
+                ))
             confirm = input('Type "yes" to continue: ')
             if confirm.strip() != 'yes':
                 self.stdout.write('Aborted.')
                 return
 
         with zipfile.ZipFile(input_path, 'r') as zf:
+            data = json.loads(zf.read('data.json'))
+
+            if not include_users:
+                # Either the archive never had users, or --exclude-users was passed —
+                # either way, drop any authuser rows and the Org.users M2M that
+                # references them so loaddata doesn't try to link to a user that
+                # won't exist on this system.
+                data = [obj for obj in data if not obj['model'].startswith('authuser.')]
+                for obj in data:
+                    if obj['model'] == 'crm.org':
+                        obj['fields'].pop('users', None)
+
             # Write fixture to a temp file so loaddata can infer format from extension.
             tmp_fd, tmp_path = tempfile.mkstemp(suffix='.json')
             try:
-                with os.fdopen(tmp_fd, 'wb') as tmp:
-                    tmp.write(zf.read('data.json'))
+                with os.fdopen(tmp_fd, 'w') as tmp:
+                    json.dump(data, tmp)
 
                 with transaction.atomic():
                     self.stdout.write('Clearing existing data...')
-                    _flush_app_data()
+                    _flush_app_data(include_users=include_users)
 
                     self.stdout.write('Loading database records...')
                     management.call_command('loaddata', tmp_path, verbosity=0)
@@ -126,6 +155,7 @@ class Command(BaseCommand):
                     with zf.open(name) as src, open(dest, 'wb') as dst:
                         shutil.copyfileobj(src, dst)
 
+                users_note = ' (including user accounts)' if include_users else ''
                 self.stdout.write(self.style.SUCCESS(
-                    f'Import complete: {manifest["record_count"]} records and {len(media_files)} media files restored.'
+                    f'Import complete: {len(data)} records and {len(media_files)} media files restored{users_note}.'
                 ))

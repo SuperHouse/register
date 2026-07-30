@@ -23,31 +23,41 @@ class Command(BaseCommand):
             nargs='?',
             help='Output ZIP file path (default: register-export-YYYY-MM-DD.zip in current directory)',
         )
+        parser.add_argument(
+            '--include-users',
+            action='store_true',
+            help='Include user accounts (authuser.User, with password hashes and API keys) in the export',
+        )
 
     def handle(self, *args, **options):
         output = options['output'] or f'register-export-{datetime.date.today().isoformat()}.zip'
+        include_users = options['include_users']
+
+        dump_apps = EXPORT_APPS + ['authuser'] if include_users else EXPORT_APPS
 
         self.stdout.write('Dumping database records...')
         buf = io.StringIO()
         management.call_command(
             'dumpdata',
-            *EXPORT_APPS,
+            *dump_apps,
             format='json',
             indent=2,
             stdout=buf,
         )
         data = json.loads(buf.getvalue())
 
-        # Strip Org.users M2M — user accounts are not included in the export.
-        for obj in data:
-            if obj['model'] == 'crm.org':
-                obj['fields'].pop('users', None)
+        if not include_users:
+            # Strip Org.users M2M — user accounts are not included in the export.
+            for obj in data:
+                if obj['model'] == 'crm.org':
+                    obj['fields'].pop('users', None)
 
         manifest = {
             'export_dt': datetime.datetime.now(datetime.timezone.utc).isoformat(),
             'app_version': settings.VERSION,
             'django_version': django.__version__,
             'record_count': len(data),
+            'includes_users': include_users,
         }
 
         self.stdout.write(f'Writing {len(data)} records to {output}...')
@@ -69,6 +79,7 @@ class Command(BaseCommand):
                     zf.write(file_path, 'media/' + str(rel))
                     media_file_count += 1
 
+        users_note = ' (including user accounts)' if include_users else ''
         self.stdout.write(self.style.SUCCESS(
-            f'Exported {len(data)} records and {media_file_count} media files to {output}'
+            f'Exported {len(data)} records and {media_file_count} media files to {output}{users_note}'
         ))
