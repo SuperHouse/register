@@ -56,15 +56,13 @@
                         Dashboard
                     </a>
                 </li>
-                {% if user.is_staff %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if url_name == 'batch_list' or url_name == 'batch_edit' or url_name == 'batch_add' %}active{% endif %}"
-                           href="{% url 'erp:batch_list' %}">
-                            <i class="nav-icon cil-layers"></i>
-                            Batches
-                        </a>
-                    </li>
-                {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link {% if url_name == 'batch_list' or url_name == 'batch_edit' or url_name == 'batch_add' %}active{% endif %}"
+                       href="{% url 'erp:batch_list' %}">
+                        <i class="nav-icon cil-layers"></i>
+                        Batches
+                    </a>
+                </li>
                 <li class="nav-item">
                     <a class="nav-link {% if app_name == 'device' %}active{% endif %}"
                        href="{% url 'device:top' %}">
@@ -72,14 +70,14 @@
                         Boards
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' %}active{% endif %}"
+                       href="{% url 'design_list' %}">
+                        <i class="nav-icon cil-list"></i>
+                        Designs
+                    </a>
+                </li>
                 {% if user.is_staff %}
-                    <li class="nav-item">
-                        <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' %}active{% endif %}"
-                           href="{% url 'design_list' %}">
-                            <i class="nav-icon cil-list"></i>
-                            Designs
-                        </a>
-                    </li>
                     <li class="nav-item">
                         <a class="nav-link {% if app_name == 'erp' and url_name|slice:":5" == "part_" and url_name|slice:":6" != "part_c" and url_name != "part_import_filter_list" %}active{% endif %}"
                            href="{% url 'erp:part_list' %}">

@@ -259,7 +259,7 @@
                 </div>
             {% endif %}
 
-            {% if user.is_staff or bom_entries %}
+            {% if user.is_staff %}
                 <h5 class="mt-4" id="bom">Bill of Materials</h5>
                 <div class="card border-0 mb-3">
                     <div class="card-body py-10">
@@ -349,9 +349,6 @@
                                             <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
                                         </form>
                                     </tr>
-                                {% endif %}
-                                {% if not bom_entries and not user.is_staff %}
-                                    <tr><td colspan="12"><i>No BOM has been added for this design.</i></td></tr>
                                 {% endif %}
                             </tbody>
                             {% if bom_entries %}

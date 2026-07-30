@@ -51,6 +51,7 @@ from .forms import (
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
 )
+from crm.models import Org
 from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
@@ -3281,13 +3282,16 @@ def bom_library_setting_delete(request, library_setting_id):
     return render(request, 'erp/bom_library_setting_delete.html', ctx)
 
 
-@staff_member_required
 def batch_list(request):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
     batches = Batch.objects.select_related('design__client').prefetch_related(
         Prefetch('design__designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
         'production_stages',
     )
+
+    if not request.user.is_staff:
+        clients = Org.objects.filter(users=request.user)
+        batches = batches.filter(design__client__in=clients)
 
     groups = {'new': [], 'in_progress': [], 'complete': []}
     for batch in batches:
@@ -3305,10 +3309,14 @@ def batch_list(request):
     return render(request, 'erp/batch_list.html', ctx)
 
 
-@staff_member_required
 def batch_list_data(request):
     """JSON snapshot of every batch's production stage statuses, for polling on the Batches list page."""
     batches = Batch.objects.prefetch_related('production_stages')
+
+    if not request.user.is_staff:
+        clients = Org.objects.filter(users=request.user)
+        batches = batches.filter(design__client__in=clients)
+
     return JsonResponse({
         'batches': [
             {
@@ -3448,9 +3456,25 @@ def _batch_parts_required(batch):
     return rows
 
 
-@staff_member_required
 def batch_edit(request, batch_id):
-    batch = get_object_or_404(Batch, pk=batch_id)
+    if request.user.is_staff:
+        batch = get_object_or_404(Batch, pk=batch_id)
+    else:
+        clients = Org.objects.filter(users=request.user)
+        batch = get_object_or_404(Batch, design__client__in=clients, pk=batch_id)
+
+    if not request.user.is_staff:
+        ctx = {
+            'form': None,
+            'batch': batch,
+            'production_stages_with_forms': [
+                (batch_production_stage, None) for batch_production_stage in batch.production_stages.all()
+            ],
+            'boards': batch.devices.order_by('pk'),
+            'pcb_top': DesignAsset.objects.filter(
+                design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
+        }
+        return render(request, 'erp/batch_edit.html', ctx)
 
     if request.method == 'POST':
         form = BatchForm(request.POST, instance=batch)

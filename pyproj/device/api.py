@@ -221,11 +221,13 @@ def get_dashboard_stats(request):
     clients = Org.objects.all()
     designs = Design.objects.all()
     devices = Device.objects.all()
+    batches = Batch.objects.all()
 
     if not user.is_staff:
         clients = clients.filter(users=user)
         designs = designs.filter(client__in=clients)
         devices = devices.filter(design__client__in=clients)
+        batches = batches.filter(design__client__in=clients)
 
     # Calculate devices created per month
     devices_by_month = (
@@ -251,7 +253,7 @@ def get_dashboard_stats(request):
         'design_count': designs.count(),
         'device_count': devices.count(),
         'part_count': Part.objects.count(),
-        'batch_count': Batch.objects.count(),
+        'batch_count': batches.count(),
         'stock_count': Part.objects.aggregate(total=Sum('stock'))['total'] or 0,
         'chart_labels': chart_labels,
         'chart_data': chart_data,

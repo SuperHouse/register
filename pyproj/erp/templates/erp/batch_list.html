@@ -15,9 +15,11 @@
                 onclick="enterDisplayMode()">
             <i class="cil-fullscreen icon"></i> Display
         </button>
-        <a href="{% url 'erp:batch_add' %}" class="btn btn-primary hide-in-display-mode">
-            <i class="cil-plus"></i> Add Batch
-        </a>
+        {% if user.is_staff %}
+            <a href="{% url 'erp:batch_add' %}" class="btn btn-primary hide-in-display-mode">
+                <i class="cil-plus"></i> Add Batch
+            </a>
+        {% endif %}
     </div>
 
     <div class="card">
@@ -72,18 +74,20 @@
                                         </div>
                                     </td>
                                     <td class="text-nowrap hide-in-display-mode">
-                                        <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print" onclick="event.stopPropagation();">
-                                            <i class="cil-print"></i>
-                                        </a>
-                                        <form method="post" action="{% url 'erp:batch_duplicate' batch.pk %}" class="d-inline" onclick="event.stopPropagation();">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate">
-                                                <i class="cil-copy"></i>
-                                            </button>
-                                        </form>
-                                        <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
-                                            <i class="cil-trash"></i>
-                                        </a>
+                                        {% if user.is_staff %}
+                                            <a href="{% url 'erp:batch_print' batch.pk %}" target="_blank" class="btn btn-sm btn-outline-secondary" title="Print" onclick="event.stopPropagation();">
+                                                <i class="cil-print"></i>
+                                            </a>
+                                            <form method="post" action="{% url 'erp:batch_duplicate' batch.pk %}" class="d-inline" onclick="event.stopPropagation();">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplicate">
+                                                    <i class="cil-copy"></i>
+                                                </button>
+                                            </form>
+                                            <a href="{% url 'erp:batch_delete' batch.pk %}" class="btn btn-sm btn-outline-danger" title="Delete" onclick="event.stopPropagation();">
+                                                <i class="cil-trash"></i>
+                                            </a>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
