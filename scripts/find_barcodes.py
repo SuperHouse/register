@@ -1,15 +1,46 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import cv2
 import numpy as np
-from pyzbar import pyzbar
+import zxingcpp
 import re
 import glob
 import shutil
-import os
 
-padding = 100               # pixels padding around bounding box of PCB detected in the image
-prefix = "d.superlab.au/"   # Find QR codes that begin with this prefix and use the rest as the serial number
+padding = 100                # pixels padding around bounding box of PCB detected in the image
+prefixes = [                 # Find QR codes that begin with one of these prefixes and use the
+    "d.superlab.au/",        # rest as the serial number
+    "d.superhouse.tv/",
+]
+min_serial = 1               # Sanity bounds for a valid serial number. Leaves headroom while still
+max_serial = 9999999         #  rejecting things like an individual component's own id getting misread as a serial.
+
+
+def extract_serial(result):
+    """Return the serial number encoded in a decoded barcode/QR result, or
+    None if it doesn't look like a genuine board-label serial (e.g. it's a
+    QR code for something else entirely, such as a microcontroller's own
+    ID label, or a Data Matrix code from a component)."""
+    text = result.text
+    fmt = str(result.format)
+
+    if fmt == "QR Code":
+        # QR codes on these boards encode a URL. Anything else is a
+        # different QR code that happened to be in frame.
+        matched_prefix = next((p for p in prefixes if text.startswith(p)), None)
+        if matched_prefix is None:
+            return None
+        candidate = text[len(matched_prefix):]
+    elif fmt == "Code 128":
+        candidate = text
+    else:
+        return None
+
+    if not candidate.isdigit():
+        return None
+    if not (min_serial <= int(candidate) <= max_serial):
+        return None
+    return candidate
 
 image_files = glob.glob("IncomingImages/*.jpg")
 
@@ -21,6 +52,14 @@ else:
 for image_filename in image_files:
     print(image_filename)
     #quit()
+
+    # Reset per-image state. Without this, a value left over from a
+    # previous iteration would be silently reused for an image where
+    # nothing was actually detected.
+    original_date = None
+    image_date = None
+    serial_number = None
+
     # Extract the image timestamp from its filename
     # Pattern to find "YYYY-MM-DD hh.mm.ss"
     pattern = r'\d{4}-\d{2}-\d{2} \d{2}\.\d{2}\.\d{2}'
@@ -32,9 +71,7 @@ for image_filename in image_files:
         print("Original:", original_date)
         print("Converted:", image_date)
 
-    try:
-        image_date
-    except NameError:
+    if image_date is None:
         print("No date found in the image filename. Skipping.")
         continue
 
@@ -46,25 +83,8 @@ for image_filename in image_files:
     # Convert to grayscale
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Invert image if needed (depending on object/background contrast)
-    #gray = cv2.bitwise_not(gray)
-
-    # Threshold the image to separate object from background
-    # Basic manual threshold:
-    #_, thresh = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
-
     # Otsu's binarisation (automatic global threshold based on histogram):
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
-    # Adaptive thresholding:
-    #thresh = cv2.adaptiveThreshold(
-    #    gray, 255,
-    #    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,  # or ADAPTIVE_THRESH_MEAN_C
-    #    cv2.THRESH_BINARY_INV,
-    #    blockSize=11,  # neighborhood size
-    #    C=2            # constant subtracted from mean
-    #)
-
 
     # Find contours of the object
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -86,34 +106,29 @@ for image_filename in image_files:
         # Crop to bounding box
         cropped_image = image[y_pad:y_end, x_pad:x_end]
 
-        # --- Barcode Detection ---
-        barcodes = pyzbar.decode(cropped_image)
+        # --- Barcode / QR Code Detection ---
+        # Detect on a downscaled copy. At full resolution, dense silkscreen
+        # detail on some boards sends zxingcpp's finder-pattern search into
+        # a pathological, effectively non-terminating slowdown; downscaling
+        # avoids it, while cropped_image (saved below) stays full resolution.
+        detection_max_dimension = 2000
+        scale = min(1.0, detection_max_dimension / max(cropped_image.shape[:2]))
+        if scale < 1.0:
+            detection_image = cv2.resize(cropped_image, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+        else:
+            detection_image = cropped_image
+        results = zxingcpp.read_barcodes(detection_image)
 
-        if barcodes:
-            for barcode in barcodes:
-                barcode_data = barcode.data.decode("utf-8")
-                print("Barcode detected:", barcode_data)
-                if barcode_data.startswith(prefix):
-                    serial_number = barcode_data[len(prefix):]
-                else:
-                    serial_number = barcode_data
-
-        # --- QR Code Detection ---
-        qr_detector = cv2.QRCodeDetector()
-        qr_data, bbox, _ = qr_detector.detectAndDecode(cropped_image)
-
-        if qr_data:
-            print("QR Code detected:", qr_data)
-            if qr_data.startswith(prefix):
-                serial_number = qr_data[len(prefix):]
-                print("####### Serial is: " + serial_number)
+        for result in results:
+            print(f"{result.format} detected:", result.text)
+            candidate = extract_serial(result)
+            if candidate is None:
+                print("  -> ignored (not a valid board serial)")
             else:
-                print("QR Code detected, but prefix not matched:", qr_data)
+                serial_number = candidate
 
         # Save the cropped image if we have a serial number
-        try:
-            serial_number
-        except NameError:
+        if serial_number is None:
             print("Can't find a serial number in the image")
         else:
             print("### Serial is: " + serial_number)

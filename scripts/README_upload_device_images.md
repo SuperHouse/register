@@ -1,15 +1,16 @@
 # Device Image Upload Script
 
-This script automatically processes device images from the `IncomingImages` directory and uploads them to the Register API.
+This script uploads device images to the Register API.
 
 ## Features
 
-- Scans `IncomingImages` directory for image files
+- Scans a configured directory for image files
 - Extracts device ID from the start of the filename
-- Verifies device exists via API before uploading
+- Verifies the device exists via the API before uploading
 - Uploads images using the Register API
-- Moves processed images to `ProcessedImages` directory
-- Handles errors gracefully and provides detailed logging
+- Moves processed images to a configured output directory
+- Infers MIME type from the image filename extension
+- Logs success, skipped files, and errors
 
 ## Requirements
 
@@ -31,8 +32,8 @@ This script automatically processes device images from the `IncomingImages` dire
 
    Optional (defaults shown):
    ```bash
-   export INCOMING_DIR="./ProcessedImages"
-   export PROCESSED_DIR="./UploadedImages"
+   export PROCESSED_DIR="./ProcessedImages"
+   export UPLOADED_DIR="./UploadedImages"
    ```
 
 3. Create the directories:
@@ -77,14 +78,14 @@ The script looks for numeric digits at the beginning of the filename (before the
 
 ## Workflow
 
-1. Place image files in the `IncomingImages` directory
+1. Place image files in the configured input directory
 2. Run the script
 3. The script will:
-   - Extract device ID from filename
-   - Check if device exists via API
-   - Upload image if device exists
-   - Move file to `ProcessedImages` directory
-4. Files that fail validation or upload are moved to `ProcessedImages` to avoid reprocessing
+   - Extract device ID from the filename
+   - Check if the device exists via the API
+   - Upload the image if the device exists
+   - Move the file to the configured output directory
+4. Files that fail validation or upload are moved to the output directory or left for retry depending on the error
 
 ## Example
 
@@ -92,8 +93,8 @@ The script looks for numeric digits at the beginning of the filename (before the
 # Set your API credentials
 export REGISTER_API_KEY="abc123xyz"
 
-# Place images in IncomingImages
-cp my_device_12345.jpg IncomingImages/
+# Place images in the input directory
+cp my_device_12345.jpg ProcessedImages/
 
 # Run the script
 python scripts/upload_device_images.py

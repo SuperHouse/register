@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Standalone script to process device images from ProcessedImages directory.
+Standalone script to upload device images from a configured input directory.
 
 This script:
-1. Scans the "ProcessedImages" directory for image files
+1. Scans the input directory for image files
 2. Extracts device ID from the start of the filename
 3. Checks if the device exists via the Register API
 4. Uploads the image if the device exists
-5. Moves the processed image to "UploadedImages" directory
+5. Moves the processed image to the output directory
 
 Usage:
     python upload_device_images.py
@@ -19,6 +19,7 @@ Environment variables:
     UPLOADED_DIR: Directory to move uploaded images (default: ./UploadedImages)
 """
 
+import mimetypes
 import os
 import sys
 import shutil
@@ -126,8 +127,9 @@ def upload_device_image(api_url: str, api_key: str, device_id: int, image_path: 
     headers = {"X-API-Key": api_key}
     
     try:
+        mime_type = get_mime_type(image_path)
         with open(image_path, 'rb') as f:
-            files = {'file': (image_path.name, f, 'image/jpeg')}
+            files = {'file': (image_path.name, f, mime_type)}
             response = requests.post(url, headers=headers, files=files, timeout=30)
         
         if response.status_code == 200:
@@ -155,6 +157,12 @@ def upload_device_image(api_url: str, api_key: str, device_id: int, image_path: 
 def ensure_directory_exists(directory: Path):
     """Create directory if it doesn't exist."""
     directory.mkdir(parents=True, exist_ok=True)
+
+
+def get_mime_type(image_path: Path) -> str:
+    """Return a MIME type based on the image filename extension."""
+    mime_type, _ = mimetypes.guess_type(image_path.name)
+    return mime_type or 'application/octet-stream'
 
 
 def process_images(config: dict):
