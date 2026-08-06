@@ -408,15 +408,35 @@ def part_list(request):
     # to_attr instead of the default cache gives an ordinary list that's safe to .sort() directly.
     uncategorised = list(parts_qs.filter(category__isnull=True))
     uncategorised.sort(key=lambda part: part.value_sort_key)
-    categories_with_parts = list(
+    categories_with_own_parts = list(
         PartCategory.objects
         .filter(category_filter)
         .prefetch_related(Prefetch('parts', queryset=parts_qs, to_attr='sorted_parts'))
         .distinct()
-        .order_by('order', 'name')
     )
-    for category in categories_with_parts:
+    for category in categories_with_own_parts:
         category.sorted_parts.sort(key=lambda part: part.value_sort_key)
+    sorted_parts_by_pk = {category.pk: category.sorted_parts for category in categories_with_own_parts}
+
+    # A category with no matching parts of its own still needs to appear, purely so any
+    # descendant category that does have matches can be nested under it (issue #97) rather than
+    # showing up as if it were a top-level category itself.
+    all_categories = list(PartCategory.objects.all())
+    categories_by_pk = {category.pk: category for category in all_categories}
+    included_pks = set(sorted_parts_by_pk.keys())
+    for pk in list(included_pks):
+        parent_id = categories_by_pk[pk].parent_id
+        while parent_id is not None and parent_id not in included_pks:
+            included_pks.add(parent_id)
+            parent_id = categories_by_pk[parent_id].parent_id
+
+    categories_with_parts = []
+    for category, depth in _build_part_category_tree(all_categories):
+        if category.pk not in included_pks:
+            continue
+        category.sorted_parts = sorted_parts_by_pk.get(category.pk, [])
+        category.depth = depth
+        categories_with_parts.append(category)
 
     # A filter should reveal its matches even inside a collapsed category, without
     # actually persisting that category as expanded for the next unfiltered visit.

@@ -55,6 +55,45 @@ class GroupedPartChoiceField(forms.ModelChoiceField):
     iterator = GroupedPartChoiceIterator
 
 
+def _category_tree_order(categories):
+    """Return (category, depth) tuples in depth-first tree order, same shape as
+    erp.views._build_part_category_tree — reimplemented here rather than imported to avoid a
+    views->forms->views circular import. `categories` must already be in sibling order
+    (PartCategory.Meta.ordering) for siblings to come out in that order within each parent."""
+    by_parent = {}
+    for cat in categories:
+        by_parent.setdefault(cat.parent_id, []).append(cat)
+
+    def walk(parent_id, depth):
+        result = []
+        for cat in by_parent.get(parent_id, []):
+            result.append((cat, depth))
+            result.extend(walk(cat.pk, depth + 1))
+        return result
+
+    return walk(None, 0)
+
+
+class PartCategoryChoiceIterator(forms.models.ModelChoiceIterator):
+    """Yields PartCategory options in depth-first tree order, each indented to show its nesting
+    depth — otherwise the dropdown is a flat alphabetical list with no hint of hierarchy (#97)."""
+
+    def __iter__(self):
+        if self.field.empty_label is not None:
+            yield ('', self.field.empty_label)
+
+        for cat, depth in _category_tree_order(list(self.queryset)):
+            value, _ = self.choice(cat)
+            # Regular spaces collapse in rendered <option> text; non-breaking spaces plus the
+            # same └ glyph as part_category_list.html keep the indentation visible.
+            prefix = ('\u00a0' * 4 * (depth - 1)) + '└ ' if depth > 0 else ''
+            yield (value, prefix + cat.name)
+
+
+class PartCategoryChoiceField(forms.ModelChoiceField):
+    iterator = PartCategoryChoiceIterator
+
+
 class ProductionStageForm(forms.ModelForm):
     class Meta:
         model = ProductionStage
@@ -199,6 +238,13 @@ class PartImageWidget(forms.ClearableFileInput):
 
 
 class PartForm(forms.ModelForm):
+    category = PartCategoryChoiceField(
+        queryset=PartCategory.objects.all(),
+        required=False,
+        empty_label='(uncategorised)',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
     class Meta:
         model = Part
         fields = [
@@ -208,7 +254,6 @@ class PartForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
             'device': forms.TextInput(attrs={'class': 'form-control'}),
             'package': forms.TextInput(attrs={'class': 'form-control'}),
             'value': forms.TextInput(attrs={'class': 'form-control'}),
@@ -220,11 +265,6 @@ class PartForm(forms.ModelForm):
             'committed_stock': forms.NumberInput(attrs={'class': 'form-control'}),
             'image': PartImageWidget(attrs={'class': 'form-control'}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['category'].required = False
-        self.fields['category'].empty_label = '(uncategorised)'
 
 
 class PartSourceForm(forms.Form):
