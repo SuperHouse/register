@@ -41,6 +41,10 @@
                     <th>Quantity</th>
                     <td>{{ batch.quantity }}</td>
                 </tr>
+                <tr>
+                    <th>Due</th>
+                    <td>{{ batch.due_date|date:"j-M-Y"|default:"" }}</td>
+                </tr>
                 {% if batch.notes %}
                     <tr>
                         <th>Notes</th>

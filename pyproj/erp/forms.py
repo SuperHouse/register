@@ -147,10 +147,25 @@ class BatchForm(forms.ModelForm):
         ),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
+    # Free-text date entry (e.g. "26-Jul-2026") rather than a native <input type="date">
+    # picker, since the browser controls that widget's own display format and can't be
+    # made to show this project's "j-M-Y" convention (issue #98).
+    due_date = forms.DateField(
+        required=False,
+        input_formats=['%d-%b-%Y', '%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'],
+        widget=forms.DateInput(
+            format='%d-%b-%Y',
+            # Explicit id: BatchProductionStageUpdateForm (rendered once per production
+            # stage row on this same page, with no per-row auto_id prefix) also has a
+            # due_date field, so the default 'id_due_date' would collide with those and
+            # break a JS selector trying to target this field specifically.
+            attrs={'class': 'form-control', 'placeholder': 'e.g. 26-Jul-2026', 'id': 'batch-due-date'},
+        ),
+    )
 
     class Meta:
         model = Batch
-        fields = ['design', 'po', 'quantity', 'notes']
+        fields = ['design', 'po', 'quantity', 'due_date', 'notes']
         widgets = {
             'po': forms.TextInput(attrs={'class': 'form-control'}),
             'quantity': forms.NumberInput(attrs={'class': 'form-control'}),

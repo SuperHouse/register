@@ -8,6 +8,14 @@
     {% if batch %}Production Batch #{{ batch.pk }}{% else %}Add Batch{% endif %}
 {% endblock h1 %}
 
+{% block extra_head %}
+    {% if user.is_staff %}
+        <!-- flatpickr, for the Due date picker (kept as "d-M-Y" text so it matches this project's date display convention, unlike a native <input type="date">, whose display format the browser controls) -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    {% endif %}
+{% endblock extra_head %}
+
 {% block content %}
     {% if batch and user.is_staff %}
         <div class="d-flex justify-content-end gap-2 mb-3">
@@ -63,6 +71,12 @@
                         </div>
 
                         <div class="mb-3">
+                            <label for="{{ form.due_date.id_for_label }}" class="form-label">{{ form.due_date.label }}</label>
+                            {{ form.due_date }}
+                            {% if form.due_date.errors %}<div class="text-danger small">{{ form.due_date.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="mb-3">
                             <label for="{{ form.notes.id_for_label }}" class="form-label">{{ form.notes.label }}</label>
                             {{ form.notes }}
                             {% if form.notes.errors %}<div class="text-danger small">{{ form.notes.errors }}</div>{% endif %}
@@ -91,6 +105,10 @@
                                 <tr>
                                     <th>Quantity:</th>
                                     <td>{{ batch.quantity }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Due:</th>
+                                    <td>{{ batch.due_date|date:"j-M-Y"|default:"—" }}</td>
                                 </tr>
                                 <tr>
                                     <th>PO:</th>
@@ -356,6 +374,11 @@
 {% endblock content %}
 
 {% block extra_js %}
+    {% if user.is_staff %}
+        <script>
+            flatpickr('#batch-due-date', {dateFormat: 'd-M-Y', allowInput: true});
+        </script>
+    {% endif %}
     {% if batch and user.is_staff %}
         <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
         <script>

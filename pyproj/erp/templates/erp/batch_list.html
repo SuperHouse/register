@@ -33,6 +33,7 @@
                         <th>PO</th>
                         <th>Qty</th>
                         <th>Created</th>
+                        <th>Due</th>
                         <th>Progress</th>
                         <th class="hide-in-display-mode" style="width: 120px;"></th>
                     </tr>
@@ -40,13 +41,13 @@
                 <tbody>
                     {% if not has_batches %}
                         <tr>
-                            <td colspan="8"><i>There are no batches yet.</i></td>
+                            <td colspan="9"><i>There are no batches yet.</i></td>
                         </tr>
                     {% endif %}
                     {% for title, category, group in batch_groups %}
                         {% if group %}
                             <tr class="table-secondary">
-                                <th colspan="8">{{ title }}</th>
+                                <th colspan="9">{{ title }}</th>
                             </tr>
                             {% for batch in group %}
                                 <tr data-batch-id="{{ batch.pk }}" data-category="{{ category }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
@@ -64,6 +65,7 @@
                                     <td>{{ batch.po }}</td>
                                     <td>{{ batch.quantity }}</td>
                                     <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
+                                    <td>{{ batch.due_date|date:"j-M-Y"|default:"" }}</td>
                                     <td>
                                         <div class="d-flex gap-1 batch-progress">
                                             {% for stage in batch.production_stages.all %}

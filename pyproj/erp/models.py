@@ -69,6 +69,7 @@ class Batch(models.Model):
     quantity = models.PositiveIntegerField()
     notes = models.TextField(null=True, blank=True)
     created_dt = models.DateTimeField(default=timezone.now)
+    due_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ['-created_dt']
