@@ -18,8 +18,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Count, F, Prefetch, ProtectedError, Q, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import Count, Prefetch, ProtectedError, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -831,8 +830,13 @@ def _part_stock_chart_data(part):
     distinct timestamp across all sources and summing only the sources with a known
     reading at that point - a source with no reading yet is excluded from the sum
     rather than counted as zero stock, so the Total doesn't dip misleadingly low
-    before a newly added source's first refresh. Returns None if no source on the
-    part has any stock history yet, so the caller can skip rendering the chart card.
+    before a newly added source's first refresh. Also, when the part's own
+    manually-tracked stock (PartStockHistory, issue #99) has any history, an "On-Hand
+    Stock" dataset - a different quantity from supplier-reported stock (what's
+    physically on the shelf vs. what a supplier claims to have), so it's flagged
+    'own': True rather than folded into the per-source/Total figures, letting the
+    template style it distinctly. Returns None if neither the part nor any of its
+    sources has any stock history yet, so the caller can skip rendering the chart card.
 
     Also returns x_min/x_max: a fixed STOCK_TREND_PERIOD-wide window ending now,
     regardless of how much history actually exists, so a part with only a few days
@@ -851,10 +855,23 @@ def _part_stock_chart_data(part):
         if points:
             per_source_points[source.pk] = points
 
-    if not per_source_points:
+    own_points = [
+        (h.recorded_dt, h.stock)
+        for h in reversed(part.stock_history.all())
+        if h.stock is not None
+    ]
+
+    if not per_source_points and not own_points:
         return None
 
     datasets = []
+    if own_points:
+        datasets.append({
+            'label': 'On-Hand Stock',
+            'total': False,
+            'own': True,
+            'data': [{'x': dt.timestamp() * 1000, 'y': stock} for dt, stock in own_points],
+        })
     for source in part.sources.all():
         points = per_source_points.get(source.pk)
         if points:
@@ -912,6 +929,7 @@ def part_edit(request, part_id):
             'substitutions__substitute',
             'sources__variants__price_breaks',
             'sources__stock_history',
+            'stock_history',
             'design_bom_entries__design__client',
         ),
         pk=part_id,
@@ -2795,17 +2813,24 @@ def parts_order_refresh(request):
 
 
 def _apply_part_stock_deltas(deltas):
-    """Apply {part_id: delta} to Part.stock, one UPDATE per part. A null stock is treated as
-    0 for the purposes of the delta (via Coalesce) rather than left null, so a part with no
+    """Apply {part_id: delta} to Part.stock, one SELECT-then-save() per part. A null stock
+    is treated as 0 for the purposes of the delta rather than left null, so a part with no
     manually-tracked count yet still ends up with a sensible value instead of staying
     unknown. Deltas are applied as given, including negative ones - un-receiving a line
     intentionally allows stock to go negative rather than clamping at 0, since that's a
     signal worth surfacing (stock was already consumed - e.g. built into a batch - between
     it being received and un-received) rather than silently hiding.
+
+    Goes through Part.save() (with select_for_update() for the same race-safety a plain
+    UPDATE...F()+delta would give) rather than a queryset .update() - both call sites
+    already run inside transaction.atomic() - so this path also logs a PartStockHistory
+    snapshot (issue #99) instead of silently bypassing it.
     """
     for part_id, delta in deltas.items():
         if delta:
-            Part.objects.filter(pk=part_id).update(stock=Coalesce(F('stock'), 0) + delta)
+            part = Part.objects.select_for_update().get(pk=part_id)
+            part.stock = (part.stock or 0) + delta
+            part.save(update_fields=['stock'])
 
 
 @staff_member_required

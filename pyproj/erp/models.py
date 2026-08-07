@@ -196,6 +196,18 @@ class Part(models.Model):
             return f'{self.name} ({self.value})'
         return self.name
 
+    def save(self, *args, **kwargs):
+        """Save, then append a PartStockHistory snapshot whenever stock changes (or there's
+        no history at all yet) - same convention as PartSource.save() for supplier stock
+        (issue #79), applied here to the manually-tracked on-hand count (issue #99) so usage
+        rate/trend can eventually be derived from it.
+        """
+        is_new = self._state.adding
+        old_stock = None if is_new else Part.objects.filter(pk=self.pk).values_list('stock', flat=True).first()
+        super().save(*args, **kwargs)
+        if is_new or old_stock != self.stock or not self.stock_history.exists():
+            self.stock_history.create(stock=self.stock)
+
     @property
     def value_sort_key(self):
         """Natural sort key for `value` so parts sort by actual magnitude (e.g. "120R" = 120 ohms
@@ -280,6 +292,26 @@ class Part(models.Model):
                     unreached.append(min(breaks, key=lambda b: max(b.quantity, moq)))
         candidates = reached or unreached
         return min(candidates, key=lambda b: b.price) if candidates else None
+
+
+class PartStockHistory(models.Model):
+    """A timestamped snapshot of a Part's manually-tracked stock level, written by
+    Part.save() whenever stock changes. Mirrors PartSourceStockHistory's role for
+    supplier listings (issue #79) - grows over time into a history usable for
+    usage-rate tracking and predictive reordering (issue #99); Part.stock itself is
+    left untouched so nothing that reads current stock needs to change or join
+    against this table.
+    """
+    part = models.ForeignKey(Part, on_delete=models.CASCADE, related_name='stock_history')
+    stock = models.IntegerField(null=True, blank=True)
+    recorded_dt = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_dt']
+        verbose_name_plural = 'part stock history'
+
+    def __str__(self):
+        return f'{self.part}: {self.stock} @ {self.recorded_dt}'
 
 
 _REFERENCE_SPLIT_RE = re.compile(r'^([A-Za-z]*)(\d*)(.*)$')

@@ -6,7 +6,7 @@ from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
     BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory,
     PartsCartLine, PartSource, PartSourceStockHistory, PartSourceVariant, PartsOrder, PartsOrderLine,
-    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    PartStockHistory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -84,6 +84,20 @@ class PartAdmin(admin.ModelAdmin):
     list_select_related = ['category']
     search_fields = ['name', 'description', 'device', 'package', 'value', 'fusion_library']
     inlines = [PartSourceInline, PartAssetInline]
+
+
+@admin.register(PartStockHistory)
+class PartStockHistoryAdmin(admin.ModelAdmin):
+    list_display = ['part', 'stock', 'recorded_dt']
+    list_select_related = ['part']
+    search_fields = ['part__name']
+    readonly_fields = ['part', 'stock', 'recorded_dt']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Location)

@@ -150,6 +150,21 @@ def test_toggle_received_adds_quantity_to_existing_part_stock(client, staff_user
 
 
 @pytest.mark.django_db
+def test_toggle_received_logs_part_stock_history(client, staff_user):
+    # _apply_part_stock_deltas() used to write via a bare queryset .update(), which bypasses
+    # Part.save() and would silently skip logging a PartStockHistory snapshot (issue #99).
+    part = Part.objects.create(name='Widget', stock=10)
+    part.stock_history.all().delete()
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    line = PartsOrderLine.objects.create(parts_order=parts_order, part=part, quantity=5)
+
+    client.force_login(staff_user)
+    client.post(reverse('erp:parts_order_line_toggle_received', args=[line.pk]))
+
+    assert list(part.stock_history.order_by('recorded_dt').values_list('stock', flat=True)) == [15]
+
+
+@pytest.mark.django_db
 def test_toggle_received_unmarking_subtracts_quantity_and_allows_negative(client, staff_user):
     part = Part.objects.create(name='Widget', stock=3)
     parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')

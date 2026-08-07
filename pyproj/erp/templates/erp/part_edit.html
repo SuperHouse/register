@@ -84,7 +84,10 @@
                                 {% if form.fusion_library.errors %}<div class="text-danger small mt-1">{{ form.fusion_library.errors }}</div>{% endif %}
                             </div>
                             <div class="col-12 col-lg-6">
-                                <label for="{{ form.stock.id_for_label }}" class="form-label fw-semibold">Stock</label>
+                                <label for="{{ form.stock.id_for_label }}" class="form-label fw-semibold">
+                                    Stock
+                                    {% if part %}{{ part|stock_sparkline_svg }}{% endif %}
+                                </label>
                                 {{ form.stock }}
                                 {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
                             </div>
@@ -560,7 +563,10 @@
         // erp/templatetags/erp_tags.py's sparkline accent) plus a thicker "Total" line
         // in ink rather than a categorical hue, since it's an aggregate, not a supplier
         // identity. A part with more than 8 sources runs out of hue slots; extras fall
-        // back to the muted tone rather than generating a new hue.
+        // back to the muted tone rather than generating a new hue. The part's own
+        // manually-tracked "On-Hand Stock" (issue #99) is a different quantity again -
+        // what's physically on the shelf, not what a supplier reports - so it's drawn
+        // dashed in the same ink tone as Total rather than taking a categorical slot.
         const stockChartDataEl = document.getElementById('stock-chart-data');
         if (stockChartDataEl && window.Chart) {
             const CATEGORICAL_COLORS = [
@@ -572,6 +578,13 @@
             const chartData = JSON.parse(stockChartDataEl.textContent);
             let colorIndex = 0;
             const datasets = chartData.datasets.map(function (ds) {
+                if (ds.own) {
+                    return {
+                        label: ds.label, data: ds.data,
+                        borderColor: TOTAL_COLOR, backgroundColor: TOTAL_COLOR,
+                        borderWidth: 2, borderDash: [6, 3], pointRadius: 0, tension: 0,
+                    };
+                }
                 if (ds.total) {
                     return {
                         label: ds.label, data: ds.data,

@@ -124,6 +124,56 @@ def test_save_self_heals_missing_history_on_unchanged_stock():
     assert list(source.stock_history.values_list('stock', flat=True)) == [100]
 
 
+# --- Part.save() stock history logging (issue #99) ---
+
+@pytest.mark.django_db
+def test_part_save_logs_history_on_creation():
+    part = Part.objects.create(name='Fresh part', value='1', stock=100)
+    assert list(part.stock_history.values_list('stock', flat=True)) == [100]
+
+
+@pytest.mark.django_db
+def test_part_save_logs_history_when_stock_changes():
+    part = Part.objects.create(name='Changing stock', value='1', stock=100)
+
+    part.stock = 50
+    part.save(update_fields=['stock'])
+
+    assert list(part.stock_history.order_by('recorded_dt').values_list('stock', flat=True)) == [100, 50]
+
+
+@pytest.mark.django_db
+def test_part_save_does_not_duplicate_history_on_unchanged_stock():
+    part = Part.objects.create(name='Stable stock', value='1', stock=100)
+
+    part.stock = 100
+    part.save(update_fields=['stock'])
+
+    assert part.stock_history.count() == 1
+
+
+@pytest.mark.django_db
+def test_part_save_self_heals_missing_history_on_unchanged_stock():
+    part = Part.objects.create(name='Historyless', value='1', stock=100)
+    part.stock_history.all().delete()
+    assert part.stock_history.count() == 0
+
+    part.stock = 100  # unchanged - a naive "did it change" check alone wouldn't log this
+    part.save(update_fields=['stock'])
+
+    assert list(part.stock_history.values_list('stock', flat=True)) == [100]
+
+
+@pytest.mark.django_db
+def test_part_save_allows_negative_stock_history():
+    part = Part.objects.create(name='Overcommitted', value='1', stock=3)
+
+    part.stock = -2
+    part.save(update_fields=['stock'])
+
+    assert list(part.stock_history.order_by('recorded_dt').values_list('stock', flat=True)) == [3, -2]
+
+
 @pytest.mark.django_db
 def test_part_edit_shows_stale_warning_per_source(client, staff_user):
     STALE_TITLE = 'Stock has never been refreshed, or not refreshed in over 48 hours'
