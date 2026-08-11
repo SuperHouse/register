@@ -44,6 +44,16 @@ class Design(models.Model):
     conformal_coating = models.BooleanField(default=False, verbose_name='Conformal Coating')
     anti_shock_glue = models.BooleanField(default=False, verbose_name='Anti-Shock Glue')
     packaging = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Packaging')
+    # String reference, not a direct import, for the same reason as Device.batch below -
+    # erp.models already imports device.models, so a direct import the other way would be
+    # circular. Lets a Design record which erp.Part represents its own bare PCB stock (one
+    # Part per PCB design, issue #52) - set manually on this page, not auto-matched from any
+    # supplier order data (JLCPCB order lines carry no reliable per-design identifier - see
+    # erp.views._match_or_create_part_for_jlcpcb_line's docstring).
+    pcb_part = models.ForeignKey(
+        'erp.Part', on_delete=models.SET_NULL, null=True, blank=True, related_name='designs',
+        verbose_name='PCB Part',
+    )
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=['sku', 'hw_version'], name='unique_sku_hwversion')]

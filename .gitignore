@@ -170,6 +170,7 @@ cython_debug/
 /static
 /pyproj/.digikey/
 /pyproj/.lcsc/
+/pyproj/.jlcpcb/
 /pyproj/localhost-key.pem
 /pyproj/localhost.pem
 

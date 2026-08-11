@@ -187,6 +187,42 @@ Set `ELEMENT14_STORE_ID` to the regional storefront you source from:
 
 Restart the development server and the E14 fetch button will be active immediately.
 
+## JLCPCB API Integration
+
+JLCPCB integration tracks PCB fabrication orders only. JLCPCB is not a component supplier, so this integration has no part-search feature. Authentication uses a static App ID, Access Key, and Secret Key. It does not use OAuth. It does not use a captured session. JLCPCB has no sandbox environment.
+
+### 1. Apply for JLCPCB Open API access
+
+1. Sign in or create an account at [api.jlcpcb.com](https://api.jlcpcb.com).
+2. Apply for API access. JLCPCB approves applications manually, so approval is not immediate.
+3. After JLCPCB approves your application, create an application under "Manage Apps".
+4. Note the **App ID**, **Access Key**, and **Secret Key**.
+
+### 2. Configure the environment
+
+Add these lines to `pyproj/.env`:
+
+```
+JLCPCB_APP_ID = "your-app-id"
+JLCPCB_ACCESS_KEY = "your-access-key"
+JLCPCB_SECRET_KEY = "your-secret-key"
+```
+
+Restart the development server. The "Add PCB Order" field then appears on the Parts Orders page. No further setup is necessary.
+
+### Order discovery
+
+JLCPCB's API has no endpoint to list or discover orders. It supports lookup by `batchNum` only. The `batchNum` is JLCPCB's own order identifier and appears on JLCPCB's order-history pages. Unlike DigiKey and Mouser, this app cannot find a JLCPCB order automatically.
+
+To add a JLCPCB order:
+
+1. On the Parts Orders page, enter the batch number into the "Add PCB Order" field.
+2. Submit the form.
+
+The app looks up the order through JLCPCB's API and creates a matching order record. If the batch number is already on file, the app refreshes that record instead.
+
+After you add an order, the app keeps it up to date like any other supplier's order. Use the order's own "Refresh" button, the Parts Orders list's "Refresh All Orders" button, or the scheduled `refresh_parts_orders` cron job. See [SETUP.md](SETUP.md) for the cron job setup. For JLCPCB, this cron job re-syncs each order already on file. It does not search for new orders. JLCPCB's API has no way to search for orders.
+
 ## Data Export and Import
 
 All application data (database records and uploaded media files) can be exported

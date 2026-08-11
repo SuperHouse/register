@@ -89,6 +89,15 @@
                                     </td>
                                 </tr>
                                 <tr>
+                                    <th>{{ design_form.pcb_part.label }}:</th>
+                                    <td>
+                                        <div style="max-width: 300px;">
+                                            {{ design_form.pcb_part }}
+                                        </div>
+                                        {% if design_form.pcb_part.errors %}<div class="text-danger small">{{ design_form.pcb_part.errors }}</div>{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
                                     <th>{{ design_form.assembly_time_minutes.label }}:</th>
                                     <td>
                                         <div class="input-group" style="max-width: 180px;">
@@ -160,6 +169,10 @@
                             <tr>
                                 <th>Price:</th>
                                 <td>{{ design.price|default:"<i>Not set</i>" }}</td>
+                            </tr>
+                            <tr>
+                                <th>PCB:</th>
+                                <td>{{ design.pcb_part.name|default:"<i>Not set</i>" }}</td>
                             </tr>
                             <tr>
                                 <th>Devices:</th>

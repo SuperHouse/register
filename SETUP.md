@@ -48,7 +48,8 @@ for the `--max-per-run` and `--dry-run` options.
 
 Supplier order data (`erp.PartsOrder`/`erp.PartsOrderLine`) is kept up to date by the
 `refresh_parts_orders` management command, which syncs DigiKey and, if configured,
-Mouser — the two integrated suppliers with a self-service order-status API. Not run
+Mouser and JLCPCB — DigiKey and Mouser via a self-service order-status API, JLCPCB via
+a per-order refresh of every order already on file (see below). Not run
 automatically by the app itself — add a crontab entry for it on each production host,
 e.g. every 4 hours:
 
@@ -73,6 +74,14 @@ call), and Mouser's documented rate limit (30 calls/minute, 1000 calls/day, shar
 across its Search/Cart/Order APIs) is tighter than DigiKey's — a busy Mouser account
 may need a coarser cron cadence than the example above, or a shorter
 `--lookback-days`.
+
+JLCPCB order syncing is opt-in too: skipped entirely unless `JLCPCB_APP_ID`,
+`JLCPCB_ACCESS_KEY`, and `JLCPCB_SECRET_KEY` are all set in `.env` (see [JLCPCB API
+Integration](README.md#jlcpcb-api-integration)). It works differently from DigiKey/Mouser
+though — JLCPCB's API has no order-discovery endpoint at all, so this run doesn't search
+the lookback window for new orders; it just re-syncs the status of every JLCPCB order
+already on file. A new JLCPCB order still needs to be added once via the Parts Orders
+page's "Add PCB Order" field before this cron job will keep it updated.
 
 ## Linux Local Setup (dev)
 

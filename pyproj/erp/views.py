@@ -1,10 +1,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import base64
 import csv
+import hashlib
+import hmac
 import io
 import json
 import os
 import re
+import secrets
 import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote as urlquote
@@ -2750,6 +2754,351 @@ def _sync_lcsc_parts_orders(from_date, to_date):
         return {'ok': False, 'error': f'LCSC order sync failed: {e}'}
 
 
+# --- JLCPCB PCB order sync (issue #52) ---
+#
+# JLCPCB's Open API has no order-discovery/list endpoint for PCB orders - only a lookup by
+# batchNum, which JLCPCB itself regenerates on every order/quote (not a stable per-design
+# id). So unlike DigiKey/Mouser/LCSC, a JLCPCB PartsOrder can't be auto-discovered; it has to
+# start from a human-supplied batchNum (see parts_order_add_jlcpcb below), then stays synced
+# the same way every other supplier's orders do. Per the project owner's direction, this
+# deliberately reuses the existing PartsOrder/PartsOrderLine models rather than adding a
+# separate model or fields on Batch - a PCB order is still "an order placed with a
+# supplier", it just can't be discovered automatically.
+#
+# The request-signing algorithm below was reverse-engineered from the official Java SDK's
+# bytecode (Resources/JLCPCB-API/, untracked) - no JVM was available on this machine to
+# decompile it properly, and the "API Request Signature" docs page was never captured, so a
+# small constant-pool + opcode disassembler was written from scratch to read the real
+# algorithm out of SignAuthorization.getAuthorization()/AbstractSigner/HmacSHA256Signer/
+# NonceKit.createNonce(). It's since been verified live: a bogus batchNum against
+# /pcb/order/detail returned a clean {"success":false,"code":2005,"message":"batch_num_error"}
+# - a real application-level error, not a signature/auth failure - confirming the algorithm
+# is correct. One thing bytecode alone didn't reveal and had to be checked empirically: every
+# PCB endpoint is a POST with a JSON body despite the SDK naming its request classes
+# "Get*Request" (confirmed both via each request class's actual superclass in the decompiled
+# SDK - PostRequest, not GetRequest - and empirically: GET on /pcb/order/detail returns a
+# plain HTTP 405).
+#
+# Official PDF docs for these endpoints were obtained after the above was written
+# (Resources/JLCPCB-API/*.pdf) and used to double-check every field name/type below -
+# everything matched what the decompiled SDK already suggested, with one real correction:
+# orderStatus is a small INTEGER enum (0-5, plus at least one undocumented value - the
+# docs' own worked example uses 7), not a status string, so the initial best-effort
+# substring-match implementation was simply wrong for this supplier and has been replaced
+# (see _map_jlcpcb_order_status). The docs also don't resolve the one thing bytecode alone
+# couldn't: where /pcb/wip/get's required orderUUID actually comes from - it's not among
+# any of /pcb/order/detail's documented response fields either, so production-progress
+# tracking remains out of scope for now (per the project owner's direction), not just
+# blocked on bytecode's limits. One lead for whoever picks this up: the separate "Create an
+# order" docs (Resources/JLCPCB-API/Create an order.pdf) show /pcb/create returning an
+# "orderId", described with the exact same generic "Order ID" wording /pcb/wip/get's
+# orderUUID param uses - plausibly the same value, though this hasn't been confirmed
+# against a real response from either endpoint. Also confirmed in that doc: JLCPCB's error
+# code 2005 ("Batch number does not exist or cannot be bound") is exactly what a bogus
+# batchNum returned during live verification above - a second, independent confirmation
+# the signing/auth layer is correct, not just a coincidental-looking error shape.
+
+JLCPCB_BASE_URL = 'https://open.jlcpcb.com'
+_JLCPCB_NONCE_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+
+def _jlcpcb_configured():
+    return all(os.environ.get(var, '').strip() for var in ('JLCPCB_APP_ID', 'JLCPCB_ACCESS_KEY', 'JLCPCB_SECRET_KEY'))
+
+
+def _jlcpcb_query_string(query_params):
+    return '&'.join(f'{k}={v}' for k, v in query_params.items())
+
+
+def _jlcpcb_sign_request(method, path, query_params=None, body_json=None, timestamp=None, nonce=None):
+    """Build the Authorization header value for a JLCPCB Open API request (see the module
+    comment above for how this was derived/verified).
+
+    stringToSign = "{METHOD}\\n{canonicalURI}\\n{timestamp}\\n{nonce}\\n{body}\\n", where
+    canonicalURI is the path plus "?"+query string when there are query params, timestamp is
+    unix seconds as a decimal string (confirmed via bytecode: currentTimeMillis()/1000, not
+    plain millis), nonce is a 32-char random string from [0-9a-zA-Z], and body is the exact
+    JSON string sent as the request body, or "" for a request with none. signature =
+    base64(HMAC-SHA256(secretKey, stringToSign)). The final header is
+    'JOP appid="...",accesskey="...",timestamp="...",nonce="...",signature="..."' - "JOP" is
+    JLCPCB's fixed authenticator scheme name, confirmed via bytecode
+    (Authenticator.JOP.isSchemeWithAlgorithm() is False, so no algorithm suffix is appended).
+    timestamp/nonce are overridable purely so tests can assert an exact, deterministic
+    signature.
+    """
+    app_id = os.environ.get('JLCPCB_APP_ID', '').strip()
+    access_key = os.environ.get('JLCPCB_ACCESS_KEY', '').strip()
+    secret_key = os.environ.get('JLCPCB_SECRET_KEY', '').strip()
+
+    canonical_uri = path
+    if query_params:
+        canonical_uri = f'{path}?{_jlcpcb_query_string(query_params)}'
+
+    timestamp = timestamp if timestamp is not None else str(int(time.time()))
+    nonce = nonce if nonce is not None else ''.join(secrets.choice(_JLCPCB_NONCE_ALPHABET) for _ in range(32))
+    body = body_json if body_json is not None else ''
+
+    string_to_sign = f'{method.upper()}\n{canonical_uri}\n{timestamp}\n{nonce}\n{body}\n'
+    signature = base64.b64encode(
+        hmac.new(secret_key.encode('utf-8'), string_to_sign.encode('utf-8'), hashlib.sha256).digest()
+    ).decode('utf-8')
+
+    return (
+        f'JOP appid="{app_id}",accesskey="{access_key}",timestamp="{timestamp}",'
+        f'nonce="{nonce}",signature="{signature}"'
+    )
+
+
+def _jlcpcb_request(method, path, query_params=None, body_obj=None):
+    """Send a signed request to the JLCPCB Open API and return the parsed 'data' object, or
+    raise RuntimeError with a readable message on an HTTP-level or application-level (JLC's
+    own success/code/message envelope) failure. May raise - callers (_sync_jlcpcb_parts_order)
+    are expected to catch, same "fetch may raise, orchestration never does" convention as
+    _refresh_variant/_sync_lcsc_parts_orders. Local `import requests`, matching the existing
+    convention (e.g. _get_digikey_access_token) of not importing it at module level."""
+    import requests
+
+    body_json = json.dumps(body_obj) if body_obj is not None else None
+    auth = _jlcpcb_sign_request(method, path, query_params=query_params, body_json=body_json)
+    headers = {'Authorization': auth, 'Content-Type': 'application/json'}
+
+    url = JLCPCB_BASE_URL + path
+    if query_params:
+        url += '?' + _jlcpcb_query_string(query_params)
+
+    if method.upper() == 'GET':
+        resp = requests.get(url, headers=headers, timeout=15)
+    else:
+        resp = requests.post(url, data=body_json.encode('utf-8'), headers=headers, timeout=15)
+
+    if resp.status_code < 200 or resp.status_code >= 300:
+        raise RuntimeError(f'JLCPCB API returned HTTP {resp.status_code}: {resp.text[:300]}')
+
+    # Success is signalled two ways depending on the source: a live call returns an explicit
+    # `success` boolean (confirmed - a bogus batchNum returned {"success": false, "code":
+    # 2005, ...}), but the official docs' own worked example for a successful call omits
+    # `success` entirely and shows only {"code": 200, "message": "success", ...} (with 200
+    # documented as "Request Success" in the docs' Error Code table). Checking `success` when
+    # present and falling back to `code == 200` otherwise covers both.
+    result = resp.json()
+    if not result.get('success', result.get('code') == 200):
+        raise RuntimeError(f"JLCPCB API error {result.get('code')}: {result.get('message')}")
+
+    return result.get('data')
+
+
+def _parse_jlcpcb_dt(raw):
+    """Parse a JLCPCB order timestamp field. Format confirmed as "YYYY-MM-DD HH:MM:SS" by
+    JLCPCB's own "Order Information Query API" docs (Resources/JLCPCB-API/Order Information
+    Query API.pdf, orderDate example "2018-09-18 09:37:35") - UTC is still an assumption
+    though, since the docs don't state a timezone, same caveat as _parse_lcsc_dt. The
+    milliseconds-since-epoch fallback is kept for defensiveness (deliveryTime's format is
+    still unconfirmed - the one worked example has it null) but is no longer the primary
+    guess. Returns None for anything else."""
+    if not raw:
+        return None
+    if isinstance(raw, (int, float)):
+        try:
+            return datetime.fromtimestamp(raw / 1000, tz=dt_timezone.utc)
+        except (ValueError, OSError, OverflowError):
+            return None
+    try:
+        return datetime.strptime(str(raw), '%Y-%m-%d %H:%M:%S').replace(tzinfo=dt_timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_jlcpcb_date(raw):
+    """Same format uncertainty as _parse_jlcpcb_dt, but returns a plain date for
+    PartsOrder.expected_arrival_date (a DateField, not a DateTimeField)."""
+    parsed = _parse_jlcpcb_dt(raw)
+    return parsed.date() if parsed else None
+
+
+_JLCPCB_ORDER_STATUS_LABELS = {
+    0: 'Cancelled',
+    1: 'Pending Review',
+    2: 'Awaiting Confirmation',
+    3: 'Confirmed',
+    4: 'Submitted to the factory',
+    5: 'Shipped',
+}
+
+
+def _jlcpcb_order_status_label(raw_status):
+    """Human-readable label for JLCPCB's integer orderStatus, for PartsOrder.status (a
+    free-text display field - see the model docstring). Falls back to the raw integer
+    stringified for anything outside the documented 0-5 range - JLCPCB's own "Order
+    Information Query API" docs worked example uses orderStatus 7, a value the same docs
+    never define, so at least one further undocumented status clearly exists."""
+    try:
+        status = int(raw_status)
+    except (TypeError, ValueError):
+        return ''
+    return _JLCPCB_ORDER_STATUS_LABELS.get(status, f'Unknown ({status})')
+
+
+def _map_jlcpcb_order_status(raw_status):
+    """Map JLCPCB's orderStatus to PartsOrderLine.STATUS_CHOICES. Confirmed via JLCPCB's own
+    "Order Information Query API" docs (Resources/JLCPCB-API/Order Information Query
+    API.pdf) to be an INTEGER enum, not a string - the initial implementation guessed at
+    substring-matching a status string, which was wrong. Documented values: 0-Cancelled,
+    1-Pending Review, 2-Awaiting Confirmation, 3-Confirmed, 4-Submitted to the factory,
+    5-Shipped; everything else (including the docs' own undocumented example value, 7) maps
+    to OPEN. There's no "delivered/received" status in JLCPCB's own enum at all -
+    PartsOrderLine.RECEIVED is only ever set manually via the Receive action, same as every
+    other supplier."""
+    try:
+        status = int(raw_status)
+    except (TypeError, ValueError):
+        return PartsOrderLine.OPEN
+
+    if status == 0:
+        return PartsOrderLine.CANCELLED
+    if status == 5:
+        return PartsOrderLine.SHIPPED
+    return PartsOrderLine.OPEN
+
+
+def _parse_jlcpcb_order_item(item, order_status, currency, line_index):
+    """Pure: flatten one orderItem's PCB-specific fields (nested under 'pcbItem', confirmed
+    field names per PCBItem in the official docs) into the flat line dict
+    _upsert_parts_order() expects. produceCode is documented as the item's own "Order
+    Number" - a real per-item identifier, not a positional guess - so it's used for both
+    supplier_sku and supplier_line_number (stable across resyncs, same convention as
+    DigiKey's DetailId/LCSC's line uuid); line_index is only a fallback for the
+    supplier_line_number if produceCode is ever blank. unit_price divides the item's price
+    by its count - confirmed plausible against the docs' own worked example (price=5 for
+    count=10, consistent with JLCPCB's well-known low-cost prototype pricing), though the
+    docs don't say in so many words that price is a line total rather than already
+    per-unit."""
+    pcb_item = item.get('pcbItem') or {}
+    count = pcb_item.get('count') or 1
+    price = pcb_item.get('price')
+    unit_price = None
+    if price is not None:
+        try:
+            unit_price = Decimal(str(price)) / Decimal(str(count))
+        except (InvalidOperation, ZeroDivisionError):
+            unit_price = None
+    produce_code = pcb_item.get('produceCode') or ''
+    return {
+        'supplier_sku': produce_code,
+        'supplier_line_number': produce_code or str(line_index),
+        'description': pcb_item.get('fileName') or '',
+        'quantity': count,
+        'unit_price': unit_price,
+        'currency': currency,
+        'status': order_status,
+    }
+
+
+def _parse_jlcpcb_order(data, batch_num):
+    """Pure, no I/O: convert a /pcb/order/detail response's data object into the flat dict
+    shape _upsert_parts_order() expects - same pattern as _parse_digikey_order/
+    _parse_lcsc_order. supplier_order_url stays blank - no order-page URL field exists
+    anywhere in the documented response shape, same gap as Mouser. Only orderType == 1
+    (PCB) entries are kept - orderType == 3 (Stencil) entries carry their data under a
+    separate smtItem key instead of pcbItem (confirmed by the docs' own worked example,
+    which shows one PCB orderItem with an all-null smtItem alongside it), and stencil
+    orders aren't tracked by this app. order_dt/status are read from the first PCB
+    orderItem, since GetOrderDetailByBatchNumData has no order-level date/status field of
+    its own - only per-item orderDate/orderStatus."""
+    order_items = data.get('orderItem') or []
+    pcb_items = [item for item in order_items if item.get('orderType') == 1]
+    first_item = (pcb_items[0].get('pcbItem') or {}) if pcb_items else {}
+    order_status = _map_jlcpcb_order_status(first_item.get('orderStatus'))
+    currency = 'USD'  # docs annotate money fields with a "$" comment, not an ISO code - same assumption as LCSC
+    return {
+        'supplier_order_number': batch_num,
+        'supplier_order_url': '',
+        'order_dt': _parse_jlcpcb_dt(first_item.get('orderDate')),
+        'expected_arrival_date': _parse_jlcpcb_date(first_item.get('deliveryTime')),
+        'status': _jlcpcb_order_status_label(first_item.get('orderStatus')),
+        'lines': [
+            _parse_jlcpcb_order_item(item, order_status, currency, i) for i, item in enumerate(pcb_items)
+        ],
+    }
+
+
+def _match_or_create_part_for_jlcpcb_line(supplier_sku, description):
+    """Resolve a JLCPCB order line's produceCode (stored as supplier_sku - see
+    _parse_jlcpcb_order_item) to a Part - same match/create-by-SKU shape as
+    _match_or_create_part_for_digikey_line/_lcsc_line/_mouser_line, matching against a
+    'JLCPCB' PartSource. Note produceCode is a fresh id per order/reorder (confirmed live -
+    reordering the same physical PCB design gets a new produceCode each time), so unlike a
+    component's manufacturer SKU this won't dedupe a design across reorders on its own; a
+    Design's pcb_part field (set manually on the Design detail page) is the mechanism for
+    tying a specific Part back to a design, not this matcher. New parts are filed under a
+    'PCBs' PartCategory (get-or-created here) rather than left uncategorised like the other
+    suppliers' auto-created parts, since a PCB fab line isn't a stocked component."""
+    if not supplier_sku:
+        return None, None
+
+    variant = (
+        PartSourceVariant.objects
+        .filter(supplier_sku__iexact=supplier_sku, source__supplier_name__iexact='JLCPCB')
+        .select_related('source__part')
+        .first()
+    )
+    if variant:
+        return variant.source.part, variant
+
+    category, _created = PartCategory.objects.get_or_create(name='PCBs')
+    part = Part.objects.create(name=supplier_sku, description=description or '', category=category)
+    listing = PartSource.objects.create(part=part, supplier_name='JLCPCB', manufacturer_sku='')
+    variant = PartSourceVariant.objects.create(source=listing, supplier_sku=supplier_sku)
+    return part, variant
+
+
+def _sync_jlcpcb_parts_order(batch_num):
+    """Fetch, parse, and upsert a single JLCPCB PCB order by its batchNum. Never raises -
+    same {'ok': True/False, ...} contract as _sync_digikey_parts_orders/
+    _sync_mouser_parts_orders/_sync_lcsc_parts_orders, with one addition: on success the
+    upserted PartsOrder is returned too (as 'parts_order'), since the one caller that syncs a
+    single order synchronously (parts_order_add_jlcpcb, "Add PCB Order") needs somewhere to
+    redirect to. Unlike every other supplier's _sync_* function, this has no from_date/to_date
+    - there's no discovery step here at all, batch_num must already be known (see the module
+    comment)."""
+    if not _jlcpcb_configured():
+        return {'ok': False, 'error': 'JLCPCB API credentials are not configured.'}
+
+    batch_num = (batch_num or '').strip()
+    if not batch_num:
+        return {'ok': False, 'error': 'A batch number is required.'}
+
+    try:
+        data = _jlcpcb_request('POST', '/overseas/openapi/pcb/order/detail', body_obj={'batchNum': batch_num})
+        parsed = _parse_jlcpcb_order(data or {}, batch_num)
+        parts_order = _upsert_parts_order(
+            parsed, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line
+        )
+        return {'ok': True, 'parts_order': parts_order}
+    except Exception as e:
+        return {'ok': False, 'error': f'JLCPCB order sync failed: {e}'}
+
+
+@staff_member_required
+def parts_order_add_jlcpcb(request):
+    """POST-only: create/refresh a JLCPCB PartsOrder from a manually-entered batchNum. This
+    is the only way a JLCPCB order enters the Parts Orders list - JLCPCB has no
+    order-discovery endpoint (see the module comment above). Because _upsert_parts_order()
+    is update_or_create on (supplier_name, supplier_order_number), re-submitting an already-
+    known batchNum just refreshes it rather than erroring, so this form doubles as a
+    per-order manual refresh too."""
+    if request.method != 'POST':
+        return redirect('erp:parts_order_list')
+
+    batch_num = request.POST.get('batch_num', '').strip()
+    result = _sync_jlcpcb_parts_order(batch_num)
+    if result.get('ok'):
+        messages.success(request, f'JLCPCB order {batch_num} synced.')
+        return redirect('erp:parts_order_detail', parts_order_id=result['parts_order'].pk)
+
+    messages.warning(request, f"Couldn't sync JLCPCB order {batch_num}: {result.get('error')}")
+    return redirect('erp:parts_order_list')
+
+
 @staff_member_required
 def parts_order_list(request):
     """List all supplier orders, newest first, filterable by ?q= against
@@ -2765,7 +3114,9 @@ def parts_order_list(request):
     paginator = Paginator(parts_orders_qs, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
 
-    return render(request, 'erp/parts_order_list.html', {'parts_orders': page_obj, 'page_obj': page_obj, 'q': q})
+    return render(request, 'erp/parts_order_list.html', {
+        'parts_orders': page_obj, 'page_obj': page_obj, 'q': q, 'jlcpcb_configured': _jlcpcb_configured(),
+    })
 
 
 @staff_member_required
@@ -2774,6 +3125,32 @@ def parts_order_detail(request, parts_order_id):
         PartsOrder.objects.prefetch_related('lines__part', 'lines__part_source_variant'), pk=parts_order_id
     )
     return render(request, 'erp/parts_order_detail.html', {'parts_order': parts_order})
+
+
+@staff_member_required
+def parts_order_refresh_one(request, parts_order_id):
+    """POST-only AJAX endpoint: refresh a single PartsOrder in place, unlike
+    parts_order_refresh (which re-syncs every configured supplier's whole date-range/order
+    set). Dispatches on supplier_name - currently only JLCPCB supports a genuine per-order
+    lookup (_sync_jlcpcb_parts_order(batch_num), no discovery step involved - see its
+    module comment). DigiKey/Mouser/LCSC don't have an equivalent single-order fetch built
+    yet (their sync functions are all date-range/discovery-shaped), so this reports a clear
+    'not supported' error for those rather than silently no-op'ing or re-running a
+    broader sync that could touch unrelated orders - a caller asking to refresh "that
+    specific order" shouldn't get side effects on others."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    parts_order = get_object_or_404(PartsOrder, pk=parts_order_id)
+
+    if parts_order.supplier_name == 'JLCPCB':
+        result = _sync_jlcpcb_parts_order(parts_order.supplier_order_number)
+        return JsonResponse({'ok': result.get('ok', False), 'error': result.get('error')})
+
+    return JsonResponse({
+        'ok': False,
+        'error': f'Refreshing a single order is not yet supported for {parts_order.supplier_name}.',
+    })
 
 
 @staff_member_required
@@ -2787,8 +3164,11 @@ def parts_order_refresh(request):
     get a "not configured" error every time this button is clicked - 'mouser' is simply
     omitted from the response in that case. Same opt-in gating for LCSC, on
     LCSC_SESSION_FILE - and LCSC is only ever synced from here, never from the scheduled
-    refresh_parts_orders command (see the module comment above). Overall ok is True only if
-    every sync that was actually attempted succeeded."""
+    refresh_parts_orders command (see the module comment above). JLCPCB is gated the same
+    way, on the three JLCPCB_* env vars all being set - but unlike the other three, there's
+    no discovery step: it just re-syncs every already-known JLCPCB PartsOrder one at a time
+    (see _sync_jlcpcb_parts_order's module comment). Overall ok is True only if every sync
+    that was actually attempted succeeded."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
@@ -2808,6 +3188,21 @@ def parts_order_refresh(request):
         lcsc_result = _sync_lcsc_parts_orders(from_date, to_date)
         response['lcsc'] = lcsc_result
         response['ok'] = response['ok'] and lcsc_result.get('ok', False)
+
+    if _jlcpcb_configured():
+        jlcpcb_errors = []
+        synced = 0
+        for order in PartsOrder.objects.filter(supplier_name='JLCPCB'):
+            result = _sync_jlcpcb_parts_order(order.supplier_order_number)
+            if result.get('ok'):
+                synced += 1
+            else:
+                jlcpcb_errors.append(result.get('error', 'unknown error'))
+        jlcpcb_result = {'ok': not jlcpcb_errors, 'orders_synced': synced}
+        if jlcpcb_errors:
+            jlcpcb_result['error'] = '; '.join(jlcpcb_errors)
+        response['jlcpcb'] = jlcpcb_result
+        response['ok'] = response['ok'] and jlcpcb_result['ok']
 
     return JsonResponse(response)
 

@@ -9,7 +9,7 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
         <div class="input-group" style="max-width: 400px;">
             <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
             <input type="text" id="list-search" class="form-control" placeholder="Filter orders..."
@@ -19,9 +19,27 @@
                 <i class="cil-x icon"></i>
             </button>
         </div>
-        <button type="button" id="refresh-orders-btn" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-clockwise"></i> Refresh Now
-        </button>
+        {% comment %}
+            flex: 0 0 <px> is a fixed width, not auto/max-content: nested flex containers here hit a
+            real browser sizing quirk where flex-basis:auto/width:max-content compute narrower than
+            the actual (non-shrinking) children, clipping content. If either button's label text
+            changes, re-measure this group's natural width and update the pixel value to match.
+        {% endcomment %}
+        <div class="d-flex gap-2" style="flex: 0 0 520px;">
+            {% if jlcpcb_configured %}
+                <form method="post" action="{% url 'erp:parts_order_add_jlcpcb' %}"
+                      class="input-group input-group-sm flex-nowrap" style="max-width: 320px; flex: none;">
+                    {% csrf_token %}
+                    <input type="text" name="batch_num" class="form-control" placeholder="JLCPCB batch number" required>
+                    <button type="submit" class="btn btn-outline-secondary text-nowrap" title="Add PCB order from JLCPCB">
+                        <i class="cil-plus"></i> JLCPCB
+                    </button>
+                </form>
+            {% endif %}
+            <button type="button" id="refresh-orders-btn" class="btn btn-outline-secondary text-nowrap" style="flex: none;">
+                <i class="bi bi-arrow-clockwise"></i> Refresh All Orders
+            </button>
+        </div>
     </div>
 
     <div id="parts-orders-results">
@@ -130,19 +148,19 @@
                     if (data.ok) {
                         window.location.reload();
                     } else {
-                        const failures = ['digikey', 'mouser', 'lcsc']
+                        const failures = ['digikey', 'mouser', 'lcsc', 'jlcpcb']
                             .map(supplier => data[supplier])
                             .filter(result => result && !result.ok)
                             .map(result => result.error || 'unknown error');
                         alert('Refresh failed: ' + (failures.join('; ') || data.error || 'unknown error'));
                         btn.disabled = false;
-                        btn.innerHTML = '<i class="cil-reload"></i> Refresh Now';
+                        btn.innerHTML = '<i class="cil-reload"></i> Refresh All Orders';
                     }
                 })
                 .catch(() => {
                     alert('Refresh failed.');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="cil-reload"></i> Refresh Now';
+                    btn.innerHTML = '<i class="cil-reload"></i> Refresh All Orders';
                 });
         });
     </script>
