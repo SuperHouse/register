@@ -314,6 +314,25 @@ class PartStockHistory(models.Model):
         return f'{self.part}: {self.stock} @ {self.recorded_dt}'
 
 
+class DesignPcbStockHistory(models.Model):
+    """A timestamped snapshot of a Design's bare-PCB stock level (issue #100), written by
+    Design.save() whenever pcb_stock changes. Mirrors PartStockHistory's role for
+    Part.stock (issue #99) - grows over time into a history usable for usage-rate tracking;
+    Design.pcb_stock itself is left untouched so nothing that reads current stock needs to
+    change or join against this table.
+    """
+    design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='pcb_stock_history')
+    stock = models.IntegerField(null=True, blank=True)
+    recorded_dt = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-recorded_dt']
+        verbose_name_plural = 'design pcb stock history'
+
+    def __str__(self):
+        return f'{self.design}: {self.stock} @ {self.recorded_dt}'
+
+
 _REFERENCE_SPLIT_RE = re.compile(r'^([A-Za-z]*)(\d*)(.*)$')
 
 
@@ -574,11 +593,12 @@ class PartsCartLine(models.Model):
 
 
 class PartsOrder(models.Model):
-    """A purchase order placed with a supplier, auto-discovered via that supplier's
-    order-status API (see erp.views._sync_digikey_parts_orders - DigiKey only for now).
-    There's no manual "Add Order" UI - every row here is created/updated by a
-    refresh_parts_orders run. Named "PartsOrder" rather than "Order" to leave that name
-    free for a possible future customer-order feature.
+    """A purchase order placed with a supplier. Auto-discovered via that supplier's
+    order-status API for DigiKey/Mouser/LCSC (see erp.views._sync_digikey_parts_orders and
+    its siblings), created/refreshed via a manual "Add PCB Order" batchNum entry for JLCPCB
+    instead (see erp.views.parts_order_add_jlcpcb) - JLCPCB has no order-discovery endpoint.
+    Named "PartsOrder" rather than "Order" to leave that name free for a possible future
+    customer-order feature.
     """
     supplier_name = models.CharField(max_length=200)
     supplier_order_number = models.CharField(max_length=200)
@@ -667,6 +687,17 @@ class PartsOrderLine(models.Model):
     )
     part_source_variant = models.ForeignKey(
         PartSourceVariant, null=True, blank=True, on_delete=models.SET_NULL, related_name='parts_order_lines'
+    )
+    # JLCPCB-only (issue #100): which bare-PCB Design this line is for. Deliberately
+    # per-line rather than per-order - a single JLCPCB order/batchNum can contain PCBs for
+    # more than one design, and can also contain phantom entries left behind by JLCPCB's
+    # cart "replace files" feature (the superseded entry stays in the order as a line that
+    # will never ship). There's no reliable API signal to tell a phantom line apart from a
+    # real one, so this is left unset by default and a human decides per line via
+    # erp.views.parts_order_line_set_design - an unset line never contributes to any
+    # design's pcb_stock (see erp.views._apply_design_pcb_stock_deltas).
+    design = models.ForeignKey(
+        Design, null=True, blank=True, on_delete=models.SET_NULL, related_name='pcb_order_lines'
     )
     supplier_sku = models.CharField(
         max_length=200, blank=True,

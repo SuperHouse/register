@@ -199,6 +199,13 @@ def design_detail(request, design_id):
         design, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints, assembly_cost_settings
     )
 
+    # Staff-only, same as pcb_stock itself (issue #100) - the JLCPCB order lines a human has
+    # associated with this design's PCB stock (see erp.models.PartsOrderLine.design).
+    pcb_order_lines = (
+        design.pcb_order_lines.select_related('parts_order').order_by('-parts_order__order_dt')
+        if request.user.is_staff else None
+    )
+
     context = {
         'design': design,
         'devices': devices,
@@ -220,6 +227,7 @@ def design_detail(request, design_id):
         'design_form': DesignDetailsForm(instance=design) if request.user.is_staff else None,
         'build_costing_rows': build_costing_rows,
         'build_costing_total': build_costing_total,
+        'pcb_order_lines': pcb_order_lines,
     }
 
     return render(request, 'device/design_detail.html', context)

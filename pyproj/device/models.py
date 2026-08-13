@@ -44,15 +44,14 @@ class Design(models.Model):
     conformal_coating = models.BooleanField(default=False, verbose_name='Conformal Coating')
     anti_shock_glue = models.BooleanField(default=False, verbose_name='Anti-Shock Glue')
     packaging = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Packaging')
-    # String reference, not a direct import, for the same reason as Device.batch below -
-    # erp.models already imports device.models, so a direct import the other way would be
-    # circular. Lets a Design record which erp.Part represents its own bare PCB stock (one
-    # Part per PCB design, issue #52) - set manually on this page, not auto-matched from any
-    # supplier order data (JLCPCB order lines carry no reliable per-design identifier - see
-    # erp.views._match_or_create_part_for_jlcpcb_line's docstring).
-    pcb_part = models.ForeignKey(
-        'erp.Part', on_delete=models.SET_NULL, null=True, blank=True, related_name='designs',
-        verbose_name='PCB Part',
+    # Manually-tracked bare-PCB stock count (issue #100 - supersedes the pcb_part-based
+    # approach from issue #52, which tried to track PCB stock as an erp.Part; that broke
+    # because JLCPCB's produceCode isn't stable across reorders, causing duplicate Parts).
+    # Updated both by hand and by erp.views._apply_design_pcb_stock_deltas when a JLCPCB
+    # PartsOrderLine linked to this design is marked received - see PartsOrderLine.design.
+    pcb_stock = models.IntegerField(
+        null=True, blank=True, verbose_name='PCB Stock',
+        help_text='Manually-tracked PCB stock count; also updated when a JLCPCB order line is marked received',
     )
 
     class Meta:
@@ -60,6 +59,21 @@ class Design(models.Model):
 
     def __str__(self):
         return f'{self.sku}: {self.name} v{self.hw_version}'
+
+    def save(self, *args, **kwargs):
+        """Save, then append a DesignPcbStockHistory snapshot whenever pcb_stock changes (or
+        there's no history at all yet) - same convention as Part.save() for Part.stock
+        (issue #99), applied here so PCB stock trend can eventually be derived from it too.
+        Uses a function-local import of erp.models rather than a top-level one, since
+        erp.models already imports device.models - a module-level import the other way
+        would be circular (same reason Device.batch below uses a string FK reference).
+        """
+        is_new = self._state.adding
+        old_stock = None if is_new else Design.objects.filter(pk=self.pk).values_list('pcb_stock', flat=True).first()
+        super().save(*args, **kwargs)
+        from erp.models import DesignPcbStockHistory
+        if is_new or old_stock != self.pcb_stock or not self.pcb_stock_history.exists():
+            self.pcb_stock_history.create(stock=self.pcb_stock)
 
     def bom_part_counts(self):
         """Counter of {part_id: placement count} from this design's Bill of Materials —

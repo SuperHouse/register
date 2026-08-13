@@ -2281,7 +2281,13 @@ def _upsert_parts_order(parsed_order, supplier_name='DigiKey', part_matcher=_mat
     _parse_mouser_order() result. Generic across suppliers - supplier_name and part_matcher
     (a (supplier_sku, description) -> (Part, PartSourceVariant) callable, e.g.
     _match_or_create_part_for_mouser_line) are the only supplier-specific inputs; everything
-    else operates on the shared flat dict shape both parse layers produce.
+    else operates on the shared flat dict shape both parse layers produce. part_matcher may
+    be None (JLCPCB, issue #100) to skip Part-matching entirely - every line's part/
+    part_source_variant then stays None, and PartsOrderLine.design (set later, by hand, per
+    line - see parts_order_line_set_design) is used instead. design is deliberately never
+    part of this function's line defaults, so a resync never overwrites a human-set
+    association, the same "self-reported truth left alone on refresh" treatment already
+    given to received/received_dt below.
 
     Lines are matched by supplier_line_number (DigiKey's DetailId; a synthetic per-order
     line index for Mouser, which has no equivalent field - see _parse_mouser_order_line)
@@ -2314,7 +2320,7 @@ def _upsert_parts_order(parsed_order, supplier_name='DigiKey', part_matcher=_mat
 
     seen_line_pks = []
     for line in parsed_order['lines']:
-        part, variant = part_matcher(line['supplier_sku'], line['description'])
+        part, variant = part_matcher(line['supplier_sku'], line['description']) if part_matcher else (None, None)
         defaults = {
             'part': part, 'part_source_variant': variant,
             'supplier_sku': line['supplier_sku'], 'description': line['description'],
@@ -3021,36 +3027,6 @@ def _parse_jlcpcb_order(data, batch_num):
     }
 
 
-def _match_or_create_part_for_jlcpcb_line(supplier_sku, description):
-    """Resolve a JLCPCB order line's produceCode (stored as supplier_sku - see
-    _parse_jlcpcb_order_item) to a Part - same match/create-by-SKU shape as
-    _match_or_create_part_for_digikey_line/_lcsc_line/_mouser_line, matching against a
-    'JLCPCB' PartSource. Note produceCode is a fresh id per order/reorder (confirmed live -
-    reordering the same physical PCB design gets a new produceCode each time), so unlike a
-    component's manufacturer SKU this won't dedupe a design across reorders on its own; a
-    Design's pcb_part field (set manually on the Design detail page) is the mechanism for
-    tying a specific Part back to a design, not this matcher. New parts are filed under a
-    'PCBs' PartCategory (get-or-created here) rather than left uncategorised like the other
-    suppliers' auto-created parts, since a PCB fab line isn't a stocked component."""
-    if not supplier_sku:
-        return None, None
-
-    variant = (
-        PartSourceVariant.objects
-        .filter(supplier_sku__iexact=supplier_sku, source__supplier_name__iexact='JLCPCB')
-        .select_related('source__part')
-        .first()
-    )
-    if variant:
-        return variant.source.part, variant
-
-    category, _created = PartCategory.objects.get_or_create(name='PCBs')
-    part = Part.objects.create(name=supplier_sku, description=description or '', category=category)
-    listing = PartSource.objects.create(part=part, supplier_name='JLCPCB', manufacturer_sku='')
-    variant = PartSourceVariant.objects.create(source=listing, supplier_sku=supplier_sku)
-    return part, variant
-
-
 def _sync_jlcpcb_parts_order(batch_num):
     """Fetch, parse, and upsert a single JLCPCB PCB order by its batchNum. Never raises -
     same {'ok': True/False, ...} contract as _sync_digikey_parts_orders/
@@ -3059,7 +3035,14 @@ def _sync_jlcpcb_parts_order(batch_num):
     single order synchronously (parts_order_add_jlcpcb, "Add PCB Order") needs somewhere to
     redirect to. Unlike every other supplier's _sync_* function, this has no from_date/to_date
     - there's no discovery step here at all, batch_num must already be known (see the module
-    comment)."""
+    comment).
+
+    part_matcher=None (issue #100): JLCPCB lines are never matched/created as Parts - JLCPCB's
+    produceCode is regenerated on every reorder, which made the old Part-matching approach
+    create a fresh duplicate Part per reorder. Instead each line's PartsOrderLine.design is
+    set later, by hand, via parts_order_line_set_design - see that view and
+    PartsOrderLine.design's docstring for why this has to be per-line, and manual, rather
+    than auto-matched."""
     if not _jlcpcb_configured():
         return {'ok': False, 'error': 'JLCPCB API credentials are not configured.'}
 
@@ -3070,9 +3053,7 @@ def _sync_jlcpcb_parts_order(batch_num):
     try:
         data = _jlcpcb_request('POST', '/overseas/openapi/pcb/order/detail', body_obj={'batchNum': batch_num})
         parsed = _parse_jlcpcb_order(data or {}, batch_num)
-        parts_order = _upsert_parts_order(
-            parsed, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line
-        )
+        parts_order = _upsert_parts_order(parsed, supplier_name='JLCPCB', part_matcher=None)
         return {'ok': True, 'parts_order': parts_order}
     except Exception as e:
         return {'ok': False, 'error': f'JLCPCB order sync failed: {e}'}
@@ -3122,9 +3103,18 @@ def parts_order_list(request):
 @staff_member_required
 def parts_order_detail(request, parts_order_id):
     parts_order = get_object_or_404(
-        PartsOrder.objects.prefetch_related('lines__part', 'lines__part_source_variant'), pk=parts_order_id
+        PartsOrder.objects.prefetch_related('lines__part', 'lines__part_source_variant', 'lines__design'),
+        pk=parts_order_id,
     )
-    return render(request, 'erp/parts_order_detail.html', {'parts_order': parts_order})
+    # Only actually rendered for JLCPCB orders (issue #100's per-line Design picker), but
+    # cheap enough to always fetch rather than branching on supplier_name here too.
+    designs_for_picker = Design.objects.filter(obsolete=False).select_related('client').order_by(
+        'client__company_name', 'sku', 'name', 'hw_version'
+    )
+    return render(
+        request, 'erp/parts_order_detail.html',
+        {'parts_order': parts_order, 'designs_for_picker': designs_for_picker},
+    )
 
 
 @staff_member_required
@@ -3228,6 +3218,20 @@ def _apply_part_stock_deltas(deltas):
             part.save(update_fields=['stock'])
 
 
+def _apply_design_pcb_stock_deltas(deltas):
+    """Apply {design_id: delta} to Design.pcb_stock (issue #100) - the Design/PCB-stock
+    equivalent of _apply_part_stock_deltas above (see its docstring for the null-treated-
+    as-zero and negative-delta-allowed rationale, which applies identically here). Goes
+    through Design.save() so it also logs a DesignPcbStockHistory snapshot, same as
+    _apply_part_stock_deltas does for Part.stock via PartStockHistory.
+    """
+    for design_id, delta in deltas.items():
+        if delta:
+            design = Design.objects.select_for_update().get(pk=design_id)
+            design.pcb_stock = (design.pcb_stock or 0) + delta
+            design.save(update_fields=['pcb_stock'])
+
+
 @staff_member_required
 def parts_order_line_toggle_received(request, line_id):
     """POST-only AJAX endpoint: toggles one PartsOrderLine's received flag (the "Receive"
@@ -3239,7 +3243,11 @@ def parts_order_line_toggle_received(request, line_id):
 
     Marking a line received adds its quantity to the matched Part's stock; un-marking it
     subtracts the same quantity back out (see _apply_part_stock_deltas) - a line with no
-    matched Part has nothing to adjust.
+    matched Part has nothing to adjust. Same treatment for a JLCPCB line's linked Design
+    (see _apply_design_pcb_stock_deltas, issue #100) - the two are mutually exclusive in
+    practice (JLCPCB lines never get `part` set, other suppliers' lines never get `design`
+    set), and a line with neither (not yet assigned, or a deliberately-unassociated phantom
+    entry - see PartsOrderLine.design) has nothing to adjust either way.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -3253,6 +3261,9 @@ def parts_order_line_toggle_received(request, line_id):
         if line.part_id:
             delta = line.quantity if line.received else -line.quantity
             _apply_part_stock_deltas({line.part_id: delta})
+        elif line.design_id:
+            delta = line.quantity if line.received else -line.quantity
+            _apply_design_pcb_stock_deltas({line.design_id: delta})
 
     return JsonResponse({'ok': True, 'received': line.received})
 
@@ -3267,7 +3278,10 @@ def parts_order_receive_all(request, parts_order_id):
     Adds each newly-received line's quantity to its matched Part's stock (see
     _apply_part_stock_deltas), aggregated per part first so an order with more than one
     line for the same part (a SKU can legitimately appear as more than one line - see
-    PartsOrderLine.supplier_line_number) only issues one UPDATE per part.
+    PartsOrderLine.supplier_line_number) only issues one UPDATE per part. Same treatment,
+    aggregated per design, for JLCPCB lines with a linked Design (see
+    _apply_design_pcb_stock_deltas, issue #100) - a line with neither part nor design set
+    (not yet assigned, or a deliberately-unassociated phantom entry) contributes to neither.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -3276,15 +3290,46 @@ def parts_order_receive_all(request, parts_order_id):
         parts_order = get_object_or_404(PartsOrder, pk=parts_order_id)
         lines_to_receive = list(parts_order.lines.filter(received=False))
 
-        deltas = {}
+        part_deltas = {}
+        design_deltas = {}
         for line in lines_to_receive:
             if line.part_id:
-                deltas[line.part_id] = deltas.get(line.part_id, 0) + line.quantity
+                part_deltas[line.part_id] = part_deltas.get(line.part_id, 0) + line.quantity
+            elif line.design_id:
+                design_deltas[line.design_id] = design_deltas.get(line.design_id, 0) + line.quantity
 
         count = parts_order.lines.filter(received=False).update(received=True, received_dt=timezone.now())
-        _apply_part_stock_deltas(deltas)
+        _apply_part_stock_deltas(part_deltas)
+        _apply_design_pcb_stock_deltas(design_deltas)
 
     return JsonResponse({'ok': True, 'count': count})
+
+
+@staff_member_required
+def parts_order_line_set_design(request, line_id):
+    """POST-only AJAX endpoint (issue #100): sets or clears one PartsOrderLine's Design
+    association - the per-line Design picker shown for JLCPCB order lines on the parts
+    order detail page. `design_id` in the POST body identifies the Design; blank/absent
+    clears the association (used to explicitly mark a line as not a real, shippable board -
+    e.g. a phantom entry left behind by JLCPCB's cart "replace files" feature - so it's
+    excluded from receiving; see PartsOrderLine.design and _apply_design_pcb_stock_deltas).
+    Not JLCPCB-specific at the model/view level (any PartsOrderLine can carry a design), but
+    the UI only ever offers this control for JLCPCB orders.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    line = get_object_or_404(PartsOrderLine, pk=line_id)
+    design_id = (request.POST.get('design_id') or '').strip()
+    if design_id:
+        design = get_object_or_404(Design, pk=design_id)
+        line.design = design
+    else:
+        design = None
+        line.design = None
+    line.save(update_fields=['design'])
+
+    return JsonResponse({'ok': True, 'design_id': design.pk if design else None, 'design_label': str(design) if design else ''})
 
 
 # --- Parts Cart views (issue #93) ---

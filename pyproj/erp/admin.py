@@ -4,9 +4,9 @@ from django.contrib import admin
 
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreakHistory,
-    PartsCartLine, PartSource, PartSourceStockHistory, PartSourceVariant, PartsOrder, PartsOrderLine,
-    PartStockHistory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    BomSupplementRule, DesignBomEntry, DesignPcbStockHistory, Location, Part, PartAsset, PartCategory,
+    PartPriceBreakHistory, PartsCartLine, PartSource, PartSourceStockHistory, PartSourceVariant, PartsOrder,
+    PartsOrderLine, PartStockHistory, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -92,6 +92,20 @@ class PartStockHistoryAdmin(admin.ModelAdmin):
     list_select_related = ['part']
     search_fields = ['part__name']
     readonly_fields = ['part', 'stock', 'recorded_dt']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DesignPcbStockHistory)
+class DesignPcbStockHistoryAdmin(admin.ModelAdmin):
+    list_display = ['design', 'stock', 'recorded_dt']
+    list_select_related = ['design']
+    search_fields = ['design__name', 'design__sku']
+    readonly_fields = ['design', 'stock', 'recorded_dt']
 
     def has_add_permission(self, request):
         return False

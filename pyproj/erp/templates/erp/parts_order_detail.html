@@ -71,7 +71,11 @@
                     <thead>
                         <tr class="highlight">
                             <th style="width: 70px;"></th>
-                            <th>Part</th>
+                            {% if parts_order.supplier_name == 'JLCPCB' %}
+                                <th>Design</th>
+                            {% else %}
+                                <th>Part</th>
+                            {% endif %}
                             <th>Supplier SKU</th>
                             <th>Quantity</th>
                             <th>Unit Price</th>
@@ -88,13 +92,28 @@
                                              style="max-height: 50px; max-width: 60px; object-fit: contain; display: block;">
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if line.part %}
-                                        <a href="{% url 'erp:part_edit' line.part.pk %}">{{ line.part }}</a>
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
+                                {% if parts_order.supplier_name == 'JLCPCB' %}
+                                    <td>
+                                        {# No design is set by default (issue #100) - JLCPCB's cart can leave phantom, #}
+                                        {# never-shipped entries in an order, and there's no reliable way to tell them #}
+                                        {# apart from a real line, so a human decides per line whether to associate one. #}
+                                        <select class="form-select form-select-sm design-picker-select"
+                                                data-url="{% url 'erp:parts_order_line_set_design' line.pk %}">
+                                            <option value=""{% if not line.design_id %} selected{% endif %}>— not associated —</option>
+                                            {% for design in designs_for_picker %}
+                                                <option value="{{ design.pk }}"{% if line.design_id == design.pk %} selected{% endif %}>{{ design.client.company_name }} {{ design.sku }}: {{ design.name }} v{{ design.hw_version }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                {% else %}
+                                    <td>
+                                        {% if line.part %}
+                                            <a href="{% url 'erp:part_edit' line.part.pk %}">{{ line.part }}</a>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                                 <td>{{ line.supplier_sku|default:"—" }}</td>
                                 <td>{{ line.quantity }}</td>
                                 <td>
@@ -174,6 +193,34 @@
                     alert('Network error.');
                 } finally {
                     btn.disabled = false;
+                }
+            });
+        });
+
+        document.querySelectorAll('.design-picker-select').forEach(function (select) {
+            select.addEventListener('change', async function () {
+                const originalValue = select.dataset.lastValue ?? '';
+                select.disabled = true;
+                try {
+                    const body = new URLSearchParams();
+                    body.set('design_id', select.value);
+                    const resp = await fetch(select.dataset.url, {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+                        body: body,
+                    });
+                    const data = await resp.json();
+                    if (data.ok) {
+                        select.dataset.lastValue = select.value;
+                    } else {
+                        alert(data.error || 'Failed to update.');
+                        select.value = originalValue;
+                    }
+                } catch (e) {
+                    alert('Network error.');
+                    select.value = originalValue;
+                } finally {
+                    select.disabled = false;
                 }
             });
         });

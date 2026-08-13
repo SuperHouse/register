@@ -7,8 +7,6 @@ from django.utils import timezone
 
 from .models import Design, Device, DeviceAsset, DeviceEvent, DeviceImage, DesignAsset, TestRecord
 from crm.models import Org
-from erp.forms import GroupedPartChoiceField
-from erp.models import Part
 
 
 class DateTimeLocalInput(forms.DateTimeInput):
@@ -32,22 +30,14 @@ class DateTimeLocalInput(forms.DateTimeInput):
 class DesignDetailsForm(forms.ModelForm):
     """Editable fields shown in the Design detail page's top info card: the core
     identity/pricing fields (currently only ever set via the XLSX import command) plus
-    the Build Costing input fields."""
-    pcb_part = GroupedPartChoiceField(
-        label='PCB',
-        # Scoped to the "PCBs" category (see erp.views._match_or_create_part_for_jlcpcb_line,
-        # which files every auto-created JLCPCB Part there) rather than every Part in the
-        # database - a bare PCB stock item should only ever be chosen from that category.
-        queryset=Part.objects.filter(category__name='PCBs').select_related('category').order_by('name'),
-        required=False,
-        empty_label='— not set —',
-        widget=forms.Select(attrs={'class': 'form-select'}),
-    )
-
+    the Build Costing input fields. pcb_stock (issue #100) is staff-only the same way the
+    Build Costing inputs already are on this page - present in this form/card, but not in
+    the non-staff read-only table in design_detail.html, which is what makes it staff-only
+    (there's no separate visibility flag)."""
     class Meta:
         model = Design
         fields = [
-            'sku', 'description', 'price', 'pcb_part',
+            'sku', 'description', 'price', 'pcb_stock',
             'assembly_time_minutes', 'additional_materials', 'pcb_cost',
             'conformal_coating', 'anti_shock_glue', 'packaging',
         ]
@@ -55,6 +45,7 @@ class DesignDetailsForm(forms.ModelForm):
             'sku': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 250px;'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'pcb_stock': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'additional_materials': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'pcb_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),

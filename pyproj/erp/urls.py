@@ -37,6 +37,7 @@ urlpatterns = [
     path('parts-orders/add-jlcpcb/', views.parts_order_add_jlcpcb, name='parts_order_add_jlcpcb'),
     path('parts-orders/<int:parts_order_id>/receive-all/', views.parts_order_receive_all, name='parts_order_receive_all'),
     path('parts-orders/line/<int:line_id>/toggle-received/', views.parts_order_line_toggle_received, name='parts_order_line_toggle_received'),
+    path('parts-orders/line/<int:line_id>/set-design/', views.parts_order_line_set_design, name='parts_order_line_set_design'),
 
     path('parts-cart/', views.parts_cart_list, name='parts_cart_list'),
     path('parts-cart/add/', views.parts_cart_add, name='parts_cart_add'),

@@ -89,12 +89,12 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th>{{ design_form.pcb_part.label }}:</th>
+                                    <th>{{ design_form.pcb_stock.label }}:</th>
                                     <td>
-                                        <div style="max-width: 300px;">
-                                            {{ design_form.pcb_part }}
+                                        <div class="input-group" style="max-width: 150px;">
+                                            {{ design_form.pcb_stock }}
                                         </div>
-                                        {% if design_form.pcb_part.errors %}<div class="text-danger small">{{ design_form.pcb_part.errors }}</div>{% endif %}
+                                        {% if design_form.pcb_stock.errors %}<div class="text-danger small">{{ design_form.pcb_stock.errors }}</div>{% endif %}
                                     </td>
                                 </tr>
                                 <tr>
@@ -171,10 +171,6 @@
                                 <td>{{ design.price|default:"<i>Not set</i>" }}</td>
                             </tr>
                             <tr>
-                                <th>PCB:</th>
-                                <td>{{ design.pcb_part.name|default:"<i>Not set</i>" }}</td>
-                            </tr>
-                            <tr>
                                 <th>Devices:</th>
                                 <td>{{ device_count }}</td>
                             </tr>
@@ -182,6 +178,34 @@
                     {% endif %}
                 </div>
             </div>
+
+            {% if user.is_staff and pcb_order_lines %}
+                <h5 class="mt-4">PCB Orders</h5>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr class="highlight">
+                                    <th>Order Number</th>
+                                    <th>Order Date</th>
+                                    <th>Quantity</th>
+                                    <th>Received</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for line in pcb_order_lines %}
+                                    <tr>
+                                        <td><a href="{% url 'erp:parts_order_detail' line.parts_order.pk %}">{{ line.parts_order.supplier_order_number }}</a></td>
+                                        <td>{{ line.parts_order.order_dt|date:"j-M-Y"|default:"—" }}</td>
+                                        <td>{{ line.quantity }}</td>
+                                        <td>{% if line.received %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}—{% endif %}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
 
             {% if user.is_staff or has_core_assets %}
                 <h5 class="mt-4">Design Files</h5>

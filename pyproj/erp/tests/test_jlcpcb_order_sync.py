@@ -7,18 +7,25 @@ from datetime import datetime, timezone as dt_timezone
 
 import pytest
 
-from erp.models import Part, PartCategory, PartsOrder, PartSource, PartSourceVariant, PartsOrderLine
+from crm.models import Org
+from device.models import Design
+from erp.models import Part, PartsOrder, PartsOrderLine
 from erp.views import (
     _jlcpcb_order_status_label,
     _jlcpcb_sign_request,
     _map_jlcpcb_order_status,
-    _match_or_create_part_for_jlcpcb_line,
     _parse_jlcpcb_date,
     _parse_jlcpcb_dt,
     _parse_jlcpcb_order,
     _parse_jlcpcb_order_item,
     _upsert_parts_order,
 )
+
+
+@pytest.fixture
+def design():
+    org = Org.objects.create(company_name='JLCPCB Sync Test Org')
+    return Design.objects.create(client=org, sku='JLC1', name='JLCPCB Sync Test Design', hw_version='1.0')
 
 
 def _set_jlcpcb_env(monkeypatch, app_id='APP1', access_key='ACCESS1', secret_key='SECRET1'):
@@ -255,70 +262,18 @@ def test_parse_jlcpcb_order_all_stencil_items_yields_no_lines_and_blank_status()
     assert parsed['status'] == ''
 
 
-# --- _match_or_create_part_for_jlcpcb_line ---
+# --- _upsert_parts_order with part_matcher=None (issue #100) ---
+#
+# JLCPCB lines are never matched/created as Parts any more (produceCode isn't stable across
+# reorders - see _sync_jlcpcb_parts_order's docstring). Instead each line's `design` is left
+# unset by _upsert_parts_order entirely and is set later, by hand, per line, via
+# parts_order_line_set_design - see erp/tests/test_parts_order_views.py for that path.
 
 @pytest.mark.django_db
-def test_match_or_create_part_for_jlcpcb_line_matches_existing_variant():
-    part = Part.objects.create(name='Existing PCB Part')
-    source = PartSource.objects.create(part=part, supplier_name='JLCPCB', manufacturer_sku='')
-    variant = PartSourceVariant.objects.create(source=source, supplier_sku='Y467')
-
-    matched_part, matched_variant = _match_or_create_part_for_jlcpcb_line('Y467', 'ignored')
-
-    assert matched_part == part
-    assert matched_variant == variant
-
-
-@pytest.mark.django_db
-def test_match_or_create_part_for_jlcpcb_line_matches_case_insensitively():
-    part = Part.objects.create(name='Existing PCB Part')
-    source = PartSource.objects.create(part=part, supplier_name='JLCPCB', manufacturer_sku='')
-    PartSourceVariant.objects.create(source=source, supplier_sku='Y467')
-
-    matched_part, _ = _match_or_create_part_for_jlcpcb_line('y467', 'ignored')
-
-    assert matched_part == part
-
-
-@pytest.mark.django_db
-def test_match_or_create_part_for_jlcpcb_line_creates_new_part_under_pcbs_category():
-    assert not PartSourceVariant.objects.filter(supplier_sku='Y999').exists()
-
-    matched_part, matched_variant = _match_or_create_part_for_jlcpcb_line('Y999', 'BeetleBot-v1_0_Y999')
-
-    assert matched_part is not None
-    assert matched_part.name == 'Y999'
-    assert matched_part.description == 'BeetleBot-v1_0_Y999'
-    assert matched_part.category.name == 'PCBs'
-    assert matched_variant.supplier_sku == 'Y999'
-    assert matched_variant.source.supplier_name == 'JLCPCB'
-    assert matched_variant.source.part == matched_part
-
-
-@pytest.mark.django_db
-def test_match_or_create_part_for_jlcpcb_line_reuses_pcbs_category_across_calls():
-    _match_or_create_part_for_jlcpcb_line('Y001', 'design one')
-    _match_or_create_part_for_jlcpcb_line('Y002', 'design two')
-
-    assert PartCategory.objects.filter(name='PCBs').count() == 1
-
-
-@pytest.mark.django_db
-def test_match_or_create_part_for_jlcpcb_line_returns_none_for_blank_sku():
-    matched_part, matched_variant = _match_or_create_part_for_jlcpcb_line('', 'desc')
-    assert matched_part is None
-    assert matched_variant is None
-
-
-# --- _upsert_parts_order with the JLCPCB matcher ---
-
-@pytest.mark.django_db
-def test_upsert_parts_order_creates_jlcpcb_order_and_lines():
+def test_upsert_parts_order_with_none_matcher_leaves_part_and_variant_none():
     parsed = _parse_jlcpcb_order({'orderItem': [_order_item(produce_code='PC1', count=10)]}, batch_num='BATCH1')
 
-    parts_order = _upsert_parts_order(
-        parsed, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line
-    )
+    parts_order = _upsert_parts_order(parsed, supplier_name='JLCPCB', part_matcher=None)
 
     assert parts_order.supplier_name == 'JLCPCB'
     assert parts_order.supplier_order_number == 'BATCH1'
@@ -326,10 +281,10 @@ def test_upsert_parts_order_creates_jlcpcb_order_and_lines():
     line = parts_order.lines.first()
     assert line.supplier_sku == 'PC1'
     assert line.quantity == 10
-    assert line.part is not None
-    assert line.part.name == 'PC1'
-    assert line.part.category.name == 'PCBs'
-    assert line.part_source_variant is not None
+    assert line.part is None
+    assert line.part_source_variant is None
+    assert line.design is None
+    assert Part.objects.count() == 0  # confirms no stray Part was created
 
 
 @pytest.mark.django_db
@@ -337,13 +292,31 @@ def test_upsert_parts_order_jlcpcb_reuses_row_on_resubmit():
     # parts_order_add_jlcpcb re-submits an existing batchNum to manually refresh it -
     # relies on _upsert_parts_order's update_or_create behaviour, not a new row each time.
     parsed = _parse_jlcpcb_order({'orderItem': [_order_item(order_status=4)]}, batch_num='BATCH1')
-    _upsert_parts_order(parsed, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line)
+    _upsert_parts_order(parsed, supplier_name='JLCPCB', part_matcher=None)
 
     resynced = _parse_jlcpcb_order({'orderItem': [_order_item(order_status=5)]}, batch_num='BATCH1')
-    _upsert_parts_order(resynced, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line)
+    _upsert_parts_order(resynced, supplier_name='JLCPCB', part_matcher=None)
 
     assert PartsOrder.objects.filter(supplier_name='JLCPCB', supplier_order_number='BATCH1').count() == 1
     assert PartsOrder.objects.get(supplier_name='JLCPCB', supplier_order_number='BATCH1').status == 'Shipped'
+
+
+@pytest.mark.django_db
+def test_upsert_parts_order_jlcpcb_resync_preserves_a_human_set_design(design):
+    # design is never part of _upsert_parts_order's line defaults, so a resync (e.g. the
+    # scheduled refresh_parts_orders run, which never knows about designs at all) must never
+    # clobber an association a human set via parts_order_line_set_design.
+    parsed = _parse_jlcpcb_order({'orderItem': [_order_item(produce_code='PC1')]}, batch_num='BATCH1')
+    parts_order = _upsert_parts_order(parsed, supplier_name='JLCPCB', part_matcher=None)
+    line = parts_order.lines.get(supplier_sku='PC1')
+    line.design = design
+    line.save(update_fields=['design'])
+
+    resynced = _parse_jlcpcb_order({'orderItem': [_order_item(produce_code='PC1', order_status=5)]}, batch_num='BATCH1')
+    _upsert_parts_order(resynced, supplier_name='JLCPCB', part_matcher=None)
+
+    line.refresh_from_db()
+    assert line.design_id == design.pk
 
 
 @pytest.mark.django_db
@@ -355,7 +328,7 @@ def test_upsert_parts_order_jlcpcb_does_not_collide_with_other_suppliers_sharing
     jlcpcb_parsed = dict(digikey_parsed)
 
     _upsert_parts_order(digikey_parsed, supplier_name='DigiKey')
-    _upsert_parts_order(jlcpcb_parsed, supplier_name='JLCPCB', part_matcher=_match_or_create_part_for_jlcpcb_line)
+    _upsert_parts_order(jlcpcb_parsed, supplier_name='JLCPCB', part_matcher=None)
 
     assert PartsOrder.objects.filter(supplier_order_number='SHARED1').count() == 2
     assert Part.objects.count() == 0  # confirms no stray Parts were created for either row
