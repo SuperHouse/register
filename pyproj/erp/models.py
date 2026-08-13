@@ -728,6 +728,34 @@ class PartsOrderLine(models.Model):
     def symbol(self):
         return PartPriceBreak.CURRENCY_SYMBOLS.get(self.currency, '')
 
+    @property
+    def display_sku(self):
+        """The value to show wherever a line's "Supplier SKU" is displayed. For every
+        supplier except JLCPCB this is just supplier_sku, already a complete, human-
+        meaningful identifier on its own. JLCPCB is the one exception (same "we already
+        have one JLCPCB special case" reasoning as PartsOrderLine.design): its
+        supplier_sku is produceCode, a fresh, meaningless-on-its-own ID minted per
+        order/reorder/replace-file (see PartsOrderLine.design's docstring), so on its own
+        it tells a human nothing about which board it is. JLCPCB's own website instead
+        labels each entry with a compound value built from the Gerber filename (stored as
+        description - see erp.views._parse_jlcpcb_order_item) and produceCode, e.g.
+        "BeetleBot-v1_0_Y466" - description is "BeetleBot-v1_0.zip", supplier_sku is
+        "Y466". This reconstructs that two-part compound (extension stripped from
+        description, whatever it is - not hardcoded to ".zip") so staff can recognise an
+        entry the same way JLCPCB's own site presents it, without needing to store the
+        compound string itself (description and supplier_sku alone are still what's
+        matched against on resync - see _upsert_parts_order). Deliberately doesn't
+        reconstruct JLCPCB's further "(Reorder)"/"(replacefile)" annotations - those come
+        from other status data this app doesn't currently parse (which field(s) carry it
+        is unconfirmed - see the "# --- JLCPCB PCB order sync" module comment in
+        erp/views.py for this integration's other unconfirmed-field caveats), not from
+        fileName or produceCode alone.
+        """
+        if self.parts_order.supplier_name == 'JLCPCB' and self.description:
+            stem = os.path.splitext(self.description)[0]
+            return f'{stem}_{self.supplier_sku}' if self.supplier_sku else stem
+        return self.supplier_sku
+
 
 class PartCategory(models.Model):
     """A category in a hierarchy for classifying parts (e.g. Passives > Resistors > SMD)."""

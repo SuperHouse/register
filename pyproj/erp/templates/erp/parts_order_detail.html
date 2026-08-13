@@ -114,7 +114,7 @@
                                         {% endif %}
                                     </td>
                                 {% endif %}
-                                <td>{{ line.supplier_sku|default:"—" }}</td>
+                                <td>{{ line.display_sku|default:"—" }}</td>
                                 <td>{{ line.quantity }}</td>
                                 <td>
                                     {% if line.unit_price is not None %}

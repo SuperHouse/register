@@ -3106,6 +3106,12 @@ def parts_order_detail(request, parts_order_id):
         PartsOrder.objects.prefetch_related('lines__part', 'lines__part_source_variant', 'lines__design'),
         pk=parts_order_id,
     )
+    # Populate each line's parts_order cache manually rather than adding a
+    # select_related('parts_order') to the prefetch above - Django already has the object
+    # in hand here, so this avoids an N+1 query PartsOrderLine.display_sku would otherwise
+    # trigger reading line.parts_order.supplier_name once per line.
+    for line in parts_order.lines.all():
+        line.parts_order = parts_order
     # Only actually rendered for JLCPCB orders (issue #100's per-line Design picker), but
     # cheap enough to always fetch rather than branching on supplier_name here too.
     designs_for_picker = Design.objects.filter(obsolete=False).select_related('client').order_by(

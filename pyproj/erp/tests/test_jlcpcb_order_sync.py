@@ -332,3 +332,53 @@ def test_upsert_parts_order_jlcpcb_does_not_collide_with_other_suppliers_sharing
 
     assert PartsOrder.objects.filter(supplier_order_number='SHARED1').count() == 2
     assert Part.objects.count() == 0  # confirms no stray Parts were created for either row
+
+
+# --- PartsOrderLine.display_sku ---
+
+@pytest.mark.django_db
+def test_display_sku_compounds_filename_and_produce_code_for_jlcpcb():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y466', description='BeetleBot-v1_0.zip', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y466'
+
+
+@pytest.mark.django_db
+def test_display_sku_strips_whatever_extension_is_present_not_just_zip():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y466', description='BeetleBot-v1_0.rar', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y466'
+
+
+@pytest.mark.django_db
+def test_display_sku_falls_back_to_filename_alone_when_produce_code_blank():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='', description='BeetleBot-v1_0.zip', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0'
+
+
+@pytest.mark.django_db
+def test_display_sku_falls_back_to_supplier_sku_when_description_blank():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(parts_order=parts_order, supplier_sku='Y466', description='', quantity=1)
+
+    assert line.display_sku == 'Y466'
+
+
+@pytest.mark.django_db
+def test_display_sku_is_plain_supplier_sku_for_non_jlcpcb_suppliers():
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='DK123', description='Some Part', quantity=1,
+    )
+
+    assert line.display_sku == 'DK123'
