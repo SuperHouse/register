@@ -85,7 +85,16 @@
                     </thead>
                     <tbody id="line-items-body">
                         {% for line in parts_order.lines.all %}
-                            <tr data-line-id="{{ line.pk }}">
+                            {% comment %}
+                                A CANCELLED line (issue #100 - confirmed via a real JLCPCB order that
+                                orderStatus 0 marks a phantom entry left behind by the "replace file"
+                                cart feature, e.g. an old produceCode superseded by a newer one) is
+                                greyed out and has its controls disabled rather than hidden - it stays
+                                visible as a record of what the supplier reported, but can't be
+                                associated with a Design or received. Not JLCPCB-specific - any
+                                supplier's cancelled line gets the same treatment.
+                            {% endcomment %}
+                            <tr data-line-id="{{ line.pk }}"{% if line.status == 'CANCELLED' %} class="table-secondary text-body-secondary"{% endif %}>
                                 <td>
                                     {% if line.part.image %}
                                         <img src="{{ line.part.image.url }}" alt="{{ line.part.name }}"
@@ -98,7 +107,8 @@
                                         {# never-shipped entries in an order, and there's no reliable way to tell them #}
                                         {# apart from a real line, so a human decides per line whether to associate one. #}
                                         <select class="form-select form-select-sm design-picker-select"
-                                                data-url="{% url 'erp:parts_order_line_set_design' line.pk %}">
+                                                data-url="{% url 'erp:parts_order_line_set_design' line.pk %}"
+                                                {% if line.status == 'CANCELLED' %}disabled title="Cancelled by the supplier - can't be associated with a design"{% endif %}>
                                             <option value=""{% if not line.design_id %} selected{% endif %}>— not associated —</option>
                                             {% for design in designs_for_picker %}
                                                 <option value="{{ design.pk }}"{% if line.design_id == design.pk %} selected{% endif %}>{{ design.client.company_name }} {{ design.sku }}: {{ design.name }} v{{ design.hw_version }}</option>
@@ -127,7 +137,11 @@
                                 <td>
                                     <button type="button" class="btn btn-sm btn-link p-0 received-toggle-btn"
                                             data-url="{% url 'erp:parts_order_line_toggle_received' line.pk %}"
-                                            title="{% if line.received %}Received {{ line.received_dt|date:'j-M-Y H:i' }} - click to unmark{% else %}Mark as received{% endif %}">
+                                            {% if line.status == 'CANCELLED' %}
+                                                disabled title="Cancelled by the supplier - can't be received"
+                                            {% else %}
+                                                title="{% if line.received %}Received {{ line.received_dt|date:'j-M-Y H:i' }} - click to unmark{% else %}Mark as received{% endif %}"
+                                            {% endif %}>
                                         <i class="bi {% if line.received %}bi-check-circle-fill text-success{% else %}bi-check-circle{% endif %}"></i>
                                     </button>
                                 </td>

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 from datetime import datetime, timezone as dt_timezone
+from decimal import Decimal
 
 import pytest
 
@@ -35,14 +36,19 @@ def _set_jlcpcb_env(monkeypatch, app_id='APP1', access_key='ACCESS1', secret_key
 
 
 def _order_item(order_type=1, count=1, price='10.00', order_status=4, file_name='design-v1.zip',
-                 produce_code='PC1', order_date='2026-07-08 16:11:03', delivery_time='2026-07-15 00:00:00'):
+                 produce_code='PC1', order_date='2026-07-08 16:11:03', delivery_time='2026-07-15 00:00:00',
+                 panel_flag=0, panel_x=None, panel_y=None):
     # order_status defaults to 4 ("Submitted to the factory") - a documented, non-edge-case
     # value, per the confirmed enum in Resources/JLCPCB-API/Order Information Query API.pdf.
+    # panel_flag/panel_x/panel_y default to the unpanelised shape (0/null/null), confirmed
+    # live against real order W2026080710498327 alongside the panelised shape (1/2/1) - see
+    # test_parse_jlcpcb_order_item_multiplies_quantity_by_panel_count below.
     return {
         'orderType': order_type,
         'pcbItem': {
             'count': count, 'price': price, 'orderStatus': order_status, 'fileName': file_name,
             'produceCode': produce_code, 'orderDate': order_date, 'deliveryTime': delivery_time,
+            'panelFlag': panel_flag, 'panelByJLCPCB_X': panel_x, 'panelByJLCPCB_Y': panel_y,
         },
     }
 
@@ -203,6 +209,51 @@ def test_parse_jlcpcb_order_item_handles_missing_price():
     parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.OPEN, currency='USD', line_index=0)
 
     assert parsed['unit_price'] is None
+
+
+# --- _parse_jlcpcb_order_item panelisation (issue #100) ---
+#
+# Confirmed live against real order W2026080710498327: a panelised line reports `count` as
+# panels ordered, not individual PCBs - JLCPCB's own site shows this exact line as "30
+# Panels, 60 Single Pieces" (count=30, panelByJLCPCB_X=2, panelByJLCPCB_Y=1).
+
+def test_parse_jlcpcb_order_item_multiplies_quantity_by_panel_count():
+    item = _order_item(count=30, price='108.30', panel_flag=1, panel_x=2, panel_y=1)
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.OPEN, currency='USD', line_index=0)
+
+    assert parsed['quantity'] == 60
+    assert parsed['unit_price'] == pytest.approx(Decimal('108.30') / 60)
+
+
+def test_parse_jlcpcb_order_item_unpanelised_quantity_is_plain_count():
+    # panelFlag=0, panelByJLCPCB_X/_Y both null - the shape a real unpanelised line has.
+    item = _order_item(count=10, price='42.70', panel_flag=0, panel_x=None, panel_y=None)
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.OPEN, currency='USD', line_index=0)
+
+    assert parsed['quantity'] == 10
+    assert parsed['unit_price'] == pytest.approx(Decimal('42.70') / 10)
+
+
+def test_parse_jlcpcb_order_item_ignores_panel_xy_when_panel_flag_not_set():
+    # Defensive: only multiply when panelFlag genuinely says 1 - stray/unexpected X/Y values
+    # on an otherwise-unpanelised line shouldn't silently inflate quantity.
+    item = _order_item(count=10, panel_flag=0, panel_x=2, panel_y=1)
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.OPEN, currency='USD', line_index=0)
+
+    assert parsed['quantity'] == 10
+
+
+def test_parse_jlcpcb_order_item_panel_flag_set_but_xy_missing_falls_back_to_count():
+    # Defensive: panelFlag=1 with a missing/zero X or Y (shouldn't happen per the confirmed
+    # shape, but not guaranteed) shouldn't multiply by None/0 or raise.
+    item = _order_item(count=10, panel_flag=1, panel_x=None, panel_y=None)
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.OPEN, currency='USD', line_index=0)
+
+    assert parsed['quantity'] == 10
 
 
 # --- _parse_jlcpcb_order ---

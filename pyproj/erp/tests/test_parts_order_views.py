@@ -484,3 +484,71 @@ def test_parts_order_detail_renders_design_picker_for_jlcpcb_orders(client, staf
     assert response.status_code == 200
     assert 'design-picker-select' in content
     assert design.sku in content
+
+
+# --- CANCELLED lines are suppressed (issue #100 - confirmed via a real JLCPCB order that
+# orderStatus 0 marks a phantom entry a supplier's "replace file"-style feature leaves behind) ---
+
+@pytest.mark.django_db
+def test_toggle_received_refuses_a_cancelled_line(client, staff_user):
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, quantity=5, status=PartsOrderLine.CANCELLED,
+    )
+
+    client.force_login(staff_user)
+    response = client.post(reverse('erp:parts_order_line_toggle_received', args=[line.pk]))
+
+    assert response.json()['ok'] is False
+    line.refresh_from_db()
+    assert line.received is False
+
+
+@pytest.mark.django_db
+def test_set_design_refuses_a_cancelled_line(client, staff_user, design):
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, quantity=1, status=PartsOrderLine.CANCELLED,
+    )
+
+    client.force_login(staff_user)
+    response = client.post(reverse('erp:parts_order_line_set_design', args=[line.pk]), {'design_id': design.pk})
+
+    assert response.json()['ok'] is False
+    line.refresh_from_db()
+    assert line.design_id is None
+
+
+@pytest.mark.django_db
+def test_receive_all_excludes_cancelled_lines(client, staff_user, design):
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    cancelled = PartsOrderLine.objects.create(
+        parts_order=parts_order, design=design, quantity=5, status=PartsOrderLine.CANCELLED,
+    )
+    receivable = PartsOrderLine.objects.create(parts_order=parts_order, design=design, quantity=3)
+
+    client.force_login(staff_user)
+    response = client.post(reverse('erp:parts_order_receive_all', args=[parts_order.pk]))
+
+    assert response.json() == {'ok': True, 'count': 1}
+    cancelled.refresh_from_db()
+    receivable.refresh_from_db()
+    assert cancelled.received is False
+    assert receivable.received is True
+    design.refresh_from_db()
+    assert design.pcb_stock == 3  # only the receivable line's quantity, not the cancelled one's
+
+
+@pytest.mark.django_db
+def test_parts_order_detail_disables_controls_for_a_cancelled_line(client, staff_user, design):
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='PC1', quantity=1, status=PartsOrderLine.CANCELLED,
+    )
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:parts_order_detail', args=[parts_order.pk]))
+    content = response.content.decode()
+
+    assert 'table-secondary' in content
+    assert 'design-picker-select' in content and 'disabled' in content

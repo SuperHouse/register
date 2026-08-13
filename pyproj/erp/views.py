@@ -2803,6 +2803,30 @@ def _sync_lcsc_parts_orders(from_date, to_date):
 # code 2005 ("Batch number does not exist or cannot be bound") is exactly what a bogus
 # batchNum returned during live verification above - a second, independent confirmation
 # the signing/auth layer is correct, not just a coincidental-looking error shape.
+#
+# A real /pcb/order/detail response (order W2026080710498327, captured live - issue #100)
+# confirmed several more pcbItem fields beyond what's parsed today, some of which are now
+# used (panelFlag/panelByJLCPCB_X/panelByJLCPCB_Y - see _parse_jlcpcb_order_item's
+# docstring; orderStatus 0 = Cancelled correlating with a cart "replace file" superseding an
+# earlier produceCode, alongside a human-readable cancelReason - see
+# parts_order_detail.html's CANCELLED-line handling), and some noted here for future PCB
+# management work rather than acted on now:
+#   - customerCode: confirmed NOT board-specific - identical across three different-design
+#     lines in the same order, so it's most likely an account-level code, not something
+#     that could help identify which physical board a line is. Answers the open question
+#     from issue #52's own research notes.
+#   - Per-line physical spec, not currently stored anywhere: layer, width, length,
+#     thickness, pcbColor, surfaceFinish, copperWeight, goldFinger, materialDetails,
+#     halfHole/halfHoleNumber, insideCuprumThickness. Could be useful for a future PCB
+#     stock/board-identification feature, or for cross-checking against a Design's own
+#     recorded specs.
+#   - orderFileUrl: a direct download link (path-relative to JLCPCB's own site, e.g.
+#     "/file/download?uuid=...&businessType=example") to the exact Gerber archive for that
+#     line - could let staff download and inspect the real file when a filename/produceCode
+#     alone isn't enough to tell which design a line belongs to.
+#   - Order-level fields also present but unused: orderAddress, shippingMethod,
+#     paymentMethod, totalDummyMoney, totalCarriageMoney, totalMoney - shipping/billing
+#     detail, not obviously relevant to stock tracking.
 
 JLCPCB_BASE_URL = 'https://open.jlcpcb.com'
 _JLCPCB_NONCE_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -2973,18 +2997,40 @@ def _parse_jlcpcb_order_item(item, order_status, currency, line_index):
     Number" - a real per-item identifier, not a positional guess - so it's used for both
     supplier_sku and supplier_line_number (stable across resyncs, same convention as
     DigiKey's DetailId/LCSC's line uuid); line_index is only a fallback for the
-    supplier_line_number if produceCode is ever blank. unit_price divides the item's price
-    by its count - confirmed plausible against the docs' own worked example (price=5 for
-    count=10, consistent with JLCPCB's well-known low-cost prototype pricing), though the
-    docs don't say in so many words that price is a line total rather than already
-    per-unit."""
+    supplier_line_number if produceCode is ever blank.
+
+    quantity is the actual individual-PCB piece count, not JLCPCB's own "count" field as-is
+    (issue #100) - confirmed live against real order W2026080710498327: a panelised line
+    reports count as the number of PANELS ordered (e.g. count=30), with the pieces-per-panel
+    breakdown in panelByJLCPCB_X/panelByJLCPCB_Y (2x1 there - JLCPCB's own site shows this
+    same order as "30 Panels, 60 Single Pieces"). panelFlag distinguishes a panelised line
+    (panelByJLCPCB_X/_Y populated) from an unpanelised one (both null, count already is the
+    piece count) - confirmed against the same live order, which has both kinds of line in
+    one response. This is stored as `quantity` (not kept as a separate "panels" figure)
+    because every other supplier's `quantity`/PartsOrderLine.quantity already means "how
+    many individual units", and Design.pcb_stock crediting (_apply_design_pcb_stock_deltas)
+    reads quantity directly - keeping quantity supplier-consistent means that crediting
+    logic needs no JLCPCB-specific carve-out.
+
+    unit_price divides price by the piece count (not the raw panel count), so quantity *
+    unit_price still reconstructs the original line price regardless of panelisation -
+    confirmed plausible against the docs' own worked example (price=5 for count=10,
+    consistent with JLCPCB's well-known low-cost prototype pricing) for the unpanelised
+    case, though the docs don't say in so many words that price is a line total rather than
+    already per-unit."""
     pcb_item = item.get('pcbItem') or {}
     count = pcb_item.get('count') or 1
+    panel_x = pcb_item.get('panelByJLCPCB_X')
+    panel_y = pcb_item.get('panelByJLCPCB_Y')
+    if pcb_item.get('panelFlag') == 1 and panel_x and panel_y:
+        quantity = count * panel_x * panel_y
+    else:
+        quantity = count
     price = pcb_item.get('price')
     unit_price = None
     if price is not None:
         try:
-            unit_price = Decimal(str(price)) / Decimal(str(count))
+            unit_price = Decimal(str(price)) / Decimal(str(quantity))
         except (InvalidOperation, ZeroDivisionError):
             unit_price = None
     produce_code = pcb_item.get('produceCode') or ''
@@ -2992,7 +3038,7 @@ def _parse_jlcpcb_order_item(item, order_status, currency, line_index):
         'supplier_sku': produce_code,
         'supplier_line_number': produce_code or str(line_index),
         'description': pcb_item.get('fileName') or '',
-        'quantity': count,
+        'quantity': quantity,
         'unit_price': unit_price,
         'currency': currency,
         'status': order_status,
@@ -3261,12 +3307,18 @@ def parts_order_line_toggle_received(request, line_id):
     silently discarding the far more useful ordering line. A line with neither (not yet
     assigned, or a deliberately-unassociated phantom entry - see PartsOrderLine.design) has
     nothing to adjust either way.
+
+    Refuses a CANCELLED line (issue #100) - the UI already disables this control for one
+    (see parts_order_detail.html), this is the server-side backstop so a stale page or a
+    direct POST can't receive a phantom entry regardless.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
     with transaction.atomic():
         line = get_object_or_404(PartsOrderLine, pk=line_id)
+        if line.status == PartsOrderLine.CANCELLED:
+            return JsonResponse({'ok': False, 'error': 'This line was cancelled by the supplier and cannot be received.'})
         line.received = not line.received
         line.received_dt = timezone.now() if line.received else None
         line.save(update_fields=['received', 'received_dt'])
@@ -3297,13 +3349,19 @@ def parts_order_receive_all(request, parts_order_id):
     for why a line can legitimately have a stale `part` left over from the pre-issue-#100
     Part-matching implementation alongside a `design` set since. A line with neither (not
     yet assigned, or a deliberately-unassociated phantom entry) contributes to neither.
+
+    Excludes CANCELLED lines entirely (issue #100) - same reasoning as
+    parts_order_line_toggle_received's server-side backstop, so a bulk "Receive All" can't
+    sweep a phantom entry's quantity into stock even though its own per-line toggle is
+    disabled in the UI.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
     with transaction.atomic():
         parts_order = get_object_or_404(PartsOrder, pk=parts_order_id)
-        lines_to_receive = list(parts_order.lines.filter(received=False))
+        receivable_lines = parts_order.lines.filter(received=False).exclude(status=PartsOrderLine.CANCELLED)
+        lines_to_receive = list(receivable_lines)
 
         part_deltas = {}
         design_deltas = {}
@@ -3313,7 +3371,7 @@ def parts_order_receive_all(request, parts_order_id):
             if line.design_id:
                 design_deltas[line.design_id] = design_deltas.get(line.design_id, 0) + line.quantity
 
-        count = parts_order.lines.filter(received=False).update(received=True, received_dt=timezone.now())
+        count = receivable_lines.update(received=True, received_dt=timezone.now())
         _apply_part_stock_deltas(part_deltas)
         _apply_design_pcb_stock_deltas(design_deltas)
 
@@ -3330,11 +3388,16 @@ def parts_order_line_set_design(request, line_id):
     excluded from receiving; see PartsOrderLine.design and _apply_design_pcb_stock_deltas).
     Not JLCPCB-specific at the model/view level (any PartsOrderLine can carry a design), but
     the UI only ever offers this control for JLCPCB orders.
+
+    Refuses a CANCELLED line (issue #100) - same server-side backstop as
+    parts_order_line_toggle_received, matching the disabled picker in the UI.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
     line = get_object_or_404(PartsOrderLine, pk=line_id)
+    if line.status == PartsOrderLine.CANCELLED:
+        return JsonResponse({'ok': False, 'error': 'This line was cancelled by the supplier and cannot be associated with a design.'})
     design_id = (request.POST.get('design_id') or '').strip()
     if design_id:
         design = get_object_or_404(Design, pk=design_id)
