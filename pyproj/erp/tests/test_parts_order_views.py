@@ -360,6 +360,40 @@ def test_toggle_received_with_no_part_or_design_does_not_error(client, staff_use
 
 
 @pytest.mark.django_db
+def test_toggle_received_credits_both_when_line_has_stale_part_and_a_design(client, staff_user, design):
+    # Regression: a line synced under the pre-issue-#100 Part-matching implementation can
+    # still carry a stale `part` (an orphaned Part from that era) alongside a `design` a
+    # human has since assigned via parts_order_line_set_design. An if/elif on part_id used
+    # to silently credit only the stale Part and skip the Design entirely.
+    part = Part.objects.create(name='Orphaned JLCPCB Part')
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(parts_order=parts_order, part=part, design=design, quantity=5)
+
+    client.force_login(staff_user)
+    client.post(reverse('erp:parts_order_line_toggle_received', args=[line.pk]))
+
+    part.refresh_from_db()
+    design.refresh_from_db()
+    assert part.stock == 5
+    assert design.pcb_stock == 5
+
+
+@pytest.mark.django_db
+def test_receive_all_credits_both_when_a_line_has_stale_part_and_a_design(client, staff_user, design):
+    part = Part.objects.create(name='Orphaned JLCPCB Part')
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    PartsOrderLine.objects.create(parts_order=parts_order, part=part, design=design, quantity=5)
+
+    client.force_login(staff_user)
+    client.post(reverse('erp:parts_order_receive_all', args=[parts_order.pk]))
+
+    part.refresh_from_db()
+    design.refresh_from_db()
+    assert part.stock == 5
+    assert design.pcb_stock == 5
+
+
+@pytest.mark.django_db
 def test_receive_all_adds_quantities_to_design_pcb_stock(client, staff_user, design):
     parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
     PartsOrderLine.objects.create(parts_order=parts_order, design=design, quantity=4)

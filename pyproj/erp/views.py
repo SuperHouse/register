@@ -3250,10 +3250,17 @@ def parts_order_line_toggle_received(request, line_id):
     Marking a line received adds its quantity to the matched Part's stock; un-marking it
     subtracts the same quantity back out (see _apply_part_stock_deltas) - a line with no
     matched Part has nothing to adjust. Same treatment for a JLCPCB line's linked Design
-    (see _apply_design_pcb_stock_deltas, issue #100) - the two are mutually exclusive in
-    practice (JLCPCB lines never get `part` set, other suppliers' lines never get `design`
-    set), and a line with neither (not yet assigned, or a deliberately-unassociated phantom
-    entry - see PartsOrderLine.design) has nothing to adjust either way.
+    (see _apply_design_pcb_stock_deltas, issue #100). Checked independently, not as an
+    if/elif - part and design are only mutually exclusive for a line created under the
+    current code (JLCPCB lines never get `part` set any more), but a line synced under the
+    pre-issue-#100 Part-matching implementation can still have a stale `part` pointing at
+    an orphaned Part left over from that era, alongside a `design` a human has since set
+    via parts_order_line_set_design. An if/elif here would silently credit only the stale
+    Part and skip the Design entirely - independent checks credit whichever is actually
+    set, so a legacy line self-heals as soon as it also gets a design assigned, rather than
+    silently discarding the far more useful ordering line. A line with neither (not yet
+    assigned, or a deliberately-unassociated phantom entry - see PartsOrderLine.design) has
+    nothing to adjust either way.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -3264,11 +3271,10 @@ def parts_order_line_toggle_received(request, line_id):
         line.received_dt = timezone.now() if line.received else None
         line.save(update_fields=['received', 'received_dt'])
 
+        delta = line.quantity if line.received else -line.quantity
         if line.part_id:
-            delta = line.quantity if line.received else -line.quantity
             _apply_part_stock_deltas({line.part_id: delta})
-        elif line.design_id:
-            delta = line.quantity if line.received else -line.quantity
+        if line.design_id:
             _apply_design_pcb_stock_deltas({line.design_id: delta})
 
     return JsonResponse({'ok': True, 'received': line.received})
@@ -3286,8 +3292,11 @@ def parts_order_receive_all(request, parts_order_id):
     line for the same part (a SKU can legitimately appear as more than one line - see
     PartsOrderLine.supplier_line_number) only issues one UPDATE per part. Same treatment,
     aggregated per design, for JLCPCB lines with a linked Design (see
-    _apply_design_pcb_stock_deltas, issue #100) - a line with neither part nor design set
-    (not yet assigned, or a deliberately-unassociated phantom entry) contributes to neither.
+    _apply_design_pcb_stock_deltas, issue #100). part and design are checked
+    independently, not as an if/elif - see parts_order_line_toggle_received's docstring
+    for why a line can legitimately have a stale `part` left over from the pre-issue-#100
+    Part-matching implementation alongside a `design` set since. A line with neither (not
+    yet assigned, or a deliberately-unassociated phantom entry) contributes to neither.
     """
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -3301,7 +3310,7 @@ def parts_order_receive_all(request, parts_order_id):
         for line in lines_to_receive:
             if line.part_id:
                 part_deltas[line.part_id] = part_deltas.get(line.part_id, 0) + line.quantity
-            elif line.design_id:
+            if line.design_id:
                 design_deltas[line.design_id] = design_deltas.get(line.design_id, 0) + line.quantity
 
         count = parts_order.lines.filter(received=False).update(received=True, received_dt=timezone.now())
