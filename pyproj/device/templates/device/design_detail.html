@@ -1,5 +1,6 @@
 {% extends "device/base-with-sidebar.html" %}
 {% load static %}
+{% load erp_tags %}
 
 {% block title %}
     {{ design.sku }} {{ design.hw_version }} - SuperHouse Device Register
@@ -91,8 +92,11 @@
                                 <tr>
                                     <th>{{ design_form.pcb_stock.label }}:</th>
                                     <td>
-                                        <div class="input-group" style="max-width: 150px;">
-                                            {{ design_form.pcb_stock }}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="input-group" style="max-width: 150px;">
+                                                {{ design_form.pcb_stock }}
+                                            </div>
+                                            {{ design|design_pcb_stock_sparkline_svg }}
                                         </div>
                                         {% if design_form.pcb_stock.errors %}<div class="text-danger small">{{ design_form.pcb_stock.errors }}</div>{% endif %}
                                     </td>

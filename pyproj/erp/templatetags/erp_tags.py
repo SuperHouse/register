@@ -38,14 +38,16 @@ def _stock_sparkline_points(timed_values, window_start, window_end, width, heigh
     return points
 
 
-@register.filter
-def stock_sparkline_svg(source, dims='64x20'):
-    """Render a tiny inline SVG sparkline of a PartSource's stock history.
+def _render_stock_sparkline_svg(history, dims):
+    """Shared rendering behind stock_sparkline_svg/design_pcb_stock_sparkline_svg - both
+    PartSourceStockHistory and DesignPcbStockHistory are timestamped stock/recorded_dt
+    snapshots ordered newest-first, just under different related-name attributes, so the
+    two filters differ only in which queryset they hand in here.
 
     The line is drawn in a muted/de-emphasis tone with only the most recent reading
     picked out in the accent color, following the stat-tile trend-sparkline
     convention - the point is the shape of the trend, not a precise readout (the
-    adjacent Stock cell already shows the current number), so it's static markup
+    adjacent stock figure already shows the current number), so it's static markup
     with no hover/JS behaviour. Only readings within the last STOCK_TREND_PERIOD are
     plotted (same fixed window as the Stock History chart); returns '' when fewer
     than two known-stock readings fall in that window, since a single point has no
@@ -56,7 +58,7 @@ def stock_sparkline_svg(source, dims='64x20'):
     window_start = window_end - STOCK_TREND_PERIOD
     timed_values = [
         (h.recorded_dt, h.stock)
-        for h in reversed(source.stock_history.all())
+        for h in reversed(history)
         if h.stock is not None and h.recorded_dt >= window_start
     ]
     if len(timed_values) < 2:
@@ -77,3 +79,18 @@ def stock_sparkline_svg(source, dims='64x20'):
         f'</svg>'
     )
     return mark_safe(svg)
+
+
+@register.filter
+def stock_sparkline_svg(source, dims='64x20'):
+    """Render a tiny inline SVG sparkline of a PartSource's stock history - see
+    _render_stock_sparkline_svg for the shared rendering behaviour."""
+    return _render_stock_sparkline_svg(source.stock_history.all(), dims)
+
+
+@register.filter
+def design_pcb_stock_sparkline_svg(design, dims='64x20'):
+    """Render a tiny inline SVG sparkline of a Design's PCB stock history
+    (DesignPcbStockHistory, issue #100) - see _render_stock_sparkline_svg for the shared
+    rendering behaviour."""
+    return _render_stock_sparkline_svg(design.pcb_stock_history.all(), dims)
