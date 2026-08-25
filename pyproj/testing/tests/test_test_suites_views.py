@@ -37,7 +37,6 @@ def step(suite):
 @pytest.mark.django_db
 def test_non_staff_users_are_redirected(client, plain_user, design, suite, step):
     urls = [
-        reverse('testing:test_suite_current', args=[design.pk]),
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
         reverse('testing:test_suite_version_list', args=[design.pk]),
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
@@ -54,7 +53,6 @@ def test_non_staff_users_are_redirected(client, plain_user, design, suite, step)
 def test_staff_sees_pages(client, staff_user, design, suite, step):
     client.force_login(staff_user)
     for url in [
-        reverse('testing:test_suite_current', args=[design.pk]),
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
         reverse('testing:test_suite_version_list', args=[design.pk]),
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
@@ -66,21 +64,26 @@ def test_staff_sees_pages(client, staff_user, design, suite, step):
 
 
 @pytest.mark.django_db
-def test_suite_current_lazily_creates_version_one(client, staff_user, design):
+def test_design_detail_does_not_create_suite_just_from_viewing(client, staff_user, design):
+    """The Test Suite tab (issue #102) lives on the Design detail page now, but merely
+    viewing that page must not itself create a TestSuite row - only actually adding a step
+    (test_step_add) does, lazily. Otherwise every visit to every design's page would create
+    an empty TestSuite for it."""
     assert design.test_suites.count() == 0
     client.force_login(staff_user)
-    response = client.get(reverse('testing:test_suite_current', args=[design.pk]))
+    response = client.get(reverse('design_detail', args=[design.pk]))
     assert response.status_code == 200
-    assert design.test_suites.count() == 1
-    assert design.test_suites.first().version == 1
+    assert design.test_suites.count() == 0
 
 
 @pytest.mark.django_db
-def test_suite_current_does_not_duplicate_on_repeat_visits(client, staff_user, design):
+def test_step_add_lazily_creates_version_one_when_none_exists(client, staff_user, design):
+    assert design.test_suites.count() == 0
     client.force_login(staff_user)
-    client.get(reverse('testing:test_suite_current', args=[design.pk]))
-    client.get(reverse('testing:test_suite_current', args=[design.pk]))
+    response = client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.DELAY})
+    assert response.status_code == 302
     assert design.test_suites.count() == 1
+    assert design.test_suites.first().version == 1
 
 
 @pytest.mark.django_db
@@ -98,8 +101,8 @@ def test_step_add_targets_current_suite(client, staff_user, design, suite):
 def test_add_step_dropdown_and_edit_page_type_dropdown_are_alphabetical(client, staff_user, design, suite, step):
     client.force_login(staff_user)
 
-    suite_content = client.get(reverse('testing:test_suite_current', args=[design.pk])).content.decode()
-    add_select = suite_content.split('id="id_step_type"')[1].split('</select>')[0]
+    design_content = client.get(reverse('design_detail', args=[design.pk])).content.decode()
+    add_select = design_content.split('id="id_step_type"')[1].split('</select>')[0]
     labels_in_add_dropdown = [line.split('>')[1] for line in add_select.split('<option value=') if '>' in line][:6]
     assert labels_in_add_dropdown == sorted(labels_in_add_dropdown)
 
@@ -124,7 +127,7 @@ def test_copy_steps_from_appends_to_end_with_config_preserved(client, staff_user
         'source_design': source_design.pk,
     })
     assert response.status_code == 302
-    assert response.url == reverse('testing:test_suite_current', args=[design.pk])
+    assert response.url == reverse('design_detail', args=[design.pk]) + '#test-suite'
 
     suite_steps = list(suite.steps.order_by('order'))
     assert len(suite_steps) == 2
@@ -148,7 +151,7 @@ def test_copy_steps_from_excludes_self_and_obsolete_designs(client, staff_user, 
     other_active_design = Design.objects.create(client=org3, sku='ACT1', name='Active Design', hw_version='1.0')
 
     client.force_login(staff_user)
-    content = client.get(reverse('testing:test_suite_current', args=[design.pk])).content.decode()
+    content = client.get(reverse('design_detail', args=[design.pk])).content.decode()
     select = content.split('id="id_source_design"')[1].split('</select>')[0]
 
     assert f'value="{design.pk}"' not in select  # can't copy a design's suite onto itself
@@ -216,7 +219,7 @@ def test_save_new_version_freezes_current_and_copies_steps_forward(client, staff
         'notes': 'First production release',
     })
     assert response.status_code == 302
-    assert response.url == reverse('testing:test_suite_current', args=[design.pk])
+    assert response.url == reverse('design_detail', args=[design.pk]) + '#test-suite'
 
     suite.refresh_from_db()
     assert suite.notes == 'First production release'

@@ -229,23 +229,6 @@ def _is_current_suite(suite):
 
 
 @staff_member_required
-def test_suite_current(request, design_id):
-    design = get_object_or_404(Design, pk=design_id)
-    suite = _get_or_create_current_suite(design)
-
-    ctx = {
-        'design': design,
-        'suite': suite,
-        'steps': suite.steps.all(),
-        'step_type_add_form': TestStepTypeAddForm(),
-        'version_count': design.test_suites.count(),
-        'copy_steps_form': CopyTestStepsFromForm(exclude_design=design),
-        'has_other_active_designs': Design.objects.filter(obsolete=False).exclude(pk=design.pk).exists(),
-    }
-    return render(request, 'testing/test_suite_current.html', ctx)
-
-
-@staff_member_required
 def test_suite_copy_steps_from(request, design_id):
     """Appends another Design's current Test Suite's steps (including their config) onto
     this Design's current Test Suite, at the end of its list."""
@@ -277,7 +260,7 @@ def test_suite_copy_steps_from(request, design_id):
         else:
             messages.warning(request, 'Please select a design to copy from.')
 
-    return redirect('testing:test_suite_current', design_id=design.pk)
+    return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
 
 
 @staff_member_required
@@ -304,7 +287,7 @@ def test_suite_save_new_version(request, design_id):
                     config=step.config,
                 )
             messages.success(request, f'Version {current.version} saved. Now editing version {new_suite.version}.')
-            return redirect('testing:test_suite_current', design_id=design.pk)
+            return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
@@ -361,7 +344,7 @@ def test_step_add(request, design_id):
         else:
             messages.warning(request, 'Please select a step type to add.')
 
-    return redirect('testing:test_suite_current', design_id=design.pk)
+    return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
 
 
 @staff_member_required
@@ -377,7 +360,7 @@ def test_step_edit(request, step_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Step updated.')
-            return redirect(reverse('testing:test_suite_current', args=[step.suite.design_id]) + '#test-steps')
+            return redirect(reverse('design_detail', args=[step.suite.design_id]) + '#test-suite')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
@@ -399,7 +382,7 @@ def test_step_delete(request, step_id):
     if request.method == 'POST':
         step.delete()
         messages.success(request, 'Step removed.')
-        return redirect('testing:test_suite_current', design_id=design_id)
+        return redirect(reverse('design_detail', args=[design_id]) + '#test-suite')
 
     return render(request, 'testing/test_step_delete.html', {'step': step})
 

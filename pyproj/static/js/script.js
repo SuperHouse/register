@@ -201,6 +201,34 @@ function initServerFilter(resultsId) {
     });
 }
 
+// Activates the CoreUI nav-tabs + tab-content tab (see e.g. design_detail.html) containing
+// the element matching the current URL hash, if any - so a redirect like "#bom" lands on the
+// right tab instead of a hidden pane. Simulates a click on the tab's own trigger link rather
+// than calling window.coreui.Tab directly, so this doesn't need its own reference to that
+// global. Tab triggers here use data-coreui-toggle, not Bootstrap's data-bs-toggle - this
+// CoreUI 4 bundle doesn't expose a window.bootstrap at all, only window.coreui (confirmed by
+// inspecting the loaded bundle; a data-bs-toggle="tab" trigger elsewhere in this codebase,
+// e.g. device_grid.html, doesn't actually respond to clicks because of this). Call this on
+// pages using the tab pattern with anchors inside their panes; a no-op if there's no hash or
+// no matching pane.
+function activateTabFromHash() {
+    if (!location.hash) return;
+    let target;
+    try {
+        target = document.querySelector(location.hash);
+    } catch (e) {
+        return; // an invalid selector (e.g. a hash that isn't a valid CSS id) - nothing to do
+    }
+    if (!target) return;
+    const pane = target.closest('.tab-pane');
+    if (!pane || !pane.id) return;
+    const trigger = document.querySelector('[data-coreui-toggle="tab"][href="#' + pane.id + '"]');
+    if (trigger) {
+        trigger.click();
+        target.scrollIntoView({ block: 'start' });
+    }
+}
+
 // Sidebar drawer toggle for mobile: slides in/out with a tap-to-dismiss backdrop.
 // CoreUI's data-coreui-toggle is removed to avoid conflicts with our handler.
 document.addEventListener('DOMContentLoaded', function() {

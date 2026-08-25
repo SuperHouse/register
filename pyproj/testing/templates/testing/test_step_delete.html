@@ -32,7 +32,7 @@
                         {% csrf_token %}
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-danger">Delete</button>
-                            <a href="{% url 'testing:test_suite_current' step.suite.design_id %}#test-steps" class="btn btn-secondary">Cancel</a>
+                            <a href="{% url 'design_detail' step.suite.design_id %}#test-suite" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
                 </div>

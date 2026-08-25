@@ -12,7 +12,7 @@
 {% block content %}
     <p class="text-body-secondary">
         <a href="{% url 'testing:test_suite_version_list' design.pk %}">&laquo; Back to Version History</a>
-        {% if is_current %}&mdash; <a href="{% url 'testing:test_suite_current' design.pk %}">edit this version</a>{% endif %}
+        {% if is_current %}&mdash; <a href="{% url 'design_detail' design.pk %}#test-suite">edit this version</a>{% endif %}
     </p>
 
     <div class="row">

@@ -7,6 +7,12 @@
 {% endblock title %}
 
 {% block h1 %}
+    {% if pcb_top_asset %}
+        <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
+             alt="PCB Top View"
+             style="max-height: 50px; max-width: 60px; object-fit: contain; vertical-align: middle;"
+             class="me-2">
+    {% endif %}
     {{ design.client.company_name }} <b>{{ design.name }}</b> v{{ design.hw_version }}
     {% if design.obsolete %}
         <span class="badge bg-warning text-dark ms-1">Obsolete</span>
@@ -31,646 +37,754 @@
                 {% endif %}
             </div>
 
-            {% if pcb_top_asset or pcb_bottom_asset %}
-                <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
-                    {% if pcb_top_asset %}
-                        <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
-                             alt="PCB Top View"
-                             class="rounded"
-                             style="max-width: 400px; width: 100%;">
-                    {% endif %}
-                    {% if pcb_bottom_asset %}
-                        <img src="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}"
-                             alt="PCB Bottom View"
-                             class="rounded"
-                             style="max-width: 400px; width: 100%;">
-                    {% endif %}
-                    {% if user.is_staff and pcb_top_asset and pcb_bottom_asset %}
-                        <form method="post"
-                              action="{% url 'design_swap_pcb_images' design.pk %}">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Swap top/bottom images">
-                                <i class="bi bi-arrow-left-right"></i> Swap
-                            </button>
-                        </form>
-                    {% endif %}
-                </div>
-            {% endif %}
-            <div class="card border-0 mb-4" id="design-details">
-                <div class="card-body py-10">
-                    {% if user.is_staff %}
-                        <form method="post" action="{% url 'design_update' design.pk %}">
-                            {% csrf_token %}
-                            {% if design_form.non_field_errors %}
-                                <div class="alert alert-danger">{{ design_form.non_field_errors }}</div>
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link active" id="tab-details" data-coreui-toggle="tab" href="#pane-details"
+                       role="tab" aria-controls="pane-details" aria-selected="true">Details</a>
+                </li>
+                {% if user.is_staff %}
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="tab-bom" data-coreui-toggle="tab" href="#pane-bom"
+                           role="tab" aria-controls="pane-bom" aria-selected="false">Bill of Materials</a>
+                    </li>
+                {% endif %}
+                {% if user.is_staff or has_testing_assets %}
+                    <li class="nav-item" role="presentation">
+                        <a class="nav-link" id="tab-test-suite" data-coreui-toggle="tab" href="#pane-test-suite"
+                           role="tab" aria-controls="pane-test-suite" aria-selected="false">Test Suite</a>
+                    </li>
+                {% endif %}
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link" id="tab-boards" data-coreui-toggle="tab" href="#pane-boards"
+                       role="tab" aria-controls="pane-boards" aria-selected="false">Boards</a>
+                </li>
+            </ul>
+
+            <div class="tab-content">
+                <div class="tab-pane active" id="pane-details" role="tabpanel" aria-labelledby="tab-details">
+                    {% if pcb_top_asset or pcb_bottom_asset %}
+                        <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
+                            {% if pcb_top_asset %}
+                                <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
+                                     alt="PCB Top View"
+                                     class="rounded"
+                                     style="max-width: 400px; width: 100%;">
                             {% endif %}
-                            <table class="table table-bordered">
-                                <tr>
-                                    <th style="width: 220px;">{{ design_form.sku.label }}:</th>
-                                    <td>
-                                        {{ design_form.sku }}
-                                        {% if design_form.sku.errors %}<div class="text-danger small">{{ design_form.sku.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.description.label }}:</th>
-                                    <td>
-                                        {{ design_form.description }}
-                                        {% if design_form.description.errors %}<div class="text-danger small">{{ design_form.description.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.price.label }}:</th>
-                                    <td>
-                                        <div class="input-group" style="max-width: 150px;">
-                                            <span class="input-group-text">$</span>
-                                            {{ design_form.price }}
-                                        </div>
-                                        {% if design_form.price.errors %}<div class="text-danger small">{{ design_form.price.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.pcb_stock.label }}:</th>
-                                    <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <div class="input-group" style="max-width: 150px;">
-                                                {{ design_form.pcb_stock }}
-                                            </div>
-                                            {{ design|design_pcb_stock_sparkline_svg }}
-                                        </div>
-                                        {% if design_form.pcb_stock.errors %}<div class="text-danger small">{{ design_form.pcb_stock.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.assembly_time_minutes.label }}:</th>
-                                    <td>
-                                        <div class="input-group" style="max-width: 180px;">
-                                            {{ design_form.assembly_time_minutes }}
-                                            <span class="input-group-text">minutes</span>
-                                        </div>
-                                        {% if design_form.assembly_time_minutes.errors %}<div class="text-danger small">{{ design_form.assembly_time_minutes.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.additional_materials.label }}:</th>
-                                    <td>
-                                        <div class="input-group" style="max-width: 150px;">
-                                            <span class="input-group-text">$</span>
-                                            {{ design_form.additional_materials }}
-                                        </div>
-                                        {% if design_form.additional_materials.errors %}<div class="text-danger small">{{ design_form.additional_materials.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.pcb_cost.label }}:</th>
-                                    <td>
-                                        <div class="input-group" style="max-width: 150px;">
-                                            <span class="input-group-text">$</span>
-                                            {{ design_form.pcb_cost }}
-                                        </div>
-                                        {% if design_form.pcb_cost.errors %}<div class="text-danger small">{{ design_form.pcb_cost.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.packaging.label }}:</th>
-                                    <td>
-                                        <div class="input-group" style="max-width: 150px;">
-                                            <span class="input-group-text">$</span>
-                                            {{ design_form.packaging }}
-                                        </div>
-                                        {% if design_form.packaging.errors %}<div class="text-danger small">{{ design_form.packaging.errors }}</div>{% endif %}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.conformal_coating.label }}:</th>
-                                    <td>
-                                        <div class="form-check">
-                                            {{ design_form.conformal_coating }}
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th>{{ design_form.anti_shock_glue.label }}:</th>
-                                    <td>
-                                        <div class="form-check">
-                                            {{ design_form.anti_shock_glue }}
-                                        </div>
-                                    </td>
-                                </tr>
-                            </table>
-                            <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
-                        </form>
-                    {% else %}
-                        <table class="table table-bordered">
-                            <tr>
-                                <th>SKU:</th>
-                                <td>{{ design.sku }}</td>
-                            </tr>
-                            <tr>
-                                <th>Description:</th>
-                                <td>{{ design.description|default:"<i>Not set</i>" }}</td>
-                            </tr>
-                            <tr>
-                                <th>Price:</th>
-                                <td>{{ design.price|default:"<i>Not set</i>" }}</td>
-                            </tr>
-                            <tr>
-                                <th>Devices:</th>
-                                <td>{{ device_count }}</td>
-                            </tr>
-                        </table>
+                            {% if pcb_bottom_asset %}
+                                <img src="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}"
+                                     alt="PCB Bottom View"
+                                     class="rounded"
+                                     style="max-width: 400px; width: 100%;">
+                            {% endif %}
+                            {% if user.is_staff and pcb_top_asset and pcb_bottom_asset %}
+                                <form method="post"
+                                      action="{% url 'design_swap_pcb_images' design.pk %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Swap top/bottom images">
+                                        <i class="bi bi-arrow-left-right"></i> Swap
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
                     {% endif %}
-                </div>
-            </div>
-
-            {% if user.is_staff and pcb_order_lines %}
-                <h5 class="mt-4">PCB Orders</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        <table class="table table-sm mb-0">
-                            <thead>
-                                <tr class="highlight">
-                                    <th>Order Number</th>
-                                    <th>Order Date</th>
-                                    <th>Quantity</th>
-                                    <th>Received</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for line in pcb_order_lines %}
+                    <div class="card border-0 mb-4" id="design-details">
+                        <div class="card-body py-10">
+                            {% if user.is_staff %}
+                                <form method="post" action="{% url 'design_update' design.pk %}">
+                                    {% csrf_token %}
+                                    {% if design_form.non_field_errors %}
+                                        <div class="alert alert-danger">{{ design_form.non_field_errors }}</div>
+                                    {% endif %}
+                                    <table class="table table-bordered">
+                                        <tr>
+                                            <th style="width: 220px;">{{ design_form.sku.label }}:</th>
+                                            <td>
+                                                {{ design_form.sku }}
+                                                {% if design_form.sku.errors %}<div class="text-danger small">{{ design_form.sku.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.description.label }}:</th>
+                                            <td>
+                                                {{ design_form.description }}
+                                                {% if design_form.description.errors %}<div class="text-danger small">{{ design_form.description.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.price.label }}:</th>
+                                            <td>
+                                                <div class="input-group" style="max-width: 150px;">
+                                                    <span class="input-group-text">$</span>
+                                                    {{ design_form.price }}
+                                                </div>
+                                                {% if design_form.price.errors %}<div class="text-danger small">{{ design_form.price.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.pcb_stock.label }}:</th>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <div class="input-group" style="max-width: 150px;">
+                                                        {{ design_form.pcb_stock }}
+                                                    </div>
+                                                    {{ design|design_pcb_stock_sparkline_svg }}
+                                                </div>
+                                                {% if design_form.pcb_stock.errors %}<div class="text-danger small">{{ design_form.pcb_stock.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.assembly_time_minutes.label }}:</th>
+                                            <td>
+                                                <div class="input-group" style="max-width: 180px;">
+                                                    {{ design_form.assembly_time_minutes }}
+                                                    <span class="input-group-text">minutes</span>
+                                                </div>
+                                                {% if design_form.assembly_time_minutes.errors %}<div class="text-danger small">{{ design_form.assembly_time_minutes.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.additional_materials.label }}:</th>
+                                            <td>
+                                                <div class="input-group" style="max-width: 150px;">
+                                                    <span class="input-group-text">$</span>
+                                                    {{ design_form.additional_materials }}
+                                                </div>
+                                                {% if design_form.additional_materials.errors %}<div class="text-danger small">{{ design_form.additional_materials.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.pcb_cost.label }}:</th>
+                                            <td>
+                                                <div class="input-group" style="max-width: 150px;">
+                                                    <span class="input-group-text">$</span>
+                                                    {{ design_form.pcb_cost }}
+                                                </div>
+                                                {% if design_form.pcb_cost.errors %}<div class="text-danger small">{{ design_form.pcb_cost.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.packaging.label }}:</th>
+                                            <td>
+                                                <div class="input-group" style="max-width: 150px;">
+                                                    <span class="input-group-text">$</span>
+                                                    {{ design_form.packaging }}
+                                                </div>
+                                                {% if design_form.packaging.errors %}<div class="text-danger small">{{ design_form.packaging.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.conformal_coating.label }}:</th>
+                                            <td>
+                                                <div class="form-check">
+                                                    {{ design_form.conformal_coating }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <th>{{ design_form.anti_shock_glue.label }}:</th>
+                                            <td>
+                                                <div class="form-check">
+                                                    {{ design_form.anti_shock_glue }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                    <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                                </form>
+                            {% else %}
+                                <table class="table table-bordered">
                                     <tr>
-                                        <td><a href="{% url 'erp:parts_order_detail' line.parts_order.pk %}">{{ line.parts_order.supplier_order_number }}</a></td>
-                                        <td>{{ line.parts_order.order_dt|date:"j-M-Y"|default:"—" }}</td>
-                                        <td>{{ line.quantity }}</td>
-                                        <td>{% if line.received %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}—{% endif %}</td>
+                                        <th>SKU:</th>
+                                        <td>{{ design.sku }}</td>
                                     </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                                    <tr>
+                                        <th>Description:</th>
+                                        <td>{{ design.description|default:"<i>Not set</i>" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Price:</th>
+                                        <td>{{ design.price|default:"<i>Not set</i>" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Devices:</th>
+                                        <td>{{ device_count }}</td>
+                                    </tr>
+                                </table>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-            {% endif %}
 
-            {% if user.is_staff or has_core_assets %}
-                <h5 class="mt-4">Design Files</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        <table class="table core-file-table">
-                            <tbody>
-                                {% for type_key, label, asset in core_assets %}
-                                    {% if asset or user.is_staff %}
-                                        {% if asset %}
+                    {% if user.is_staff or has_core_assets %}
+                        <h5 class="mt-4">Design Files</h5>
+                        <div class="card border-0 mb-3">
+                            <div class="card-body py-10">
+                                <table class="table core-file-table">
+                                    <tbody>
+                                        {% for type_key, label, asset in core_assets %}
+                                            {% if asset or user.is_staff %}
+                                                {% if asset %}
+                                                    <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                                        <td class="text-nowrap" style="width:1px">
+                                                            {% if type_key == 'FUSION' %}
+                                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                                            {% else %}
+                                                                <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-nowrap">{{ label }}</td>
+                                                        <td>
+                                                            {{ asset.filename }}
+                                                            {% if user.is_staff and asset.internal %}
+                                                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        {% if user.is_staff %}
+                                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                                <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                                   class="btn btn-sm btn-primary me-1"
+                                                                   title="Edit">
+                                                                    <i class="cil-pencil"></i>
+                                                                </a>
+                                                                <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                                   class="btn btn-sm btn-danger"
+                                                                   title="Delete">
+                                                                    <i class="cil-trash"></i>
+                                                                </a>
+                                                            </td>
+                                                        {% endif %}
+                                                    </tr>
+                                                {% else %}
+                                                    <tr class="core-upload-trigger"
+                                                        data-type="{{ type_key }}"
+                                                        style="cursor:pointer"
+                                                        title="Click to upload {{ label }}">
+                                                        <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
+                                                        <td class="text-nowrap">{{ label }}</td>
+                                                        <td><span class="text-muted fst-italic">Not uploaded</span></td>
+                                                        <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                                            <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
+                                                        <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                                            <form method="post"
+                                                                  action="{% url 'design_asset_add' design.pk %}"
+                                                                  enctype="multipart/form-data"
+                                                                  class="d-flex align-items-end gap-3 flex-wrap">
+                                                                {% csrf_token %}
+                                                                <input type="hidden" name="asset_type" value="{{ type_key }}">
+                                                                <div>
+                                                                    <label class="form-label small mb-1">File</label>
+                                                                    <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
+                                                                </div>
+                                                                <div>
+                                                                    <label class="form-label small mb-1">Name</label>
+                                                                    <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
+                                                                </div>
+                                                                <div class="d-flex gap-2">
+                                                                    <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                                    <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
+                                                                </div>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                                <style>
+                                    .core-file-table tr.clickable-row:hover td,
+                                    #attachment-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
+                                    .core-file-table tr.core-upload-trigger:hover td,
+                                    #attachment-table tr#attachment-add-trigger:hover td { background-color: #e8efff !important; }
+                                </style>
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if attachments or user.is_staff %}
+                        <h5 class="mt-4">Attachments</h5>
+                        <div class="card border-0 mb-3">
+                            <div class="card-body py-10">
+                                <table class="table table-striped" id="attachment-table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                            <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                            <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
+                                            {% if user.is_staff %}<th></th>{% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for asset in attachments %}
                                             <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
                                                 <td class="text-nowrap" style="width:1px">
-                                                    {% if type_key == 'FUSION' %}
-                                                        <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
-                                                    {% else %}
-                                                        <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
-                                                    {% endif %}
+                                                    <i class="bi {{ asset.get_icon_class }}"></i>
                                                 </td>
-                                                <td class="text-nowrap">{{ label }}</td>
                                                 <td>
-                                                    {{ asset.filename }}
+                                                    {{ asset.name }}
                                                     {% if user.is_staff and asset.internal %}
                                                         <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
                                                     {% endif %}
                                                 </td>
+                                                <td>{{ asset.description|default:"" }}</td>
+                                                <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
                                                 {% if user.is_staff %}
                                                     <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
                                                         <a href="{% url 'design_asset_edit' asset.pk %}"
                                                            class="btn btn-sm btn-primary me-1"
-                                                           title="Edit">
+                                                           title="Edit attachment">
                                                             <i class="cil-pencil"></i>
                                                         </a>
                                                         <a href="{% url 'design_asset_delete' asset.pk %}"
                                                            class="btn btn-sm btn-danger"
-                                                           title="Delete">
+                                                           title="Delete attachment">
                                                             <i class="cil-trash"></i>
                                                         </a>
                                                     </td>
                                                 {% endif %}
                                             </tr>
-                                        {% else %}
-                                            <tr class="core-upload-trigger"
-                                                data-type="{{ type_key }}"
+                                        {% endfor %}
+                                        {% if user.is_staff %}
+                                            <tr id="attachment-add-trigger"
                                                 style="cursor:pointer"
-                                                title="Click to upload {{ label }}">
-                                                <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
-                                                <td class="text-nowrap">{{ label }}</td>
-                                                <td><span class="text-muted fst-italic">Not uploaded</span></td>
-                                                <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                                title="Click to add an attachment">
+                                                <td style="width:1px"><i class="bi bi-plus-circle text-muted"></i></td>
+                                                <td><span class="text-muted fst-italic">Add attachment</span></td>
+                                                <td></td>
+                                                <td></td>
+                                                <td class="text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
                                                     <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
                                                 </td>
                                             </tr>
-                                            <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
-                                                <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                            <tr id="attachment-add-row" class="d-none">
+                                                <td colspan="5" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
                                                     <form method="post"
                                                           action="{% url 'design_asset_add' design.pk %}"
-                                                          enctype="multipart/form-data"
-                                                          class="d-flex align-items-end gap-3 flex-wrap">
+                                                          enctype="multipart/form-data">
                                                         {% csrf_token %}
-                                                        <input type="hidden" name="asset_type" value="{{ type_key }}">
-                                                        <div>
-                                                            <label class="form-label small mb-1">File</label>
-                                                            <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
-                                                        </div>
-                                                        <div>
-                                                            <label class="form-label small mb-1">Name</label>
-                                                            <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
-                                                        </div>
-                                                        <div class="d-flex gap-2">
-                                                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
-                                                            <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
+                                                        <input type="hidden" name="asset_type" value="ATTACHMENT">
+                                                        <div class="row g-2">
+                                                            <div class="col-12 col-md-auto">
+                                                                <label class="form-label small mb-1">File</label>
+                                                                <input type="file" name="file" class="form-control form-control-sm attachment-file-input" required>
+                                                            </div>
+                                                            <div class="col-12 col-md-auto">
+                                                                <label class="form-label small mb-1">Name</label>
+                                                                <input type="text" name="name" class="form-control form-control-sm attachment-name-field" required>
+                                                            </div>
+                                                            <div class="col-12 col-md">
+                                                                <label class="form-label small mb-1">Description</label>
+                                                                <input type="text" name="description" class="form-control form-control-sm">
+                                                            </div>
+                                                            <div class="col-12 col-md-auto d-flex align-items-end gap-2">
+                                                                <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                                <button type="button" class="btn btn-sm btn-secondary" id="attachment-add-cancel">Cancel</button>
+                                                            </div>
                                                         </div>
                                                     </form>
                                                 </td>
                                             </tr>
                                         {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        <style>
-                            .core-file-table tr.clickable-row:hover td,
-                            #attachment-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
-                            .core-file-table tr.core-upload-trigger:hover td,
-                            #attachment-table tr#attachment-add-trigger:hover td { background-color: #e8efff !important; }
-                        </style>
-                    </div>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    {% endif %}
                 </div>
-            {% endif %}
 
-            {% if user.is_staff %}
-                <h5 class="mt-4" id="bom">Bill of Materials</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        {% if user.is_staff %}
-                            <div class="mb-3">
-                                <form method="post" action="{% url 'erp:design_bom_populate' design.pk %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary"
-                                            {% if not bom_csv_asset %}disabled title="Upload a BOM CSV file first"{% else %}title="Add any new reference designators from the BOM CSV; existing entries are left untouched"{% endif %}>
-                                        <i class="bi bi-arrow-repeat"></i> Populate from BOM
-                                    </button>
-                                </form>
+                {% if user.is_staff %}
+                    <div class="tab-pane" id="pane-bom" role="tabpanel" aria-labelledby="tab-bom">
+                        {% if pcb_order_lines %}
+                            <h5 class="mt-4">PCB Orders</h5>
+                            <div class="card border-0 mb-3">
+                                <div class="card-body py-10">
+                                    <table class="table table-sm mb-0">
+                                        <thead>
+                                            <tr class="highlight">
+                                                <th>Order Number</th>
+                                                <th>Order Date</th>
+                                                <th>Quantity</th>
+                                                <th>Received</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for line in pcb_order_lines %}
+                                                <tr>
+                                                    <td><a href="{% url 'erp:parts_order_detail' line.parts_order.pk %}">{{ line.parts_order.supplier_order_number }}</a></td>
+                                                    <td>{{ line.parts_order.order_dt|date:"j-M-Y"|default:"—" }}</td>
+                                                    <td>{{ line.quantity }}</td>
+                                                    <td>{% if line.received %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}—{% endif %}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         {% endif %}
-                        <table class="table table-striped" id="bom-table">
-                            <thead>
-                                <tr>
-                                    <th>Reference</th>
-                                    <th>Part</th>
-                                    <th>Device</th>
-                                    <th>Package</th>
-                                    <th>Value</th>
-                                    <th>X</th>
-                                    <th>Y</th>
-                                    <th>Rot</th>
-                                    <th>Side</th>
-                                    <th>SMT</th>
-                                    <th>PTH</th>
-                                    <th>Cost</th>
-                                    {% if user.is_staff %}<th></th>{% endif %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for entry in bom_entries %}
-                                    <tr{% if user.is_staff %} class="clickable-row" onclick="window.location='{% url 'erp:design_bom_entry_edit' entry.pk %}'" style="cursor:pointer"{% endif %}>
-                                        <td>{{ entry.reference }}</td>
-                                        <td>{{ entry.part.name }}</td>
-                                        <td>{{ entry.part.device }}</td>
-                                        <td>{{ entry.part.package }}</td>
-                                        <td>{{ entry.part.value }}</td>
-                                        <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                        <td>{% if entry.pos_x != None %}{{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                        <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
-                                        <td>{{ entry.get_side_display|default:"—" }}</td>
-                                        <td>
-                                            {% if entry.part.smt_joints == None %}
-                                                <i class="bi bi-exclamation-triangle-fill text-warning" title="SMT Joints not set"></i>
-                                            {% elif entry.part.smt_joints %}
-                                                {{ entry.part.smt_joints }}
-                                            {% endif %}
-                                        </td>
-                                        <td>
-                                            {% if entry.part.pth_joints == None %}
-                                                <i class="bi bi-exclamation-triangle-fill text-warning" title="PTH Joints not set"></i>
-                                            {% elif entry.part.pth_joints %}
-                                                {{ entry.part.pth_joints }}
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-nowrap">
-                                            {% if entry.unit_price_break %}
-                                                {{ entry.unit_price_break.symbol }}{{ entry.unit_price_break.price|floatformat:-4 }} {{ entry.unit_price_break.currency }}
-                                            {% else %}
-                                                <span class="fst-italic text-body-secondary">—</span>
-                                            {% endif %}
-                                        </td>
-                                        {% if user.is_staff %}
-                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                                        <i class="cil-trash"></i>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        {% endif %}
-                                    </tr>
-                                {% endfor %}
-                                {% if user.is_staff %}
-                                    <tr>
-                                        <form method="post" action="{% url 'erp:design_bom_entry_add' design.pk %}" class="d-contents">
+
+                        <h5 class="{% if pcb_order_lines %}mt-4{% endif %}" id="bom">Bill of Materials</h5>
+                        <div class="card border-0 mb-3">
+                            <div class="card-body py-10">
+                                <div class="mb-3">
+                                    <form method="post" action="{% url 'erp:design_bom_populate' design.pk %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                                {% if not bom_csv_asset %}disabled title="Upload a BOM CSV file first"{% else %}title="Add any new reference designators from the BOM CSV; existing entries are left untouched"{% endif %}>
+                                            <i class="bi bi-arrow-repeat"></i> Populate from BOM
+                                        </button>
+                                    </form>
+                                </div>
+                                <table class="table table-striped" id="bom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Reference</th>
+                                            <th>Part</th>
+                                            <th>Device</th>
+                                            <th>Package</th>
+                                            <th>Value</th>
+                                            <th>X</th>
+                                            <th>Y</th>
+                                            <th>Rot</th>
+                                            <th>Side</th>
+                                            <th>SMT</th>
+                                            <th>PTH</th>
+                                            <th>Cost</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for entry in bom_entries %}
+                                            <tr class="clickable-row" onclick="window.location='{% url 'erp:design_bom_entry_edit' entry.pk %}'" style="cursor:pointer">
+                                                <td>{{ entry.reference }}</td>
+                                                <td>{{ entry.part.name }}</td>
+                                                <td>{{ entry.part.device }}</td>
+                                                <td>{{ entry.part.package }}</td>
+                                                <td>{{ entry.part.value }}</td>
+                                                <td>{% if entry.pos_x != None %}{{ entry.pos_x|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                                <td>{% if entry.pos_x != None %}{{ entry.pos_y|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                                <td>{% if entry.rotation != None %}{{ entry.rotation|stringformat:"g" }}{% else %}&mdash;{% endif %}</td>
+                                                <td>{{ entry.get_side_display|default:"—" }}</td>
+                                                <td>
+                                                    {% if entry.part.smt_joints == None %}
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning" title="SMT Joints not set"></i>
+                                                    {% elif entry.part.smt_joints %}
+                                                        {{ entry.part.smt_joints }}
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if entry.part.pth_joints == None %}
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning" title="PTH Joints not set"></i>
+                                                    {% elif entry.part.pth_joints %}
+                                                        {{ entry.part.pth_joints }}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-nowrap">
+                                                    {% if entry.unit_price_break %}
+                                                        {{ entry.unit_price_break.symbol }}{{ entry.unit_price_break.price|floatformat:-4 }} {{ entry.unit_price_break.currency }}
+                                                    {% else %}
+                                                        <span class="fst-italic text-body-secondary">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                    <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                            <i class="cil-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                        <tr>
+                                            <form method="post" action="{% url 'erp:design_bom_entry_add' design.pk %}" class="d-contents">
+                                                {% csrf_token %}
+                                                <td>{{ bom_entry_form.reference }}</td>
+                                                <td colspan="7">{{ bom_entry_form.part }}</td>
+                                                <td></td>
+                                                <td></td>
+                                                <td></td>
+                                                <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
+                                            </form>
+                                        </tr>
+                                    </tbody>
+                                    {% if bom_entries %}
+                                        <tfoot>
+                                            <tr class="fw-semibold">
+                                                <td colspan="9" class="text-end">Total:</td>
+                                                <td>{{ bom_total_smt_joints }}</td>
+                                                <td>{{ bom_total_pth_joints }}</td>
+                                                <td class="text-nowrap">
+                                                    {% if bom_total_cost is not None %}
+                                                        ${{ bom_total_cost|floatformat:2 }}
+                                                    {% else %}
+                                                        <span class="fst-italic text-body-secondary">—</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    {% endif %}
+                                </table>
+                                <style>
+                                    #bom-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
+                                </style>
+                            </div>
+                        </div>
+
+                        <h5 class="mt-4" id="build-costing">Build Costing</h5>
+                        <div class="card border-0 mb-3">
+                            <div class="card-body py-10">
+                                <table class="table table-bordered w-auto mb-0">
+                                    <tbody>
+                                        {% for label, value in build_costing_rows %}
+                                            <tr>
+                                                <th>{{ label }}</th>
+                                                <td class="text-end">${{ value|floatformat:2 }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="fw-semibold">
+                                            <th>Total Price / Unit</th>
+                                            <td class="text-end">${{ build_costing_total|floatformat:2 }}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if user.is_staff or has_testing_assets %}
+                    <div class="tab-pane" id="pane-test-suite" role="tabpanel" aria-labelledby="tab-test-suite">
+                        {% if user.is_staff %}
+                            <div class="d-flex justify-content-between align-items-center mb-3" id="test-suite">
+                                <p class="text-body-secondary mb-0">
+                                    {% if test_suite_current %}
+                                        Editing version {{ test_suite_current.version }}
+                                    {% else %}
+                                        No test steps have been defined yet.
+                                    {% endif %}
+                                </p>
+                                <div class="d-flex gap-2">
+                                    {% if test_suite_version_count > 1 %}
+                                        <a href="{% url 'testing:test_suite_version_list' design.pk %}" class="btn btn-outline-secondary" title="Version History">
+                                            <i class="cil-history"></i> Version History ({{ test_suite_version_count }})
+                                        </a>
+                                    {% endif %}
+                                    <a href="{% url 'testing:test_suite_save_new_version' design.pk %}" class="btn btn-outline-primary" title="Save as New Version">
+                                        <i class="cil-save"></i> Save as New Version
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="card border-0 mb-3">
+                                <div class="card-body py-10">
+                                    <h5 class="card-title">Test Steps</h5>
+                                    <p class="text-body-secondary small">
+                                        Steps are examined in order, top to bottom. Click a step to edit its configuration.
+                                        {% if test_suite_current %}This is version {{ test_suite_current.version }}, the current working version - edits here apply
+                                        immediately; use Save as New Version to freeze it as a historical record.{% endif %}
+                                    </p>
+
+                                    <table class="table mb-3">
+                                        <tbody id="test-steps-body" data-reorder-url="{% url 'testing:test_step_reorder' design.pk %}">
+                                            {% for step in test_suite_steps %}
+                                                <tr data-stage-id="{{ step.pk }}">
+                                                    <td class="p-0 border-0">
+                                                        <div class="border rounded mb-2" style="border-left: 6px solid {{ step.get_color }} !important; overflow: hidden;">
+                                                            <div class="d-flex align-items-center gap-2 px-2 py-2 clickable-row"
+                                                                 style="cursor: pointer;"
+                                                                 onclick="window.location='{% url 'testing:test_step_edit' step.pk %}'">
+                                                                <i class="bi bi-grip-vertical" style="cursor: grab;" onclick="event.stopPropagation()"></i>
+                                                                <span class="badge" style="background-color: {{ step.get_color }};">{{ step.get_step_type_display }}</span>
+                                                                <strong>{{ step.name }}</strong>
+                                                                {% if step.hard_fail %}
+                                                                    <span class="badge bg-danger ms-auto">Hard Fail</span>
+                                                                {% endif %}
+                                                                <form method="post" action="{% url 'testing:test_step_delete' step.pk %}"
+                                                                      onclick="event.stopPropagation()" class="{% if not step.hard_fail %}ms-auto{% endif %}">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                                        <i class="cil-trash"></i>
+                                                                    </button>
+                                                                </form>
+                                                            </div>
+                                                            <div class="px-2 py-1 small text-body-secondary border-top clickable-row"
+                                                                 style="cursor: pointer;"
+                                                                 onclick="window.location='{% url 'testing:test_step_edit' step.pk %}'">
+                                                                {{ step.get_config_summary }}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            {% empty %}
+                                                <tr>
+                                                    <td class="border-0"><i>No steps have been added to this test suite yet.</i></td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+
+                                    <form method="post" action="{% url 'testing:test_step_add' design.pk %}" class="d-flex gap-2">
+                                        {% csrf_token %}
+                                        {{ test_suite_step_type_add_form.step_type }}
+                                        <button type="submit" class="btn btn-primary">Add</button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {% if test_suite_has_other_active_designs %}
+                                <div class="card border-0 mb-3">
+                                    <div class="card-body py-10">
+                                        <form method="post" action="{% url 'testing:test_suite_copy_steps_from' design.pk %}"
+                                              class="d-flex align-items-center gap-2 flex-wrap">
                                             {% csrf_token %}
-                                            <td>{{ bom_entry_form.reference }}</td>
-                                            <td colspan="7">{{ bom_entry_form.part }}</td>
-                                            <td></td>
-                                            <td></td>
-                                            <td></td>
-                                            <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
+                                            <label for="{{ test_suite_copy_steps_form.source_design.id_for_label }}" class="form-label mb-0 text-nowrap">
+                                                {{ test_suite_copy_steps_form.source_design.label }}:
+                                            </label>
+                                            {{ test_suite_copy_steps_form.source_design }}
+                                            <button type="submit" class="btn btn-outline-primary text-nowrap">
+                                                <i class="cil-copy"></i> Copy Test Suite
+                                            </button>
                                         </form>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                            {% if bom_entries %}
-                                <tfoot>
-                                    <tr class="fw-semibold">
-                                        <td colspan="9" class="text-end">Total:</td>
-                                        <td>{{ bom_total_smt_joints }}</td>
-                                        <td>{{ bom_total_pth_joints }}</td>
-                                        <td class="text-nowrap">
-                                            {% if bom_total_cost is not None %}
-                                                ${{ bom_total_cost|floatformat:2 }}
-                                            {% else %}
-                                                <span class="fst-italic text-body-secondary">—</span>
-                                            {% endif %}
-                                        </td>
-                                        {% if user.is_staff %}<td></td>{% endif %}
-                                    </tr>
-                                </tfoot>
+                                        <p class="text-body-secondary small mb-0 mt-2">
+                                            Appends the selected design's current test steps (including their configuration) to the end of this list.
+                                        </p>
+                                    </div>
+                                </div>
                             {% endif %}
-                        </table>
-                        <style>
-                            #bom-table tr.clickable-row:hover td { background-color: rgba(0,0,0,0.075) !important; }
-                        </style>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if user.is_staff %}
-                <h5 class="mt-4" id="build-costing">Build Costing</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        <table class="table table-bordered w-auto mb-0">
-                            <tbody>
-                                {% for label, value in build_costing_rows %}
-                                    <tr>
-                                        <th>{{ label }}</th>
-                                        <td class="text-end">${{ value|floatformat:2 }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                            <tfoot>
-                                <tr class="fw-semibold">
-                                    <th>Total Price / Unit</th>
-                                    <td class="text-end">${{ build_costing_total|floatformat:2 }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if user.is_staff %}
-                <h5 class="mt-4" id="test-suite">Test Suite</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        {% if test_suite_current %}
-                            <p class="mb-3">
-                                Current version: <strong>v{{ test_suite_current.version }}</strong>
-                                &mdash; {{ test_suite_current.steps.count }} step{{ test_suite_current.steps.count|pluralize }}
-                            </p>
-                        {% else %}
-                            <p class="text-body-secondary mb-3">No test steps have been defined yet.</p>
                         {% endif %}
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'testing:test_suite_current' design.pk %}" class="btn btn-primary">Manage Test Suite</a>
-                            {% if test_suite_version_count > 1 %}
-                                <a href="{% url 'testing:test_suite_version_list' design.pk %}" class="btn btn-outline-secondary">Version History ({{ test_suite_version_count }})</a>
+
+                        <h5 class="{% if user.is_staff %}mt-4{% endif %}">Testing</h5>
+                        <div class="card border-0 mb-3">
+                            <div class="card-body py-10">
+                                <table class="table core-file-table">
+                                    <tbody>
+                                        {% for type_key, label, asset in testing_assets %}
+                                            {% if asset or user.is_staff %}
+                                                {% if asset %}
+                                                    <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
+                                                        <td class="text-nowrap" style="width:1px">
+                                                            {% if type_key == 'FUSION' %}
+                                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                                            {% else %}
+                                                                <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-nowrap">{{ label }}</td>
+                                                        <td>
+                                                            {{ asset.filename }}
+                                                            {% if user.is_staff and asset.internal %}
+                                                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        {% if user.is_staff %}
+                                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
+                                                                <a href="{% url 'design_asset_edit' asset.pk %}"
+                                                                   class="btn btn-sm btn-primary me-1"
+                                                                   title="Edit">
+                                                                    <i class="cil-pencil"></i>
+                                                                </a>
+                                                                <a href="{% url 'design_asset_delete' asset.pk %}"
+                                                                   class="btn btn-sm btn-danger"
+                                                                   title="Delete">
+                                                                    <i class="cil-trash"></i>
+                                                                </a>
+                                                            </td>
+                                                        {% endif %}
+                                                    </tr>
+                                                {% else %}
+                                                    <tr class="core-upload-trigger"
+                                                        data-type="{{ type_key }}"
+                                                        style="cursor:pointer"
+                                                        title="Click to upload {{ label }}">
+                                                        <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
+                                                        <td class="text-nowrap">{{ label }}</td>
+                                                        <td><span class="text-muted fst-italic">Not uploaded</span></td>
+                                                        <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
+                                                            <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
+                                                        </td>
+                                                    </tr>
+                                                    <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
+                                                        <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
+                                                            <form method="post"
+                                                                  action="{% url 'design_asset_add' design.pk %}"
+                                                                  enctype="multipart/form-data"
+                                                                  class="d-flex align-items-end gap-3 flex-wrap">
+                                                                {% csrf_token %}
+                                                                <input type="hidden" name="asset_type" value="{{ type_key }}">
+                                                                <div>
+                                                                    <label class="form-label small mb-1">File</label>
+                                                                    <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
+                                                                </div>
+                                                                <div>
+                                                                    <label class="form-label small mb-1">Name</label>
+                                                                    <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
+                                                                </div>
+                                                                <div class="d-flex gap-2">
+                                                                    <button type="submit" class="btn btn-sm btn-primary">Upload</button>
+                                                                    <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
+                                                                </div>
+                                                            </form>
+                                                        </td>
+                                                    </tr>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="tab-pane" id="pane-boards" role="tabpanel" aria-labelledby="tab-boards">
+                    <div class="card border-0">
+                        <div class="card-body py-10">
+                            {% if devices %}
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Serial</th>
+                                            <th>Created</th>
+                                            <th>Invoice</th>
+                                            <th>Purchase Order</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for device in devices %}
+                                            <tr>
+                                                <td><a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a></td>
+                                                <td>{{ device.creation_dt|date:"j-M-Y" }}</td>
+                                                <td>{{ device.invoice|default:"" }}</td>
+                                                <td>{{ device.po|default:"" }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            {% else %}
+                                <p class="text-body-secondary mb-0">No boards have been assembled for this design yet.</p>
                             {% endif %}
                         </div>
                     </div>
                 </div>
-            {% endif %}
-
-            {% if user.is_staff or has_testing_assets %}
-                <h5 class="mt-4">Testing</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        <table class="table core-file-table">
-                            <tbody>
-                                {% for type_key, label, asset in testing_assets %}
-                                    {% if asset or user.is_staff %}
-                                        {% if asset %}
-                                            <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
-                                                <td class="text-nowrap" style="width:1px">
-                                                    {% if type_key == 'FUSION' %}
-                                                        <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
-                                                    {% else %}
-                                                        <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
-                                                    {% endif %}
-                                                </td>
-                                                <td class="text-nowrap">{{ label }}</td>
-                                                <td>
-                                                    {{ asset.filename }}
-                                                    {% if user.is_staff and asset.internal %}
-                                                        <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
-                                                    {% endif %}
-                                                </td>
-                                                {% if user.is_staff %}
-                                                    <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                        <a href="{% url 'design_asset_edit' asset.pk %}"
-                                                           class="btn btn-sm btn-primary me-1"
-                                                           title="Edit">
-                                                            <i class="cil-pencil"></i>
-                                                        </a>
-                                                        <a href="{% url 'design_asset_delete' asset.pk %}"
-                                                           class="btn btn-sm btn-danger"
-                                                           title="Delete">
-                                                            <i class="cil-trash"></i>
-                                                        </a>
-                                                    </td>
-                                                {% endif %}
-                                            </tr>
-                                        {% else %}
-                                            <tr class="core-upload-trigger"
-                                                data-type="{{ type_key }}"
-                                                style="cursor:pointer"
-                                                title="Click to upload {{ label }}">
-                                                <td class="text-nowrap" style="width:1px"><i class="bi bi-file-earmark text-muted"></i></td>
-                                                <td class="text-nowrap">{{ label }}</td>
-                                                <td><span class="text-muted fst-italic">Not uploaded</span></td>
-                                                <td class="text-nowrap text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
-                                                    <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
-                                                </td>
-                                            </tr>
-                                            <tr class="inline-upload-row d-none" data-for-type="{{ type_key }}">
-                                                <td colspan="4" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
-                                                    <form method="post"
-                                                          action="{% url 'design_asset_add' design.pk %}"
-                                                          enctype="multipart/form-data"
-                                                          class="d-flex align-items-end gap-3 flex-wrap">
-                                                        {% csrf_token %}
-                                                        <input type="hidden" name="asset_type" value="{{ type_key }}">
-                                                        <div>
-                                                            <label class="form-label small mb-1">File</label>
-                                                            <input type="file" name="file" class="form-control form-control-sm inline-file-input" required>
-                                                        </div>
-                                                        <div>
-                                                            <label class="form-label small mb-1">Name</label>
-                                                            <input type="text" name="name" class="form-control form-control-sm inline-name-field" required>
-                                                        </div>
-                                                        <div class="d-flex gap-2">
-                                                            <button type="submit" class="btn btn-sm btn-primary">Upload</button>
-                                                            <button type="button" class="btn btn-sm btn-secondary cancel-inline-upload">Cancel</button>
-                                                        </div>
-                                                    </form>
-                                                </td>
-                                            </tr>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if attachments or user.is_staff %}
-                <h5 class="mt-4">Attachments</h5>
-                <div class="card border-0 mb-3">
-                    <div class="card-body py-10">
-                        <table class="table table-striped" id="attachment-table">
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th data-col="1" style="cursor:pointer;user-select:none;">Name <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    <th data-col="2" style="cursor:pointer;user-select:none;">Description <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    <th data-col="3" style="cursor:pointer;user-select:none;">Uploaded <i class="sort-indicator bi bi-arrow-up ms-1 invisible"></i></th>
-                                    {% if user.is_staff %}<th></th>{% endif %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for asset in attachments %}
-                                    <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
-                                        <td class="text-nowrap" style="width:1px">
-                                            <i class="bi {{ asset.get_icon_class }}"></i>
-                                        </td>
-                                        <td>
-                                            {{ asset.name }}
-                                            {% if user.is_staff and asset.internal %}
-                                                <span class="badge bg-secondary ms-1" title="Internal only">🔒</span>
-                                            {% endif %}
-                                        </td>
-                                        <td>{{ asset.description|default:"" }}</td>
-                                        <td data-sort-value="{{ asset.uploaded_dt|date:'Y-m-d H:i:s' }}" title="{{ asset.uploaded_dt|date:'j-M-Y H:i:s' }}">{{ asset.uploaded_dt|date:"j-M-Y" }}</td>
-                                        {% if user.is_staff %}
-                                            <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                <a href="{% url 'design_asset_edit' asset.pk %}"
-                                                   class="btn btn-sm btn-primary me-1"
-                                                   title="Edit attachment">
-                                                    <i class="cil-pencil"></i>
-                                                </a>
-                                                <a href="{% url 'design_asset_delete' asset.pk %}"
-                                                   class="btn btn-sm btn-danger"
-                                                   title="Delete attachment">
-                                                    <i class="cil-trash"></i>
-                                                </a>
-                                            </td>
-                                        {% endif %}
-                                    </tr>
-                                {% endfor %}
-                                {% if user.is_staff %}
-                                    <tr id="attachment-add-trigger"
-                                        style="cursor:pointer"
-                                        title="Click to add an attachment">
-                                        <td style="width:1px"><i class="bi bi-plus-circle text-muted"></i></td>
-                                        <td><span class="text-muted fst-italic">Add attachment</span></td>
-                                        <td></td>
-                                        <td></td>
-                                        <td class="text-end" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important">
-                                            <span class="text-muted small"><i class="bi bi-upload me-1"></i>Upload</span>
-                                        </td>
-                                    </tr>
-                                    <tr id="attachment-add-row" class="d-none">
-                                        <td colspan="5" class="p-3" style="background:#f0f4ff;border-top:none" onclick="event.stopPropagation()">
-                                            <form method="post"
-                                                  action="{% url 'design_asset_add' design.pk %}"
-                                                  enctype="multipart/form-data">
-                                                {% csrf_token %}
-                                                <input type="hidden" name="asset_type" value="ATTACHMENT">
-                                                <div class="row g-2">
-                                                    <div class="col-12 col-md-auto">
-                                                        <label class="form-label small mb-1">File</label>
-                                                        <input type="file" name="file" class="form-control form-control-sm attachment-file-input" required>
-                                                    </div>
-                                                    <div class="col-12 col-md-auto">
-                                                        <label class="form-label small mb-1">Name</label>
-                                                        <input type="text" name="name" class="form-control form-control-sm attachment-name-field" required>
-                                                    </div>
-                                                    <div class="col-12 col-md">
-                                                        <label class="form-label small mb-1">Description</label>
-                                                        <input type="text" name="description" class="form-control form-control-sm">
-                                                    </div>
-                                                    <div class="col-12 col-md-auto d-flex align-items-end gap-2">
-                                                        <button type="submit" class="btn btn-sm btn-primary">Upload</button>
-                                                        <button type="button" class="btn btn-sm btn-secondary" id="attachment-add-cancel">Cancel</button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if devices %}
-                <h5 class="mt-4">Boards</h5>
-                <div class="card border-0">
-                    <div class="card-body py-10">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Serial</th>
-                                    <th>Created</th>
-                                    <th>Invoice</th>
-                                    <th>Purchase Order</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for device in devices %}
-                                    <tr>
-                                        <td><a href="{% url 'device:device_detail' device.pk %}">{{ device.pk }}</a></td>
-                                        <td>{{ device.creation_dt|date:"j-M-Y" }}</td>
-                                        <td>{{ device.invoice|default:"" }}</td>
-                                        <td>{{ device.po|default:"" }}</td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            {% endif %}
+            </div>
 
         </div>
     </div>
 {% endblock content %}
 
 {% block extra_js %}
+    <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
     <script>
+        activateTabFromHash();
+
+        initSortableReorder('test-steps-body');
+
         // Inline upload rows in the Design Files table
         document.querySelectorAll('.core-upload-trigger').forEach(function (row) {
             row.addEventListener('click', function () {
