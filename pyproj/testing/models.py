@@ -49,3 +49,122 @@ class TestModule(models.Model):
 
     def __str__(self):
         return f'#{self.pk} {self.module_type}'
+
+
+class TestSuite(models.Model):
+    """One version of a Design's Test Suite (issue #101) - an ordered list of TestSteps.
+    Every Design has exactly one *current* Test Suite (the highest-`version` row for that
+    design, possibly with zero steps if nothing has been configured yet - see
+    `testing.views._get_or_create_current_suite`), which is freely editable in place; older
+    versions are frozen historical records, created by the "Save as New Version" action
+    (`testing.views.test_suite_save_new_version`), which copies the current version's steps
+    onto a new row and leaves the old one untouched. Hardware revisioning lives on Design
+    (hw_version, unique with sku), not on individual Devices, so a suite is scoped to a
+    Design rather than to one physical serialized board."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='test_suites')
+    version = models.PositiveIntegerField(default=1)
+    notes = models.TextField(null=True, blank=True)
+    created_dt = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['design', '-version']
+        constraints = [
+            models.UniqueConstraint(fields=['design', 'version'], name='unique_design_test_suite_version'),
+        ]
+
+    def __str__(self):
+        return f'{self.design} Test Suite v{self.version}'
+
+
+class TestStep(models.Model):
+    """A single step within a TestSuite, executed/examined in order (issue #101) - conceptually
+    similar to a firewall rule list. Each step has a fixed type (below) with its own
+    type-specific configuration fields, stored as JSON since the fields differ per type and
+    this is the first genuinely polymorphic config shape in this codebase."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    DELAY = 'DELAY'
+    UPLOAD_FIRMWARE = 'UPLOAD_FIRMWARE'
+    BEEP = 'BEEP'
+    READ_RAIL_VOLTAGE = 'READ_RAIL_VOLTAGE'
+    READ_RAIL_CURRENT = 'READ_RAIL_CURRENT'
+    CONTROL_POWER_RAIL = 'CONTROL_POWER_RAIL'
+    STEP_TYPE_CHOICES = [
+        (DELAY, 'Delay'),
+        (UPLOAD_FIRMWARE, 'Upload Firmware'),
+        (BEEP, 'Beep'),
+        (READ_RAIL_VOLTAGE, 'Read Rail Voltage'),
+        (READ_RAIL_CURRENT, 'Read Rail Current'),
+        (CONTROL_POWER_RAIL, 'Control Power Rail'),
+    ]
+    # Alphabetical-by-label rendering of the above, computed once rather than hand-sorted, so
+    # this stays correct as more step types are added later without anyone remembering to
+    # re-order STEP_TYPE_CHOICES itself. Used by the "Add" step-type dropdown and the step
+    # edit page's Type dropdown; STEP_TYPE_CHOICES itself (definition order) still backs the
+    # model field's `choices=` and the admin.
+    STEP_TYPE_CHOICES_ALPHABETICAL = sorted(STEP_TYPE_CHOICES, key=lambda choice: choice[1])
+    # Fixed per-type colour coding for the step's box header (issue #101) - types are
+    # predefined by this codebase, not user-created rows, so (unlike ProductionStage.color)
+    # there's no per-instance colour picker.
+    STEP_TYPE_COLORS = {
+        DELAY: '#6c757d',
+        UPLOAD_FIRMWARE: '#0d6efd',
+        BEEP: '#fd7e14',
+        READ_RAIL_VOLTAGE: '#198754',
+        READ_RAIL_CURRENT: '#20c997',
+        CONTROL_POWER_RAIL: '#dc3545',
+    }
+    # Placeholder rail names until this project integrates with Testomatic, which defines
+    # power rails more fully.
+    POWER_RAIL_CHOICES = [('3.3V', '3.3V'), ('5V', '5V'), ('12V', '12V')]
+    UPLOAD_TOOL_CHOICES = [
+        ('avrdude', 'avrdude'),
+        ('esptool.py', 'esptool.py'),
+        ('openocd', 'OpenOCD'),
+        ('stm32cubeprogrammer', 'STM32CubeProgrammer'),
+    ]
+    RAIL_ACTION_ON = 'ON'
+    RAIL_ACTION_OFF = 'OFF'
+    RAIL_ACTION_CHOICES = [(RAIL_ACTION_ON, 'Turn On'), (RAIL_ACTION_OFF, 'Turn Off')]
+
+    # Bumped whenever a step type's config shape changes; stored as a "schema_version" key
+    # inside config itself (not just as a DB column) so it survives being exported/read
+    # standalone by an external consumer, per issue #101's "enable programmatic
+    # generation/modification via external scripts" requirement.
+    CONFIG_SCHEMA_VERSION = 1
+
+    suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, related_name='steps')
+    order = models.PositiveIntegerField(default=0)
+    step_type = models.CharField(max_length=20, choices=STEP_TYPE_CHOICES)
+    name = models.CharField(max_length=100)
+    hard_fail = models.BooleanField(default=False)
+    config = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return f'{self.get_step_type_display()}: {self.name}'
+
+    def get_color(self):
+        return self.STEP_TYPE_COLORS.get(self.step_type, '#6c757d')
+
+    def get_config_summary(self):
+        """A short human-readable rendering of this step's config, for the suite edit page's
+        second row (issue #101's "2 rows in a bordered box" layout)."""
+        c = self.config
+        if self.step_type == self.DELAY:
+            return f"{c.get('delay_ms', '?')} ms"
+        if self.step_type == self.UPLOAD_FIRMWARE:
+            return f"{c.get('upload_tool', '?')} via {c.get('port', '?')} — {c.get('firmware_file', '?')}"
+        if self.step_type == self.BEEP:
+            return f"{c.get('count', 1)} × {c.get('duration_ms', '?')} ms"
+        if self.step_type == self.READ_RAIL_VOLTAGE:
+            return f"{c.get('rail', '?')}: {c.get('min_v', '?')}–{c.get('max_v', '?')} V"
+        if self.step_type == self.READ_RAIL_CURRENT:
+            return f"{c.get('rail', '?')}: {c.get('min_ma', '?')}–{c.get('max_ma', '?')} mA"
+        if self.step_type == self.CONTROL_POWER_RAIL:
+            return f"{c.get('rail', '?')}: {c.get('action', '?')}"
+        return ''

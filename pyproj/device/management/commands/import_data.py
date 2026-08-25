@@ -19,7 +19,7 @@ def _flush_app_data(include_users=False):
     from device.models import DeviceEvent, DeviceAsset, DeviceImage, TestImage, TestRecord, Device, DesignAsset, Design
     from crm.models import Org
     from easy_thumbnails.models import Source, Thumbnail
-    from testing.models import Tester, TestModule, TestModuleType
+    from testing.models import Tester, TestModule, TestModuleType, TestStep, TestSuite
 
     if include_users:
         from django.contrib.auth import get_user_model
@@ -28,6 +28,8 @@ def _flush_app_data(include_users=False):
     TestModule.objects.all().delete()
     TestModuleType.objects.all().delete()
     Tester.objects.all().delete()
+    TestStep.objects.all().delete()
+    TestSuite.objects.all().delete()
     PartsCartLine.objects.all().delete()
     PartsOrderLine.objects.all().delete()
     PartsOrder.objects.all().delete()

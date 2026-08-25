@@ -228,6 +228,8 @@ def design_detail(request, design_id):
         'build_costing_rows': build_costing_rows,
         'build_costing_total': build_costing_total,
         'pcb_order_lines': pcb_order_lines,
+        'test_suite_current': design.test_suites.first() if request.user.is_staff else None,
+        'test_suite_version_count': design.test_suites.count() if request.user.is_staff else 0,
     }
 
     return render(request, 'device/design_detail.html', context)

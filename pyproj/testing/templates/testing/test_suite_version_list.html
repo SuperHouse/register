@@ -1,0 +1,51 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Test Suite Version History - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Test Suite Version History
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        <a href="{% url 'design_detail' design.pk %}">&laquo; Back to {{ design.name }}</a>
+    </p>
+
+    <div class="row">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead>
+                            <tr class="highlight">
+                                <th>Version</th>
+                                <th>Steps</th>
+                                <th>Created</th>
+                                <th>Notes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for suite in suites %}
+                                <tr style="cursor: pointer;"
+                                    onclick="window.location='{% if suite.pk == current.pk %}{% url 'testing:test_suite_current' design.pk %}{% else %}{% url 'testing:test_suite_version_detail' design.pk suite.version %}{% endif %}'">
+                                    <td>v{{ suite.version }}</td>
+                                    <td>{{ suite.steps.all|length }}</td>
+                                    <td>{{ suite.created_dt|date:"j-M-Y H:i" }}</td>
+                                    <td>{{ suite.notes|default:"" }}</td>
+                                    <td class="text-nowrap">
+                                        {% if suite.pk == current.pk %}
+                                            <span class="badge bg-primary">Current</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

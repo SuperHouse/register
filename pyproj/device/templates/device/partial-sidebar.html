@@ -71,7 +71,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' %}active{% endif %}"
+                    <a class="nav-link {% if url_name == 'design_list' or url_name == 'design_detail' or app_name == 'testing' and url_name|slice:":6" == "test_s" %}active{% endif %}"
                        href="{% url 'design_list' %}">
                         <i class="nav-icon cil-list"></i>
                         Designs
@@ -100,7 +100,7 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if app_name == 'testing' and url_name|slice:":16" != "test_module_type" %}active{% endif %}"
+                        <a class="nav-link {% if app_name == 'testing' and url_name|slice:":16" != "test_module_type" and url_name|slice:":6" != "test_s" %}active{% endif %}"
                            href="{% url 'testing:tester_list' %}">
                             <i class="nav-icon cil-task"></i>
                             Testers

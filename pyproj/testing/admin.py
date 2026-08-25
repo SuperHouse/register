@@ -2,7 +2,7 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Tester, TestModule, TestModuleType
+from .models import Tester, TestModule, TestModuleType, TestStep, TestSuite
 
 
 @admin.register(Tester)
@@ -29,3 +29,23 @@ class TestModuleAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'module_type']
     list_select_related = ['module_type']
     search_fields = ['module_type__name', 'notes']
+
+
+class TestStepInline(admin.TabularInline):
+    model = TestStep
+    extra = 0
+
+
+@admin.register(TestSuite)
+class TestSuiteAdmin(admin.ModelAdmin):
+    list_display = ['design', 'version', 'created_dt']
+    list_select_related = ['design']
+    search_fields = ['design__sku', 'design__name']
+    inlines = [TestStepInline]
+
+
+@admin.register(TestStep)
+class TestStepAdmin(admin.ModelAdmin):
+    list_display = ['name', 'step_type', 'suite', 'order', 'hard_fail']
+    list_select_related = ['suite']
+    search_fields = ['name', 'suite__design__sku', 'suite__design__name']

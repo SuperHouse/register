@@ -441,6 +441,28 @@
                 </div>
             {% endif %}
 
+            {% if user.is_staff %}
+                <h5 class="mt-4" id="test-suite">Test Suite</h5>
+                <div class="card border-0 mb-3">
+                    <div class="card-body py-10">
+                        {% if test_suite_current %}
+                            <p class="mb-3">
+                                Current version: <strong>v{{ test_suite_current.version }}</strong>
+                                &mdash; {{ test_suite_current.steps.count }} step{{ test_suite_current.steps.count|pluralize }}
+                            </p>
+                        {% else %}
+                            <p class="text-body-secondary mb-3">No test steps have been defined yet.</p>
+                        {% endif %}
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'testing:test_suite_current' design.pk %}" class="btn btn-primary">Manage Test Suite</a>
+                            {% if test_suite_version_count > 1 %}
+                                <a href="{% url 'testing:test_suite_version_list' design.pk %}" class="btn btn-outline-secondary">Version History ({{ test_suite_version_count }})</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if user.is_staff or has_testing_assets %}
                 <h5 class="mt-4">Testing</h5>
                 <div class="card border-0 mb-3">

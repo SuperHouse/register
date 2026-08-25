@@ -1,0 +1,68 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Test Suite v{{ suite.version }} - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Test Suite v{{ suite.version }}
+    {% if is_current %}<span class="badge bg-primary">Current</span>{% else %}<span class="badge bg-secondary">Historical</span>{% endif %}
+{% endblock h1 %}
+
+{% block content %}
+    <p class="text-body-secondary">
+        <a href="{% url 'testing:test_suite_version_list' design.pk %}">&laquo; Back to Version History</a>
+        {% if is_current %}&mdash; <a href="{% url 'testing:test_suite_current' design.pk %}">edit this version</a>{% endif %}
+    </p>
+
+    <div class="row">
+        <div class="col-12 col-md-10 col-lg-8">
+            {% if suite.notes %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Notes</h6>
+                        <p class="mb-0">{{ suite.notes|linebreaksbr }}</p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Test Steps</h5>
+                    {% if not is_current %}
+                        <p class="text-body-secondary small">
+                            This is a frozen historical record and can't be edited. Use Save as New Version on the current version to make further changes.
+                        </p>
+                    {% endif %}
+
+                    <table class="table mb-0">
+                        <tbody>
+                            {% for step in steps %}
+                                <tr>
+                                    <td class="p-0 border-0">
+                                        <div class="border rounded mb-2" style="border-left: 6px solid {{ step.get_color }} !important; overflow: hidden;">
+                                            <div class="d-flex align-items-center gap-2 px-2 py-2">
+                                                <span class="badge" style="background-color: {{ step.get_color }};">{{ step.get_step_type_display }}</span>
+                                                <strong>{{ step.name }}</strong>
+                                                {% if step.hard_fail %}
+                                                    <span class="badge bg-danger ms-auto">Hard Fail</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="px-2 py-1 small text-body-secondary border-top">
+                                                {{ step.get_config_summary }}
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td class="border-0"><i>No steps were defined in this version.</i></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

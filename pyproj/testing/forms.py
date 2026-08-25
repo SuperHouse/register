@@ -3,7 +3,7 @@
 from django import forms
 
 from device.models import Design
-from .models import Tester, TestModule, TestModuleType
+from .models import Tester, TestModule, TestModuleType, TestStep
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -57,3 +57,148 @@ class CompatibleDesignAddForm(forms.Form):
             self.fields['design'].queryset = self.fields['design'].queryset.exclude(
                 pk__in=module_type.compatible_designs.values_list('pk', flat=True)
             )
+
+
+class CopyTestStepsFromForm(forms.Form):
+    """Backs the "Copy Test Suite from:" control at the bottom of the current Test Suite
+    page: appends another Design's current Test Suite's steps (including their config) onto
+    this one - see testing.views.test_suite_copy_steps_from."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    source_design = DesignChoiceField(
+        queryset=Design.objects.filter(obsolete=False).select_related('client').order_by(
+            'client__company_name', 'sku', 'name', 'hw_version'
+        ),
+        label='Copy Test Suite from',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, exclude_design=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Copying a design's steps onto itself would just duplicate them - not offered.
+        if exclude_design is not None:
+            self.fields['source_design'].queryset = self.fields['source_design'].queryset.exclude(pk=exclude_design.pk)
+
+
+class TestSuiteSaveNewVersionForm(forms.Form):
+    """Backs the "Save as New Version" action: freezes the current version's steps as a
+    historical record (optionally noting what's in it) and starts the next version as an
+    editable copy - see TestSuite's docstring and testing.views.test_suite_save_new_version."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    notes = forms.CharField(
+        required=False, label='Notes',
+        help_text='Optional - what does this version represent? Shown in the version history.',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
+
+
+class TestStepTypeAddForm(forms.Form):
+    """Backs the suite edit page's drop-down + Add button for appending a new step of a
+    chosen type (issue #101's suggested initial implementation, in place of a drag-and-drop
+    palette)."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    step_type = forms.ChoiceField(choices=TestStep.STEP_TYPE_CHOICES_ALPHABETICAL, widget=forms.Select(attrs={'class': 'form-select'}))
+
+
+class TestStepForm(forms.ModelForm):
+    """A single form covering every step type's config fields; clean() picks out only the
+    subset relevant to the selected step_type (see TYPE_FIELDS) and validates that type's
+    required fields, rather than needing six separate forms/views per type. The template
+    shows/hides each type's fieldset client-side based on the step_type dropdown."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    # Declared explicitly (rather than left to Meta/the model field) so its choices can be
+    # alphabetical-by-label instead of TestStep.STEP_TYPE_CHOICES' definition order.
+    step_type = forms.ChoiceField(choices=TestStep.STEP_TYPE_CHOICES_ALPHABETICAL,
+                                   widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_step_type'}))
+
+    delay_ms = forms.IntegerField(required=False, min_value=0, label='Delay (ms)',
+                                   widget=forms.NumberInput(attrs={'class': 'form-control'}))
+
+    upload_tool = forms.ChoiceField(required=False, choices=TestStep.UPLOAD_TOOL_CHOICES,
+                                     widget=forms.Select(attrs={'class': 'form-select'}))
+    # A live dropdown of available serial ports isn't possible from this web app - it has no
+    # connection to the physical Tester that would eventually run this step - so this is
+    # plain text for now (issue #101 asked for a drop-down; flagged as a deliberate
+    # simplification rather than silently reinterpreted).
+    port = forms.CharField(required=False, label='Serial Port / Device',
+                            widget=forms.TextInput(attrs={'class': 'form-control'}))
+    firmware_file = forms.CharField(required=False, label='Firmware Binary Image',
+                                     widget=forms.TextInput(attrs={'class': 'form-control'}))
+
+    count = forms.IntegerField(required=False, min_value=1, initial=1, label='Count',
+                                widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    duration_ms = forms.IntegerField(required=False, min_value=0, label='Duration (ms)',
+                                      widget=forms.NumberInput(attrs={'class': 'form-control'}))
+
+    rail = forms.ChoiceField(required=False, choices=TestStep.POWER_RAIL_CHOICES,
+                              widget=forms.Select(attrs={'class': 'form-select'}))
+    min_v = forms.FloatField(required=False, label='Min V',
+                              widget=forms.NumberInput(attrs={'class': 'form-control', 'step': 'any'}))
+    max_v = forms.FloatField(required=False, label='Max V',
+                              widget=forms.NumberInput(attrs={'class': 'form-control', 'step': 'any'}))
+    min_ma = forms.FloatField(required=False, label='Min mA',
+                               widget=forms.NumberInput(attrs={'class': 'form-control', 'step': 'any'}))
+    max_ma = forms.FloatField(required=False, label='Max mA',
+                               widget=forms.NumberInput(attrs={'class': 'form-control', 'step': 'any'}))
+
+    action = forms.ChoiceField(required=False, choices=TestStep.RAIL_ACTION_CHOICES, widget=forms.RadioSelect)
+
+    # Maps each step type to the config fields it actually uses (a subset of the fields
+    # declared above): 'required' fields must be filled for that type; 'optional' fields are
+    # included in config only when given (their absence lets a consumer apply its own
+    # default, e.g. Beep's count defaulting to 1).
+    TYPE_FIELDS = {
+        TestStep.DELAY: {'required': ['delay_ms'], 'optional': []},
+        TestStep.UPLOAD_FIRMWARE: {'required': ['upload_tool', 'port', 'firmware_file'], 'optional': []},
+        TestStep.BEEP: {'required': ['duration_ms'], 'optional': ['count']},
+        TestStep.READ_RAIL_VOLTAGE: {'required': ['rail', 'min_v', 'max_v'], 'optional': []},
+        TestStep.READ_RAIL_CURRENT: {'required': ['rail', 'min_ma', 'max_ma'], 'optional': []},
+        TestStep.CONTROL_POWER_RAIL: {'required': ['rail', 'action'], 'optional': []},
+    }
+
+    class Meta:
+        model = TestStep
+        fields = ['step_type', 'name', 'hard_fail']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'hard_fail': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            # Seed the type-specific fields from the stored config; schema_version is never
+            # user-facing.
+            self.initial.update({k: v for k, v in self.instance.config.items() if k != 'schema_version'})
+
+    def clean(self):
+        cleaned = super().clean()
+        field_spec = self.TYPE_FIELDS.get(cleaned.get('step_type'))
+        if field_spec is None:
+            return cleaned
+
+        config = {}
+        for field_name in field_spec['required']:
+            value = cleaned.get(field_name)
+            if value in (None, ''):
+                self.add_error(field_name, 'This field is required for this step type.')
+            else:
+                config[field_name] = value
+        for field_name in field_spec['optional']:
+            value = cleaned.get(field_name)
+            if value not in (None, ''):
+                config[field_name] = value
+        cleaned['config'] = config
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        config = dict(self.cleaned_data.get('config', {}))
+        config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
+        instance.config = config
+        if commit:
+            instance.save()
+        return instance
