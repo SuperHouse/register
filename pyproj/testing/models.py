@@ -118,6 +118,7 @@ class TestStep(models.Model):
     IOMOD_DIGITAL_READ = 'IOMOD_DIGITAL_READ'
     IOMOD_DIGITAL_WRITE = 'IOMOD_DIGITAL_WRITE'
     IOMOD_ANALOG_WRITE = 'IOMOD_ANALOG_WRITE'
+    LED_SPECTRAL_READING = 'LED_SPECTRAL_READING'
     STEP_TYPE_CHOICES = [
         (DELAY, 'Delay'),
         (UPLOAD_FIRMWARE, 'Upload Firmware'),
@@ -130,6 +131,7 @@ class TestStep(models.Model):
         (IOMOD_DIGITAL_READ, 'IOMOD Digital Read'),
         (IOMOD_DIGITAL_WRITE, 'IOMOD Digital Write'),
         (IOMOD_ANALOG_WRITE, 'IOMOD Analog Write'),
+        (LED_SPECTRAL_READING, 'LED Spectral Reading'),
     ]
     # Alphabetical-by-label rendering of the above, computed once rather than hand-sorted, so
     # this stays correct as more step types are added later without anyone remembering to
@@ -152,6 +154,7 @@ class TestStep(models.Model):
         IOMOD_ANALOG_READ: '#0aa2c0',
         IOMOD_DIGITAL_WRITE: '#d63384',
         IOMOD_ANALOG_WRITE: '#ad1457',
+        LED_SPECTRAL_READING: '#ffc107',
     }
     # Placeholder rail names until this project integrates with Testomatic, which defines
     # power rails more fully.
@@ -219,6 +222,16 @@ class TestStep(models.Model):
             return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: write {c.get('digital_write', '?')}"
         if self.step_type == self.IOMOD_ANALOG_WRITE:
             return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: write {c.get('analog_write', '?')}"
+        if self.step_type == self.LED_SPECTRAL_READING:
+            mux = f"MUX {c.get('mux_addr')}:{c.get('mux_chan', '?')} " if c.get('mux_addr') else ''
+            return (
+                f"{mux}I2C {c.get('i2c_addr', '?')} — "
+                f"R {self._range_summary(c.get('r_min'), c.get('r_max'))}, "
+                f"G {self._range_summary(c.get('g_min'), c.get('g_max'))}, "
+                f"B {self._range_summary(c.get('b_min'), c.get('b_max'))}, "
+                f"Lux {self._range_summary(c.get('lux_min'), c.get('lux_max'))}, "
+                f"IR {self._range_summary(c.get('ir_min'), c.get('ir_max'))}"
+            )
         return ''
 
     @staticmethod

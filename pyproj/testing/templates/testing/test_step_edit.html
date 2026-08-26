@@ -202,6 +202,86 @@
                             </div>
                         </div>
 
+                        <div data-step-type-fields="LED_SPECTRAL_READING">
+                            <div class="row">
+                                <div class="col-auto mb-3">
+                                    <label for="{{ form.mux_addr.id_for_label }}" class="form-label">{{ form.mux_addr.label }}</label>
+                                    {{ form.mux_addr }}
+                                    {% if form.mux_addr.errors %}<div class="text-danger small">{{ form.mux_addr.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-auto mb-3">
+                                    <label for="{{ form.mux_chan.id_for_label }}" class="form-label">{{ form.mux_chan.label }}</label>
+                                    {{ form.mux_chan }}
+                                    {% if form.mux_chan.errors %}<div class="text-danger small">{{ form.mux_chan.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col-auto mb-3">
+                                    <label for="{{ form.i2c_addr.id_for_label }}" class="form-label">{{ form.i2c_addr.label }}</label>
+                                    {{ form.i2c_addr }}
+                                    {% if form.i2c_addr.errors %}<div class="text-danger small">{{ form.i2c_addr.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.r_min.id_for_label }}" class="form-label">{{ form.r_min.label }}</label>
+                                    {{ form.r_min }}
+                                    {% if form.r_min.errors %}<div class="text-danger small">{{ form.r_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.r_max.id_for_label }}" class="form-label">{{ form.r_max.label }}</label>
+                                    {{ form.r_max }}
+                                    {% if form.r_max.errors %}<div class="text-danger small">{{ form.r_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.g_min.id_for_label }}" class="form-label">{{ form.g_min.label }}</label>
+                                    {{ form.g_min }}
+                                    {% if form.g_min.errors %}<div class="text-danger small">{{ form.g_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.g_max.id_for_label }}" class="form-label">{{ form.g_max.label }}</label>
+                                    {{ form.g_max }}
+                                    {% if form.g_max.errors %}<div class="text-danger small">{{ form.g_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.b_min.id_for_label }}" class="form-label">{{ form.b_min.label }}</label>
+                                    {{ form.b_min }}
+                                    {% if form.b_min.errors %}<div class="text-danger small">{{ form.b_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.b_max.id_for_label }}" class="form-label">{{ form.b_max.label }}</label>
+                                    {{ form.b_max }}
+                                    {% if form.b_max.errors %}<div class="text-danger small">{{ form.b_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.lux_min.id_for_label }}" class="form-label">{{ form.lux_min.label }}</label>
+                                    {{ form.lux_min }}
+                                    {% if form.lux_min.errors %}<div class="text-danger small">{{ form.lux_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.lux_max.id_for_label }}" class="form-label">{{ form.lux_max.label }}</label>
+                                    {{ form.lux_max }}
+                                    {% if form.lux_max.errors %}<div class="text-danger small">{{ form.lux_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.ir_min.id_for_label }}" class="form-label">{{ form.ir_min.label }}</label>
+                                    {{ form.ir_min }}
+                                    {% if form.ir_min.errors %}<div class="text-danger small">{{ form.ir_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.ir_max.id_for_label }}" class="form-label">{{ form.ir_max.label }}</label>
+                                    {{ form.ir_max }}
+                                    {% if form.ir_max.errors %}<div class="text-danger small">{{ form.ir_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'design_detail' step.suite.design_id %}#test-suite" class="btn btn-secondary">Cancel</a>

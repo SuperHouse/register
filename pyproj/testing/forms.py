@@ -3,9 +3,16 @@
 import ast
 
 from django import forms
+from django.core.validators import RegexValidator
 
 from device.models import Design
 from .models import Tester, TestModule, TestModuleType, TestStep
+
+# Used by the LED Spectral Reading step's MUX Addr/I2C Addr fields (issue #109) - a bare hex
+# string, with or without a "0x"/"0X" prefix.
+hex_address_validator = RegexValidator(
+    regex=r'^(0[xX])?[0-9A-Fa-f]+$', message='Enter a hex value, e.g. 70 or 0x70.',
+)
 
 
 class DesignChoiceField(forms.ModelChoiceField):
@@ -171,6 +178,30 @@ class TestStepForm(forms.ModelForm):
     analog_write = forms.IntegerField(required=False, label='Write',
                                        widget=forms.NumberInput(attrs={'class': 'form-control'}))
 
+    # LED Spectral Reading (issue #109). mux_chan reuses IOMOD_PIN_CHOICES - both are a plain
+    # 0-7 selector, just for a different piece of hardware.
+    # A placeholder, not an initial value: MUX Addr is genuinely optional (issue #109's "can
+    # be null"), so this is shown greyed-out as a likely-value hint but is never part of the
+    # submitted data unless the user actually types into the field, unlike i2c_addr's default
+    # below (a real initial value, since I2C Addr is required and needs *some* value anyway).
+    mux_addr = forms.CharField(required=False, label='MUX Addr', validators=[hex_address_validator],
+                                widget=forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 150px;',
+                                                               'placeholder': '0x71'}))
+    mux_chan = forms.ChoiceField(required=False, label='MUX Chan', choices=TestStep.IOMOD_PIN_CHOICES,
+                                  widget=forms.Select(attrs={'class': 'form-select', 'style': 'max-width: 150px;'}))
+    i2c_addr = forms.CharField(required=False, label='I2C Addr', initial='0x10', validators=[hex_address_validator],
+                                widget=forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 150px;'}))
+    r_min = forms.IntegerField(required=False, label='RMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    r_max = forms.IntegerField(required=False, label='RMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    g_min = forms.IntegerField(required=False, label='GMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    g_max = forms.IntegerField(required=False, label='GMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    b_min = forms.IntegerField(required=False, label='BMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    b_max = forms.IntegerField(required=False, label='BMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    lux_min = forms.IntegerField(required=False, label='LuxMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    lux_max = forms.IntegerField(required=False, label='LuxMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    ir_min = forms.IntegerField(required=False, label='IRMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    ir_max = forms.IntegerField(required=False, label='IRMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
+
     # Maps each step type to the config fields it actually uses (a subset of the fields
     # declared above): 'required' fields must be filled for that type; 'optional' fields are
     # included in config only when given (their absence lets a consumer apply its own
@@ -187,6 +218,11 @@ class TestStepForm(forms.ModelForm):
         TestStep.IOMOD_DIGITAL_READ: {'required': ['iomod', 'pin', 'expect'], 'optional': []},
         TestStep.IOMOD_DIGITAL_WRITE: {'required': ['iomod', 'pin', 'digital_write'], 'optional': []},
         TestStep.IOMOD_ANALOG_WRITE: {'required': ['iomod', 'pin', 'analog_write'], 'optional': []},
+        TestStep.LED_SPECTRAL_READING: {
+            'required': ['mux_chan', 'i2c_addr'],
+            'optional': ['mux_addr', 'r_min', 'r_max', 'g_min', 'g_max',
+                         'b_min', 'b_max', 'lux_min', 'lux_max', 'ir_min', 'ir_max'],
+        },
     }
 
     class Meta:
@@ -202,7 +238,17 @@ class TestStepForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             # Seed the type-specific fields from the stored config; schema_version is never
             # user-facing.
-            self.initial.update({k: v for k, v in self.instance.config.items() if k != 'schema_version'})
+            config = self.instance.config
+            self.initial.update({k: v for k, v in config.items() if k != 'schema_version'})
+            # A step whose config already has real values (i.e. it's been through this form
+            # and saved at least once, as opposed to a fresh one straight from test_step_add,
+            # whose config is just {'schema_version': ...}) must show a field it was saved
+            # with left blank as blank - not silently resurface a field-level default (e.g.
+            # mux_addr's "0x71") for a value the user deliberately cleared or never set.
+            if any(k != 'schema_version' for k in config):
+                for name, field in self.fields.items():
+                    if field.initial and name not in config:
+                        self.initial[name] = ''
 
     def clean(self):
         cleaned = super().clean()

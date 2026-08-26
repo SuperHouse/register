@@ -131,6 +131,42 @@ def test_step_config_summary_python_truncates_and_counts_extra_lines(design):
 
 
 @pytest.mark.django_db
+def test_step_config_summary_led_spectral_reading(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    with_mux = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED',
+        config={
+            'mux_addr': '0x70', 'mux_chan': '2', 'i2c_addr': '0x29',
+            'r_min': 1, 'r_max': 2, 'g_min': 3, 'g_max': 4, 'b_min': 5, 'b_max': 6,
+            'lux_min': 7, 'lux_max': 8, 'ir_min': 9, 'ir_max': 10,
+        },
+    )
+    assert with_mux.get_config_summary() == (
+        'MUX 0x70:2 I2C 0x29 — R 1–2, G 3–4, B 5–6, Lux 7–8, IR 9–10'
+    )
+
+    without_mux = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED no MUX',
+        config={
+            'i2c_addr': '0x29',
+            'r_min': 1, 'r_max': 2, 'g_min': 3, 'g_max': 4, 'b_min': 5, 'b_max': 6,
+            'lux_min': 7, 'lux_max': 8, 'ir_min': 9, 'ir_max': 10,
+        },
+    )
+    assert without_mux.get_config_summary() == (
+        'I2C 0x29 — R 1–2, G 3–4, B 5–6, Lux 7–8, IR 9–10'
+    )
+
+    no_bounds = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED no bounds',
+        config={'mux_chan': '2', 'i2c_addr': '0x29'},
+    )
+    assert no_bounds.get_config_summary() == (
+        'I2C 0x29 — R any, G any, B any, Lux any, IR any'
+    )
+
+
+@pytest.mark.django_db
 def test_steps_ordered_by_order(design):
     suite = TestSuite.objects.create(design=design, version=1)
     TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='Second', order=2)
@@ -210,6 +246,64 @@ def test_step_form_iomod_digital_write_and_analog_write_use_distinct_config_keys
     assert analog.cleaned_data['config'] == {'iomod': 'D', 'pin': '5', 'analog_write': 200}
 
 
+def _led_spectral_reading_data(**overrides):
+    data = {
+        'step_type': TestStep.LED_SPECTRAL_READING, 'name': 'Read LED',
+        'mux_chan': '2', 'i2c_addr': '0x29',
+        'r_min': '1', 'r_max': '2', 'g_min': '3', 'g_max': '4', 'b_min': '5', 'b_max': '6',
+        'lux_min': '7', 'lux_max': '8', 'ir_min': '9', 'ir_max': '10',
+    }
+    data.update(overrides)
+    return data
+
+
+@pytest.mark.django_db
+def test_step_form_led_spectral_reading_requires_only_mux_chan_and_i2c_addr():
+    form = TestStepForm(data=_led_spectral_reading_data())
+    assert form.is_valid(), form.errors
+    assert 'mux_addr' not in form.cleaned_data['config']
+
+    missing_i2c = TestStepForm(data=_led_spectral_reading_data(i2c_addr=''))
+    assert not missing_i2c.is_valid()
+    assert 'i2c_addr' in missing_i2c.errors
+
+    missing_chan = TestStepForm(data=_led_spectral_reading_data(mux_chan=''))
+    assert not missing_chan.is_valid()
+    assert 'mux_chan' in missing_chan.errors
+
+
+@pytest.mark.django_db
+def test_step_form_led_spectral_reading_min_max_bounds_are_optional():
+    # A single bound left blank is simply omitted from config, not an error.
+    one_missing = TestStepForm(data=_led_spectral_reading_data(g_max=''))
+    assert one_missing.is_valid(), one_missing.errors
+    assert 'g_max' not in one_missing.cleaned_data['config']
+    assert one_missing.cleaned_data['config']['g_min'] == 3
+
+    # All ten bounds left blank - still valid, just none of them end up in config.
+    none_given = TestStepForm(data=_led_spectral_reading_data(
+        r_min='', r_max='', g_min='', g_max='', b_min='', b_max='',
+        lux_min='', lux_max='', ir_min='', ir_max='',
+    ))
+    assert none_given.is_valid(), none_given.errors
+    assert none_given.cleaned_data['config'] == {'mux_chan': '2', 'i2c_addr': '0x29'}
+
+
+@pytest.mark.django_db
+def test_step_form_led_spectral_reading_accepts_mux_addr_and_validates_hex():
+    valid = TestStepForm(data=_led_spectral_reading_data(mux_addr='0x70'))
+    assert valid.is_valid(), valid.errors
+    assert valid.cleaned_data['config']['mux_addr'] == '0x70'
+
+    invalid = TestStepForm(data=_led_spectral_reading_data(mux_addr='not-hex'))
+    assert not invalid.is_valid()
+    assert 'mux_addr' in invalid.errors
+
+    invalid_i2c = TestStepForm(data=_led_spectral_reading_data(i2c_addr='zz'))
+    assert not invalid_i2c.is_valid()
+    assert 'i2c_addr' in invalid_i2c.errors
+
+
 @pytest.mark.django_db
 def test_step_form_edit_seeds_initial_from_config_excluding_schema_version(design):
     suite = TestSuite.objects.create(design=design, version=1)
@@ -220,3 +314,53 @@ def test_step_form_edit_seeds_initial_from_config_excluding_schema_version(desig
     form = TestStepForm(instance=step)
     assert form.initial['delay_ms'] == 500
     assert 'schema_version' not in form.initial
+
+
+@pytest.mark.django_db
+def test_step_form_i2c_addr_default_but_doesnt_override_saved_values(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+
+    # A freshly-added step (empty config, as test_step_add creates it) shows the I2C Addr
+    # default - it's required, so it needs *some* value.
+    fresh_step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED', config={'schema_version': 1},
+    )
+    fresh_form = TestStepForm(instance=fresh_step)
+    assert fresh_form['i2c_addr'].value() == '0x10'
+
+    # An existing step with its own saved value keeps showing that, not the default.
+    configured_step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED 2',
+        config={'i2c_addr': '0x2a', 'mux_addr': '0x72', 'schema_version': 1},
+    )
+    configured_form = TestStepForm(instance=configured_step)
+    assert configured_form['i2c_addr'].value() == '0x2a'
+
+
+def test_step_form_mux_addr_has_a_placeholder_not_an_initial_value():
+    """MUX Addr is genuinely optional, so "0x71" is shown as a greyed-out hint (HTML
+    placeholder) rather than a real initial value - it must never appear in submitted data
+    unless the user actually types it, unlike i2c_addr's real default above."""
+    field = TestStepForm().fields['mux_addr']
+    assert field.initial in (None, '')
+    assert field.widget.attrs['placeholder'] == '0x71'
+
+
+@pytest.mark.django_db
+def test_step_form_mux_addr_left_blank_stays_blank_whether_or_not_previously_saved(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+
+    fresh_step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED', config={'schema_version': 1},
+    )
+    assert TestStepForm(instance=fresh_step)['mux_addr'].value() in (None, '')
+
+    # A step saved with MUX Addr deliberately left blank (no MUX on this board) must keep
+    # showing it blank too (issue found live: it silently reappeared as "0x71" after a save).
+    saved_step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='Read LED 2',
+        config={'i2c_addr': '0x2a', 'mux_chan': '0', 'schema_version': 1},
+    )
+    saved_form = TestStepForm(instance=saved_step)
+    assert saved_form['i2c_addr'].value() == '0x2a'
+    assert saved_form['mux_addr'].value() in (None, '')
