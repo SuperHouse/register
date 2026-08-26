@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from crm.models import Org
 from device.models import Design
-from testing.models import TestStep, TestSuite
+from testing.models import ManualCheck, TestStep, TestSuite
 
 
 @pytest.fixture
@@ -36,8 +36,13 @@ def step(suite):
     return TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='Settle', config={'delay_ms': 250})
 
 
+@pytest.fixture
+def check(suite):
+    return ManualCheck.objects.create(suite=suite, text='Confirm LED lights up', order=1)
+
+
 @pytest.mark.django_db
-def test_non_staff_users_are_redirected(client, plain_user, design, suite, step):
+def test_non_staff_users_are_redirected(client, plain_user, design, suite, step, check):
     urls = [
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
         reverse('testing:test_suite_discard_draft', args=[design.pk]),
@@ -45,6 +50,8 @@ def test_non_staff_users_are_redirected(client, plain_user, design, suite, step)
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
         reverse('testing:test_step_edit', args=[step.pk]),
         reverse('testing:test_step_delete', args=[step.pk]),
+        reverse('testing:manual_check_edit', args=[check.pk]),
+        reverse('testing:manual_check_delete', args=[check.pk]),
     ]
     client.force_login(plain_user)
     for url in urls:
@@ -53,7 +60,7 @@ def test_non_staff_users_are_redirected(client, plain_user, design, suite, step)
 
 
 @pytest.mark.django_db
-def test_staff_sees_pages(client, staff_user, design, suite, step):
+def test_staff_sees_pages(client, staff_user, design, suite, step, check):
     client.force_login(staff_user)
     for url in [
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
@@ -62,6 +69,8 @@ def test_staff_sees_pages(client, staff_user, design, suite, step):
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
         reverse('testing:test_step_edit', args=[step.pk]),
         reverse('testing:test_step_delete', args=[step.pk]),
+        reverse('testing:manual_check_edit', args=[check.pk]),
+        reverse('testing:manual_check_delete', args=[check.pk]),
     ]:
         response = client.get(url)
         assert response.status_code == 200, url
@@ -458,3 +467,227 @@ def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staf
     assert 'newer draft' in content
     assert '(v2)' in content
     assert 'frozen historical record' not in content
+
+
+# --- Manual Checks (issue #112) ---
+
+@pytest.mark.django_db
+def test_manual_check_add_lazily_creates_a_draft_when_none_exists(client, staff_user, design):
+    assert design.test_suites.count() == 0
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': 'Confirm LED lights up'})
+    assert response.status_code == 302
+    assert design.test_suites.count() == 1
+    suite = design.test_suites.first()
+    assert suite.version == 1
+    assert suite.status == TestSuite.DRAFT
+    assert suite.manual_checks.get().text == 'Confirm LED lights up'
+
+
+@pytest.mark.django_db
+def test_manual_check_add_targets_the_draft_suite(client, staff_user, design, suite, check):
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': 'Second check'})
+    assert response.status_code == 302
+
+    new_check = ManualCheck.objects.get(suite=suite, text='Second check')
+    assert new_check.order == check.order + 1
+
+
+@pytest.mark.django_db
+def test_manual_check_add_rejects_blank_text(client, staff_user, design):
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': ''})
+    assert response.status_code == 302
+    assert design.test_suites.count() == 0  # nothing was created
+
+
+@pytest.mark.django_db
+def test_manual_check_edit_updates_text(client, staff_user, check):
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:manual_check_edit', args=[check.pk]), {'text': 'Updated text'})
+    assert response.status_code == 302
+    check.refresh_from_db()
+    assert check.text == 'Updated text'
+
+
+@pytest.mark.django_db
+def test_manual_check_delete(client, staff_user, check):
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:manual_check_delete', args=[check.pk]))
+    assert response.status_code == 302
+    assert not ManualCheck.objects.filter(pk=check.pk).exists()
+
+
+@pytest.mark.django_db
+def test_manual_check_reorder(client, staff_user, design, suite):
+    check_a = ManualCheck.objects.create(suite=suite, text='A', order=1)
+    check_b = ManualCheck.objects.create(suite=suite, text='B', order=2)
+    client.force_login(staff_user)
+
+    response = client.post(
+        reverse('testing:manual_check_reorder', args=[design.pk]),
+        data=json.dumps({'order': [check_b.pk, check_a.pk]}),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+    check_a.refresh_from_db()
+    check_b.refresh_from_db()
+    assert check_b.order == 1
+    assert check_a.order == 2
+
+
+@pytest.mark.django_db
+def test_editing_a_manual_check_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, check):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:manual_check_edit', args=[check.pk]), {'text': 'Changed'})
+    assert response.status_code == 302
+
+    check.refresh_from_db()
+    assert check.text == 'Confirm LED lights up'  # original SAVED check untouched
+    suite.refresh_from_db()
+    assert suite.status == TestSuite.SAVED
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    new_check = draft.manual_checks.get()
+    assert new_check.pk != check.pk
+    assert new_check.text == 'Changed'
+
+
+@pytest.mark.django_db
+def test_deleting_a_manual_check_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, check):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:manual_check_delete', args=[check.pk]))
+    assert response.status_code == 302
+
+    assert ManualCheck.objects.filter(pk=check.pk).exists()  # original SAVED check untouched
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    assert draft.manual_checks.count() == 0  # the copy was deleted
+
+
+@pytest.mark.django_db
+def test_adding_a_manual_check_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, check):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': 'New check'})
+    assert response.status_code == 302
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    assert list(draft.manual_checks.order_by('order').values_list('text', flat=True)) == \
+        ['Confirm LED lights up', 'New check']
+
+    suite.refresh_from_db()
+    assert suite.manual_checks.count() == 1  # the SAVED version is untouched
+
+
+@pytest.mark.django_db
+def test_reordering_manual_checks_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, check):
+    check_b = ManualCheck.objects.create(suite=suite, text='B', order=2)
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(
+        reverse('testing:manual_check_reorder', args=[design.pk]),
+        data=json.dumps({'order': [check_b.pk, check.pk]}),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+
+    check.refresh_from_db()
+    check_b.refresh_from_db()
+    assert check.order == 1 and check_b.order == 2  # originals untouched
+
+    draft = design.test_suites.first()
+    assert draft.status == TestSuite.DRAFT
+    assert draft.manual_checks.get(text='B').order == 1
+    assert draft.manual_checks.get(text='Confirm LED lights up').order == 2
+
+
+@pytest.mark.django_db
+def test_editing_or_deleting_a_manual_check_on_a_historical_version_is_blocked(client, staff_user, design, suite, check):
+    client.force_login(staff_user)
+    # Save v1 (with `check` on it), then make a further edit - this forks v2, leaving v1
+    # genuinely historical.
+    client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {'notes': ''})
+    client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': 'Another'})
+    assert design.test_suites.first().version == 2
+
+    edit_response = client.post(reverse('testing:manual_check_edit', args=[check.pk]), {'text': 'Should not apply'})
+    assert edit_response.status_code == 302
+    assert edit_response.url == reverse('testing:test_suite_version_detail', args=[design.pk, suite.version])
+    check.refresh_from_db()
+    assert check.text == 'Confirm LED lights up'  # unchanged
+
+    delete_response = client.post(reverse('testing:manual_check_delete', args=[check.pk]))
+    assert delete_response.status_code == 302
+    assert ManualCheck.objects.filter(pk=check.pk).exists()  # not deleted
+
+
+@pytest.mark.django_db
+def test_forking_a_draft_carries_both_steps_and_manual_checks_together(client, staff_user, design, suite, step, check):
+    """The core of issue #112: versioning encompasses both lists together, so editing either
+    one forks a draft that includes an unchanged copy of the other."""
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    # Editing only the manual check should still carry the step forward into the new draft.
+    client.post(reverse('testing:manual_check_edit', args=[check.pk]), {'text': 'Changed'})
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    assert draft.steps.get().name == step.name
+    assert draft.manual_checks.get().text == 'Changed'
+
+
+@pytest.mark.django_db
+def test_save_new_version_and_discard_draft_apply_to_manual_checks_too(client, staff_user, design, suite, check):
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {'notes': ''})
+    assert response.status_code == 302
+    suite.refresh_from_db()
+    assert suite.status == TestSuite.SAVED
+    assert design.test_suites.count() == 1  # promoted in place, no new row
+
+    # A further edit forks a new draft...
+    client.post(reverse('testing:manual_check_add', args=[design.pk]), {'text': 'Another'})
+    assert design.test_suites.count() == 2
+
+    # ...which discarding removes entirely, taking its manual checks with it.
+    response = client.post(reverse('testing:test_suite_discard_draft', args=[design.pk]))
+    assert response.status_code == 302
+    assert design.test_suites.count() == 1
+    assert ManualCheck.objects.filter(text='Another').count() == 0
+
+
+@pytest.mark.django_db
+def test_copy_steps_from_also_copies_manual_checks(client, staff_user, design):
+    org2 = Org.objects.create(company_name='Source Org 3')
+    source_design = Design.objects.create(client=org2, sku='SRC3', name='Source Design 3', hw_version='1.0')
+    source_suite = TestSuite.objects.create(design=source_design, version=1, status=TestSuite.SAVED)
+    ManualCheck.objects.create(suite=source_suite, order=1, text='Check the fuse')
+
+    client.force_login(staff_user)
+    client.post(reverse('testing:test_suite_copy_steps_from', args=[design.pk]), {'source_design': source_design.pk})
+
+    copied = ManualCheck.objects.filter(suite__design=design)
+    assert copied.count() == 1
+    assert copied.get().text == 'Check the fuse'

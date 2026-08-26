@@ -100,6 +100,27 @@ class TestSuite(models.Model):
         return self.status == self.DRAFT
 
 
+class ManualCheck(models.Model):
+    """A single manual check item within a TestSuite (issue #112) - a plain checklist entry,
+    examined in order (`Meta.ordering = ['order']`) alongside, but independently of, the
+    suite's TestSteps. Unlike TestStep it has no type/config polymorphism, just a line of
+    text - so it needs none of TestStep's JSONField/schema_version machinery. Shares the same
+    suite/order/draft-fork versioning mechanics as TestStep (see TestSuite's docstring and
+    `testing.views._fork_draft`), so editing either list puts the suite into draft mode the
+    same way and both are carried forward together whenever a new draft is forked."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, related_name='manual_checks')
+    order = models.PositiveIntegerField(default=0)
+    text = models.CharField(max_length=255)
+
+    class Meta:
+        ordering = ['order']
+
+    def __str__(self):
+        return self.text
+
+
 class TestStep(models.Model):
     """A single step within a TestSuite, executed/examined in order (issue #101) - conceptually
     similar to a firewall rule list. Each step has a fixed type (below) with its own

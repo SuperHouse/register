@@ -14,10 +14,10 @@
             <div class="card">
                 <div class="card-body">
                     <p class="text-body-secondary">
-                        Marks draft version {{ suite.version }} ({{ suite.steps.count }} step{{ suite.steps.count|pluralize }})
-                        as the design's current, permanently saved version - its content won't change from here. The
-                        next edit you make (to any step) will automatically start a new draft version, leaving this
-                        one untouched.
+                        Marks draft version {{ suite.version }} ({{ suite.steps.count }} step{{ suite.steps.count|pluralize }},
+                        {{ suite.manual_checks.count }} manual check{{ suite.manual_checks.count|pluralize }}) as the design's
+                        current, permanently saved version - its content won't change from here. The next edit you make (to
+                        any step or manual check) will automatically start a new draft version, leaving this one untouched.
                     </p>
 
                     <form method="post">

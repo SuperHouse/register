@@ -22,6 +22,7 @@
                             <tr class="highlight">
                                 <th>Version</th>
                                 <th>Steps</th>
+                                <th>Manual Checks</th>
                                 <th>Created</th>
                                 <th>Notes</th>
                                 <th></th>
@@ -33,6 +34,7 @@
                                     onclick="window.location='{% if suite.pk == highest.pk %}{% url 'design_detail' design.pk %}#test-suite{% else %}{% url 'testing:test_suite_version_detail' design.pk suite.version %}{% endif %}'">
                                     <td>v{{ suite.version }}</td>
                                     <td>{{ suite.steps.all|length }}</td>
+                                    <td>{{ suite.manual_checks.all|length }}</td>
                                     <td>{{ suite.created_dt|date:"j-M-Y H:i" }}</td>
                                     <td>{{ suite.notes|default:"" }}</td>
                                     <td class="text-nowrap">

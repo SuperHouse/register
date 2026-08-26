@@ -75,6 +75,27 @@
                     </table>
                 </div>
             </div>
+
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">Manual Checks</h5>
+                    <table class="table mb-0">
+                        <tbody>
+                            {% for check in manual_checks %}
+                                <tr>
+                                    <td class="p-0 border-0">
+                                        <div class="border rounded mb-2 px-2 py-2">{{ check.text }}</div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td class="border-0"><i>No manual checks were defined in this version.</i></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock content %}

@@ -30,4 +30,9 @@ urlpatterns = [
     path('design/<int:design_id>/test-suite/steps/reorder/', views.test_step_reorder, name='test_step_reorder'),
     path('test-suites/steps/<int:step_id>/', views.test_step_edit, name='test_step_edit'),
     path('test-suites/steps/<int:step_id>/delete/', views.test_step_delete, name='test_step_delete'),
+
+    path('design/<int:design_id>/test-suite/manual-checks/add/', views.manual_check_add, name='manual_check_add'),
+    path('design/<int:design_id>/test-suite/manual-checks/reorder/', views.manual_check_reorder, name='manual_check_reorder'),
+    path('test-suites/manual-checks/<int:check_id>/', views.manual_check_edit, name='manual_check_edit'),
+    path('test-suites/manual-checks/<int:check_id>/delete/', views.manual_check_delete, name='manual_check_delete'),
 ]

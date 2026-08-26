@@ -27,7 +27,7 @@ from crm.models import Org
 from erp.forms import DesignBomEntryForm
 from erp.models import AssemblyCostSettings, Batch, Part
 from erp.views import build_costing_rows as get_build_costing_rows, compute_bom_pricing
-from testing.forms import CopyTestStepsFromForm, TestStepTypeAddForm
+from testing.forms import CopyTestStepsFromForm, ManualCheckForm, TestStepTypeAddForm
 
 
 def dashboard(request):
@@ -216,15 +216,19 @@ def design_detail(request, design_id):
     if request.user.is_staff:
         test_suite_current = design.test_suites.first()
         test_suite_steps = test_suite_current.steps.all() if test_suite_current else []
+        test_suite_manual_checks = test_suite_current.manual_checks.all() if test_suite_current else []
         test_suite_version_count = design.test_suites.count()
         test_suite_step_type_add_form = TestStepTypeAddForm()
+        test_suite_manual_check_form = ManualCheckForm()
         test_suite_copy_steps_form = CopyTestStepsFromForm(exclude_design=design)
         test_suite_has_other_active_designs = Design.objects.filter(obsolete=False).exclude(pk=design.pk).exists()
     else:
         test_suite_current = None
         test_suite_steps = []
+        test_suite_manual_checks = []
         test_suite_version_count = 0
         test_suite_step_type_add_form = None
+        test_suite_manual_check_form = None
         test_suite_copy_steps_form = None
         test_suite_has_other_active_designs = False
 
@@ -252,8 +256,10 @@ def design_detail(request, design_id):
         'pcb_order_lines': pcb_order_lines,
         'test_suite_current': test_suite_current,
         'test_suite_steps': test_suite_steps,
+        'test_suite_manual_checks': test_suite_manual_checks,
         'test_suite_version_count': test_suite_version_count,
         'test_suite_step_type_add_form': test_suite_step_type_add_form,
+        'test_suite_manual_check_form': test_suite_manual_check_form,
         'test_suite_copy_steps_form': test_suite_copy_steps_form,
         'test_suite_has_other_active_designs': test_suite_has_other_active_designs,
     }

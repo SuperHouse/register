@@ -15,8 +15,9 @@
                 <div class="card-body">
                     <p>
                         Are you sure you want to discard draft version {{ suite.version }}
-                        ({{ suite.steps.count }} step{{ suite.steps.count|pluralize }})? Everything changed since the
-                        last saved version will be lost - this can't be undone.
+                        ({{ suite.steps.count }} step{{ suite.steps.count|pluralize }}, {{ suite.manual_checks.count }}
+                        manual check{{ suite.manual_checks.count|pluralize }})? Everything changed since the last saved
+                        version will be lost - this can't be undone.
                     </p>
                     <form method="post">
                         {% csrf_token %}

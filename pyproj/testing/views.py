@@ -11,10 +11,10 @@ from django.urls import reverse
 
 from device.models import Design
 from .forms import (
-    CompatibleDesignAddForm, CopyTestStepsFromForm, TesterForm, TestModuleForm, TestModuleTypeForm,
-    TestStepForm, TestStepTypeAddForm, TestSuiteSaveNewVersionForm,
+    CompatibleDesignAddForm, CopyTestStepsFromForm, ManualCheckForm, TesterForm, TestModuleForm,
+    TestModuleTypeForm, TestStepForm, TestStepTypeAddForm, TestSuiteSaveNewVersionForm,
 )
-from .models import Tester, TestModule, TestModuleType, TestStep, TestSuite
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestSuite
 
 
 @staff_member_required
@@ -213,34 +213,40 @@ def test_module_type_design_remove(request, module_type_id, design_id):
 
 
 def _fork_draft(design, saved_suite):
-    """Creates a new draft version for `design`, copying `saved_suite`'s steps (if given - None
-    for a design with no Test Suite at all yet). Returns (draft, old_pk_to_new_step) so a caller
-    holding step pks from *before* the fork (e.g. a reorder payload built from the page as it was
-    rendered, before this request forked it) can translate them to their counterparts in the new
-    draft - see `_ensure_editable_step` and `test_step_reorder`."""
+    """Creates a new draft version for `design`, copying `saved_suite`'s steps and manual
+    checks (both lists are versioned together - issue #112; `saved_suite` is None for a design
+    with no Test Suite at all yet). Returns (draft, step_pk_map, manual_check_pk_map) so a
+    caller holding pks from *before* the fork (e.g. a reorder payload built from the page as it
+    was rendered, before this request forked it) can translate them to their counterparts in
+    the new draft - see `_ensure_editable_step`/`_ensure_editable_manual_check` and the
+    `*_reorder` views."""
     draft = TestSuite.objects.create(
         design=design, version=(saved_suite.version + 1 if saved_suite else 1), status=TestSuite.DRAFT,
     )
-    old_pk_to_new = {}
+    step_pk_map = {}
+    manual_check_pk_map = {}
     if saved_suite is not None:
         for step in saved_suite.steps.all():
             new_step = TestStep.objects.create(
                 suite=draft, order=step.order, step_type=step.step_type,
                 name=step.name, hard_fail=step.hard_fail, config=step.config,
             )
-            old_pk_to_new[step.pk] = new_step
-    return draft, old_pk_to_new
+            step_pk_map[step.pk] = new_step
+        for check in saved_suite.manual_checks.all():
+            new_check = ManualCheck.objects.create(suite=draft, order=check.order, text=check.text)
+            manual_check_pk_map[check.pk] = new_check
+    return draft, step_pk_map, manual_check_pk_map
 
 
 def _get_or_create_draft_suite(design):
-    """Every Design has at most one *draft* Test Suite at a time - the one steps are actually
-    added to/edited on (issue #110). If the highest version is already a draft, it's reused
-    directly; otherwise (it's SAVED, or there's no Test Suite yet) a new draft is forked from
-    it, so an already-saved version's content is never mutated in place."""
+    """Every Design has at most one *draft* Test Suite at a time - the one steps/manual checks
+    are actually added to/edited on (issue #110). If the highest version is already a draft,
+    it's reused directly; otherwise (it's SAVED, or there's no Test Suite yet) a new draft is
+    forked from it, so an already-saved version's content is never mutated in place."""
     current = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
     if current is not None and current.status == TestSuite.DRAFT:
         return current
-    draft, _old_pk_to_new = _fork_draft(design, current)
+    draft, _step_pk_map, _manual_check_pk_map = _fork_draft(design, current)
     return draft
 
 
@@ -259,16 +265,24 @@ def _ensure_editable_step(step):
     #110) - the caller should apply its edit/delete to the returned step, not `step`."""
     if step.suite.status == TestSuite.DRAFT:
         return step
-    _draft, old_pk_to_new = _fork_draft(step.suite.design, step.suite)
-    return old_pk_to_new[step.pk]
+    _draft, step_pk_map, _manual_check_pk_map = _fork_draft(step.suite.design, step.suite)
+    return step_pk_map[step.pk]
+
+
+def _ensure_editable_manual_check(check):
+    """Mirrors `_ensure_editable_step` for ManualCheck (issue #112) - see its docstring."""
+    if check.suite.status == TestSuite.DRAFT:
+        return check
+    _draft, _step_pk_map, manual_check_pk_map = _fork_draft(check.suite.design, check.suite)
+    return manual_check_pk_map[check.pk]
 
 
 @staff_member_required
 def test_suite_copy_steps_from(request, design_id):
-    """Appends another Design's current (latest saved) Test Suite's steps onto this Design's
-    draft, at the end of its list. Copies from the source's last SAVED version specifically,
-    not any in-progress draft it might have, so an unfinished edit on the source can't leak in
-    via a copy."""
+    """Appends another Design's current (latest saved) Test Suite's steps and manual checks
+    (issue #112) onto this Design's draft, at the end of each respective list. Copies from the
+    source's last SAVED version specifically, not any in-progress draft it might have, so an
+    unfinished edit on the source can't leak in via a copy."""
     design = get_object_or_404(Design, pk=design_id)
 
     if request.method == 'POST':
@@ -277,23 +291,33 @@ def test_suite_copy_steps_from(request, design_id):
             source_design = form.cleaned_data['source_design']
             source_suite = source_design.test_suites.filter(status=TestSuite.SAVED).first()
             source_steps = list(source_suite.steps.all()) if source_suite else []
+            source_checks = list(source_suite.manual_checks.all()) if source_suite else []
 
-            if not source_steps:
-                messages.warning(request, f'{source_design} has no saved test steps to copy.')
+            if not source_steps and not source_checks:
+                messages.warning(request, f'{source_design} has no saved test steps or manual checks to copy.')
             else:
                 suite = _get_or_create_draft_suite(design)
-                last_step = suite.steps.order_by('-order').first()
-                next_order = (last_step.order + 1) if last_step else 1
-                for offset, step in enumerate(source_steps):
-                    TestStep.objects.create(
-                        suite=suite,
-                        order=next_order + offset,
-                        step_type=step.step_type,
-                        name=step.name,
-                        hard_fail=step.hard_fail,
-                        config=step.config,
-                    )
-                messages.success(request, f'Copied {len(source_steps)} step(s) from {source_design}.')
+                if source_steps:
+                    last_step = suite.steps.order_by('-order').first()
+                    next_order = (last_step.order + 1) if last_step else 1
+                    for offset, step in enumerate(source_steps):
+                        TestStep.objects.create(
+                            suite=suite,
+                            order=next_order + offset,
+                            step_type=step.step_type,
+                            name=step.name,
+                            hard_fail=step.hard_fail,
+                            config=step.config,
+                        )
+                if source_checks:
+                    last_check = suite.manual_checks.order_by('-order').first()
+                    next_order = (last_check.order + 1) if last_check else 1
+                    for offset, check in enumerate(source_checks):
+                        ManualCheck.objects.create(suite=suite, order=next_order + offset, text=check.text)
+                messages.success(
+                    request,
+                    f'Copied {len(source_steps)} step(s) and {len(source_checks)} manual check(s) from {source_design}.',
+                )
         else:
             messages.warning(request, 'Please select a design to copy from.')
 
@@ -352,7 +376,7 @@ def test_suite_discard_draft(request, design_id):
 @staff_member_required
 def test_suite_version_list(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
-    suites = design.test_suites.prefetch_related('steps')
+    suites = design.test_suites.prefetch_related('steps', 'manual_checks')
     highest = suites.first()  # the draft if one exists, else the current saved version
     current = suites.filter(status=TestSuite.SAVED).first()  # may be None - never saved yet
 
@@ -372,6 +396,7 @@ def test_suite_version_detail(request, design_id, version):
         'design': design,
         'suite': suite,
         'steps': suite.steps.all(),
+        'manual_checks': suite.manual_checks.all(),
         # Whether this suite is the design's single actionable "edit slot" right now (the
         # draft, or - if there's no draft - the latest saved version) - distinct from whether
         # it's the *latest saved* version, since those can diverge once a newer draft exists
@@ -476,8 +501,8 @@ def test_step_reorder(request, design_id):
         else:
             # The pks in the request came from the page as it was rendered, before this fork -
             # translate them to their counterparts in the new draft (see _fork_draft).
-            suite, old_pk_to_new = _fork_draft(design, current)
-            ordered_pks = [old_pk_to_new[pk].pk for pk in requested_pks if pk in old_pk_to_new]
+            suite, step_pk_map, _manual_check_pk_map = _fork_draft(design, current)
+            ordered_pks = [step_pk_map[pk].pk for pk in requested_pks if pk in step_pk_map]
 
         steps_by_id = {step.pk: step for step in suite.steps.all()}
         for index, step_pk in enumerate(ordered_pks, start=1):
@@ -485,5 +510,101 @@ def test_step_reorder(request, design_id):
             if step and step.order != index:
                 step.order = index
                 step.save(update_fields=['order'])
+
+    return JsonResponse({'status': 'ok'})
+
+
+@staff_member_required
+def manual_check_add(request, design_id):
+    """Appends a new ManualCheck to the design's draft (issue #112), forking one first if
+    needed - the text is taken directly from the inline "Add" row on the Design detail page,
+    unlike test_step_add, which only picks a type there and fills in the rest on a follow-up
+    edit page; a ManualCheck has nothing else to configure, so there's no second step."""
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        form = ManualCheckForm(request.POST)
+        if form.is_valid():
+            suite = _get_or_create_draft_suite(design)
+            last_check = suite.manual_checks.order_by('-order').first()
+            next_order = (last_check.order + 1) if last_check else 1
+            ManualCheck.objects.create(suite=suite, order=next_order, text=form.cleaned_data['text'])
+            messages.success(request, 'Manual check added.')
+        else:
+            messages.warning(request, 'Please enter some text for the manual check.')
+
+    return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
+
+
+@staff_member_required
+def manual_check_edit(request, check_id):
+    check = get_object_or_404(ManualCheck.objects.select_related('suite__design'), pk=check_id)
+
+    if not _is_current_suite(check.suite):
+        messages.warning(request, 'This manual check belongs to a historical version and can no longer be edited.')
+        return redirect('testing:test_suite_version_detail', design_id=check.suite.design_id, version=check.suite.version)
+
+    if request.method == 'POST':
+        form = ManualCheckForm(request.POST, instance=check)
+        if form.is_valid():
+            # Validate against the original check first (harmless even when it's about to be
+            # superseded by a fork); only apply the change to whichever instance is actually
+            # editable, so a rejected submission never forks a version for nothing.
+            target = _ensure_editable_manual_check(check)
+            target.text = form.cleaned_data['text']
+            target.save()
+            messages.success(request, 'Manual check updated.')
+            return redirect(reverse('design_detail', args=[target.suite.design_id]) + '#test-suite')
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = ManualCheckForm(instance=check)
+
+    return render(request, 'testing/manual_check_edit.html', {'form': form, 'check': check})
+
+
+@staff_member_required
+def manual_check_delete(request, check_id):
+    check = get_object_or_404(ManualCheck.objects.select_related('suite__design'), pk=check_id)
+
+    if not _is_current_suite(check.suite):
+        messages.warning(request, 'This manual check belongs to a historical version and can no longer be deleted.')
+        return redirect('testing:test_suite_version_detail', design_id=check.suite.design_id, version=check.suite.version)
+
+    design_id = check.suite.design_id
+
+    if request.method == 'POST':
+        target = _ensure_editable_manual_check(check)
+        target.delete()
+        messages.success(request, 'Manual check removed.')
+        return redirect(reverse('design_detail', args=[design_id]) + '#test-suite')
+
+    return render(request, 'testing/manual_check_delete.html', {'check': check})
+
+
+@staff_member_required
+def manual_check_reorder(request, design_id):
+    design = get_object_or_404(Design, pk=design_id)
+
+    if request.method == 'POST':
+        current = design.test_suites.first()
+        data = json.loads(request.body)
+        requested_pks = [int(pk) for pk in data.get('order', [])]
+
+        if current is not None and current.status == TestSuite.DRAFT:
+            suite = current
+            ordered_pks = requested_pks
+        else:
+            # The pks in the request came from the page as it was rendered, before this fork -
+            # translate them to their counterparts in the new draft (see _fork_draft).
+            suite, _step_pk_map, manual_check_pk_map = _fork_draft(design, current)
+            ordered_pks = [manual_check_pk_map[pk].pk for pk in requested_pks if pk in manual_check_pk_map]
+
+        checks_by_id = {check.pk: check for check in suite.manual_checks.all()}
+        for index, check_pk in enumerate(ordered_pks, start=1):
+            check = checks_by_id.get(check_pk)
+            if check and check.order != index:
+                check.order = index
+                check.save(update_fields=['order'])
 
     return JsonResponse({'status': 'ok'})

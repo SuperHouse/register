@@ -6,7 +6,7 @@ from django import forms
 from django.core.validators import RegexValidator
 
 from device.models import Design
-from .models import Tester, TestModule, TestModuleType, TestStep
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep
 
 # Used by the LED Spectral Reading step's MUX Addr/I2C Addr fields (issue #109) - a bare hex
 # string, with or without a "0x"/"0X" prefix.
@@ -100,6 +100,20 @@ class TestSuiteSaveNewVersionForm(forms.Form):
         help_text='Optional - what does this version represent? Shown in the version history.',
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
     )
+
+
+class ManualCheckForm(forms.ModelForm):
+    """Covers ManualCheck's one field (issue #112) - used both for the inline "Add" row
+    (unbound to any suite yet - testing.views.manual_check_add sets `suite`/`order` itself)
+    and for editing an existing check (testing.views.manual_check_edit)."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    class Meta:
+        model = ManualCheck
+        fields = ['text']
+        widgets = {
+            'text': forms.TextInput(attrs={'class': 'form-control'}),
+        }
 
 
 class TestStepTypeAddForm(forms.Form):

@@ -2,7 +2,7 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 from django.contrib import admin
 
-from .models import Tester, TestModule, TestModuleType, TestStep, TestSuite
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestSuite
 
 
 @admin.register(Tester)
@@ -36,12 +36,17 @@ class TestStepInline(admin.TabularInline):
     extra = 0
 
 
+class ManualCheckInline(admin.TabularInline):
+    model = ManualCheck
+    extra = 0
+
+
 @admin.register(TestSuite)
 class TestSuiteAdmin(admin.ModelAdmin):
     list_display = ['design', 'version', 'status', 'created_dt']
     list_select_related = ['design']
     search_fields = ['design__sku', 'design__name']
-    inlines = [TestStepInline]
+    inlines = [TestStepInline, ManualCheckInline]
 
 
 @admin.register(TestStep)
@@ -49,3 +54,10 @@ class TestStepAdmin(admin.ModelAdmin):
     list_display = ['name', 'step_type', 'suite', 'order', 'hard_fail']
     list_select_related = ['suite']
     search_fields = ['name', 'suite__design__sku', 'suite__design__name']
+
+
+@admin.register(ManualCheck)
+class ManualCheckAdmin(admin.ModelAdmin):
+    list_display = ['text', 'suite', 'order']
+    list_select_related = ['suite']
+    search_fields = ['text', 'suite__design__sku', 'suite__design__name']

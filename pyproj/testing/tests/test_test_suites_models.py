@@ -4,7 +4,7 @@ from django.db import IntegrityError
 from crm.models import Org
 from device.models import Design
 from testing.forms import TestStepForm
-from testing.models import TestStep, TestSuite
+from testing.models import ManualCheck, TestStep, TestSuite
 
 
 @pytest.fixture
@@ -195,6 +195,21 @@ def test_steps_ordered_by_order(design):
     TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='Second', order=2)
     TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='First', order=1)
     assert [s.name for s in suite.steps.all()] == ['First', 'Second']
+
+
+@pytest.mark.django_db
+def test_manual_check_str(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    check = ManualCheck.objects.create(suite=suite, text='Confirm LED lights up')
+    assert str(check) == 'Confirm LED lights up'
+
+
+@pytest.mark.django_db
+def test_manual_checks_ordered_by_order(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    ManualCheck.objects.create(suite=suite, text='Second', order=2)
+    ManualCheck.objects.create(suite=suite, text='First', order=1)
+    assert [c.text for c in suite.manual_checks.all()] == ['First', 'Second']
 
 
 @pytest.mark.django_db
