@@ -565,7 +565,11 @@
                             <div class="d-flex justify-content-between align-items-center mb-3" id="test-suite">
                                 <p class="text-body-secondary mb-0">
                                     {% if test_suite_current %}
-                                        Editing version {{ test_suite_current.version }}
+                                        {% if test_suite_current.status == 'DRAFT' %}
+                                            Editing draft version {{ test_suite_current.version }}
+                                        {% else %}
+                                            Version {{ test_suite_current.version }} is the current saved version
+                                        {% endif %}
                                     {% else %}
                                         No test steps have been defined yet.
                                     {% endif %}
@@ -576,9 +580,14 @@
                                             <i class="cil-history"></i> Version History ({{ test_suite_version_count }})
                                         </a>
                                     {% endif %}
-                                    <a href="{% url 'testing:test_suite_save_new_version' design.pk %}" class="btn btn-outline-primary" title="Save as New Version">
-                                        <i class="cil-save"></i> Save as New Version
-                                    </a>
+                                    {% if test_suite_current.status == 'DRAFT' %}
+                                        <a href="{% url 'testing:test_suite_discard_draft' design.pk %}" class="btn btn-outline-danger" title="Discard Draft">
+                                            <i class="cil-x-circle"></i> Discard Draft
+                                        </a>
+                                        <a href="{% url 'testing:test_suite_save_new_version' design.pk %}" class="btn btn-outline-primary" title="Save as New Version">
+                                            <i class="cil-save"></i> Save as New Version
+                                        </a>
+                                    {% endif %}
                                 </div>
                             </div>
 
@@ -587,8 +596,13 @@
                                     <h5 class="card-title">Test Steps</h5>
                                     <p class="text-body-secondary small">
                                         Steps are examined in order, top to bottom. Click a step to edit its configuration.
-                                        {% if test_suite_current %}This is version {{ test_suite_current.version }}, the current working version - edits here apply
-                                        immediately; use Save as New Version to freeze it as a historical record.{% endif %}
+                                        {% if test_suite_current.status == 'DRAFT' %}
+                                            This is draft version {{ test_suite_current.version }} - edits here apply immediately; use Save as
+                                            New Version to make it the current version, or Discard Draft to undo everything since the last save.
+                                        {% elif test_suite_current %}
+                                            This is the current saved version, v{{ test_suite_current.version }}. Adding, editing, deleting,
+                                            or reordering a step will automatically start a new draft version.
+                                        {% endif %}
                                     </p>
 
                                     <table class="table mb-3">
@@ -653,7 +667,8 @@
                                             </button>
                                         </form>
                                         <p class="text-body-secondary small mb-0 mt-2">
-                                            Appends the selected design's current test steps (including their configuration) to the end of this list.
+                                            Appends the selected design's current saved test steps (including their configuration) to the end
+                                            of this list - any unsaved draft changes on that design are not included.
                                         </p>
                                     </div>
                                 </div>

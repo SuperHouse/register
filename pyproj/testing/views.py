@@ -212,39 +212,76 @@ def test_module_type_design_remove(request, module_type_id, design_id):
     return redirect('testing:test_module_type_edit', module_type_id=module_type.pk)
 
 
-def _get_or_create_current_suite(design):
-    """Every Design has exactly one *current* Test Suite - the highest-`version` row for that
-    design - which may not exist yet if nobody has touched this design's testing setup. Lazily
-    creates version 1 (with no steps) the first time it's needed, rather than requiring an
-    explicit "Add Test Suite" step - that step has been dropped in favour of this implicit
-    model."""
-    suite = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
-    if suite is None:
-        suite = TestSuite.objects.create(design=design, version=1)
-    return suite
+def _fork_draft(design, saved_suite):
+    """Creates a new draft version for `design`, copying `saved_suite`'s steps (if given - None
+    for a design with no Test Suite at all yet). Returns (draft, old_pk_to_new_step) so a caller
+    holding step pks from *before* the fork (e.g. a reorder payload built from the page as it was
+    rendered, before this request forked it) can translate them to their counterparts in the new
+    draft - see `_ensure_editable_step` and `test_step_reorder`."""
+    draft = TestSuite.objects.create(
+        design=design, version=(saved_suite.version + 1 if saved_suite else 1), status=TestSuite.DRAFT,
+    )
+    old_pk_to_new = {}
+    if saved_suite is not None:
+        for step in saved_suite.steps.all():
+            new_step = TestStep.objects.create(
+                suite=draft, order=step.order, step_type=step.step_type,
+                name=step.name, hard_fail=step.hard_fail, config=step.config,
+            )
+            old_pk_to_new[step.pk] = new_step
+    return draft, old_pk_to_new
+
+
+def _get_or_create_draft_suite(design):
+    """Every Design has at most one *draft* Test Suite at a time - the one steps are actually
+    added to/edited on (issue #110). If the highest version is already a draft, it's reused
+    directly; otherwise (it's SAVED, or there's no Test Suite yet) a new draft is forked from
+    it, so an already-saved version's content is never mutated in place."""
+    current = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
+    if current is not None and current.status == TestSuite.DRAFT:
+        return current
+    draft, _old_pk_to_new = _fork_draft(design, current)
+    return draft
 
 
 def _is_current_suite(suite):
+    """Whether `suite` is the single highest-version row for its design - i.e. whether it's
+    reachable/actionable from the Design detail page at all (as the draft being edited, or as
+    the current saved version about to be forked into a draft on the next edit), as opposed to
+    a fully superseded historical version, which is permanently locked."""
     return suite.design.test_suites.first().pk == suite.pk
+
+
+def _ensure_editable_step(step):
+    """`step` must already have passed `_is_current_suite(step.suite)`. If its suite is still
+    just SAVED (nothing's changed since the last save), forks a new draft from it and returns
+    this step's counterpart there instead, so the SAVED row itself is never mutated (issue
+    #110) - the caller should apply its edit/delete to the returned step, not `step`."""
+    if step.suite.status == TestSuite.DRAFT:
+        return step
+    _draft, old_pk_to_new = _fork_draft(step.suite.design, step.suite)
+    return old_pk_to_new[step.pk]
 
 
 @staff_member_required
 def test_suite_copy_steps_from(request, design_id):
-    """Appends another Design's current Test Suite's steps (including their config) onto
-    this Design's current Test Suite, at the end of its list."""
+    """Appends another Design's current (latest saved) Test Suite's steps onto this Design's
+    draft, at the end of its list. Copies from the source's last SAVED version specifically,
+    not any in-progress draft it might have, so an unfinished edit on the source can't leak in
+    via a copy."""
     design = get_object_or_404(Design, pk=design_id)
-    suite = _get_or_create_current_suite(design)
 
     if request.method == 'POST':
         form = CopyTestStepsFromForm(request.POST, exclude_design=design)
         if form.is_valid():
             source_design = form.cleaned_data['source_design']
-            source_suite = source_design.test_suites.first()
+            source_suite = source_design.test_suites.filter(status=TestSuite.SAVED).first()
             source_steps = list(source_suite.steps.all()) if source_suite else []
 
             if not source_steps:
-                messages.warning(request, f'{source_design} has no test steps to copy.')
+                messages.warning(request, f'{source_design} has no saved test steps to copy.')
             else:
+                suite = _get_or_create_draft_suite(design)
                 last_step = suite.steps.order_by('-order').first()
                 next_order = (last_step.order + 1) if last_step else 1
                 for offset, step in enumerate(source_steps):
@@ -265,45 +302,62 @@ def test_suite_copy_steps_from(request, design_id):
 
 @staff_member_required
 def test_suite_save_new_version(request, design_id):
-    """Freezes the current version's steps as a historical record and starts the next version
-    as an editable copy (see TestSuite's docstring)."""
+    """Marks the design's current draft SAVED (immutable) in place (issue #110) - see
+    TestSuite's docstring. No new row is created here; the next edit made after this will
+    lazily fork one from it via `_get_or_create_draft_suite`/`_ensure_editable_step`."""
     design = get_object_or_404(Design, pk=design_id)
-    current = _get_or_create_current_suite(design)
+    draft = design.test_suites.first()
+
+    if draft is None or draft.status != TestSuite.DRAFT:
+        messages.info(request, 'There are no unsaved changes to save.')
+        return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
 
     if request.method == 'POST':
         form = TestSuiteSaveNewVersionForm(request.POST)
         if form.is_valid():
-            current.notes = form.cleaned_data['notes']
-            current.save(update_fields=['notes'])
-
-            new_suite = TestSuite.objects.create(design=design, version=current.version + 1)
-            for step in current.steps.all():
-                TestStep.objects.create(
-                    suite=new_suite,
-                    order=step.order,
-                    step_type=step.step_type,
-                    name=step.name,
-                    hard_fail=step.hard_fail,
-                    config=step.config,
-                )
-            messages.success(request, f'Version {current.version} saved. Now editing version {new_suite.version}.')
+            draft.notes = form.cleaned_data['notes']
+            draft.status = TestSuite.SAVED
+            draft.save(update_fields=['notes', 'status'])
+            messages.success(request, f'Version {draft.version} saved.')
             return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
         form = TestSuiteSaveNewVersionForm()
 
-    return render(request, 'testing/test_suite_save_new_version.html', {'design': design, 'suite': current, 'form': form})
+    return render(request, 'testing/test_suite_save_new_version.html', {'design': design, 'suite': draft, 'form': form})
+
+
+@staff_member_required
+def test_suite_discard_draft(request, design_id):
+    """Deletes the design's current draft outright, discarding whatever's changed since the
+    last saved version (issue #110's "operator could choose to discard the draft, or save it
+    as a new version")."""
+    design = get_object_or_404(Design, pk=design_id)
+    draft = design.test_suites.first()
+
+    if draft is None or draft.status != TestSuite.DRAFT:
+        messages.info(request, 'There is no draft to discard.')
+        return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
+
+    if request.method == 'POST':
+        version = draft.version
+        draft.delete()
+        messages.success(request, f'Draft version {version} discarded.')
+        return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
+
+    return render(request, 'testing/test_suite_discard_draft.html', {'design': design, 'suite': draft})
 
 
 @staff_member_required
 def test_suite_version_list(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
     suites = design.test_suites.prefetch_related('steps')
-    current = suites.first()
+    highest = suites.first()  # the draft if one exists, else the current saved version
+    current = suites.filter(status=TestSuite.SAVED).first()  # may be None - never saved yet
 
     return render(request, 'testing/test_suite_version_list.html', {
-        'design': design, 'suites': suites, 'current': current,
+        'design': design, 'suites': suites, 'highest': highest, 'current': current,
     })
 
 
@@ -311,24 +365,33 @@ def test_suite_version_list(request, design_id):
 def test_suite_version_detail(request, design_id, version):
     design = get_object_or_404(Design, pk=design_id)
     suite = get_object_or_404(design.test_suites, version=version)
+    highest = design.test_suites.first()
+    latest_saved = design.test_suites.filter(status=TestSuite.SAVED).first()
 
     return render(request, 'testing/test_suite_version_detail.html', {
         'design': design,
         'suite': suite,
         'steps': suite.steps.all(),
-        'is_current': _is_current_suite(suite),
+        # Whether this suite is the design's single actionable "edit slot" right now (the
+        # draft, or - if there's no draft - the latest saved version) - distinct from whether
+        # it's the *latest saved* version, since those can diverge once a newer draft exists
+        # on top of an already-saved suite (issue #110): that suite is still "Current" for
+        # anyone fetching a version, but is no longer where further edits land.
+        'is_highest': highest is not None and highest.pk == suite.pk,
+        'is_current_saved': latest_saved is not None and latest_saved.pk == suite.pk,
+        'highest': highest,
     })
 
 
 @staff_member_required
 def test_step_add(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
-    suite = _get_or_create_current_suite(design)
 
     if request.method == 'POST':
         form = TestStepTypeAddForm(request.POST)
         if form.is_valid():
             step_type = form.cleaned_data['step_type']
+            suite = _get_or_create_draft_suite(design)
             last_step = suite.steps.order_by('-order').first()
             next_order = (last_step.order + 1) if last_step else 1
 
@@ -358,9 +421,19 @@ def test_step_edit(request, step_id):
     if request.method == 'POST':
         form = TestStepForm(request.POST, instance=step)
         if form.is_valid():
-            form.save()
+            # Validate against the original step first (harmless even when it's about to be
+            # superseded by a fork); only apply the change to whichever instance is actually
+            # editable, so a rejected submission never forks a version for nothing.
+            target = _ensure_editable_step(step)
+            target.step_type = form.cleaned_data['step_type']
+            target.name = form.cleaned_data['name']
+            target.hard_fail = form.cleaned_data['hard_fail']
+            config = dict(form.cleaned_data.get('config', {}))
+            config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
+            target.config = config
+            target.save()
             messages.success(request, 'Step updated.')
-            return redirect(reverse('design_detail', args=[step.suite.design_id]) + '#test-suite')
+            return redirect(reverse('design_detail', args=[target.suite.design_id]) + '#test-suite')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
@@ -380,7 +453,8 @@ def test_step_delete(request, step_id):
     design_id = step.suite.design_id
 
     if request.method == 'POST':
-        step.delete()
+        target = _ensure_editable_step(step)
+        target.delete()
         messages.success(request, 'Step removed.')
         return redirect(reverse('design_detail', args=[design_id]) + '#test-suite')
 
@@ -390,14 +464,24 @@ def test_step_delete(request, step_id):
 @staff_member_required
 def test_step_reorder(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
-    suite = _get_or_create_current_suite(design)
 
     if request.method == 'POST':
+        current = design.test_suites.first()
         data = json.loads(request.body)
-        steps_by_id = {step.pk: step for step in suite.steps.all()}
+        requested_pks = [int(pk) for pk in data.get('order', [])]
 
-        for index, step_id in enumerate(data.get('order', []), start=1):
-            step = steps_by_id.get(int(step_id))
+        if current is not None and current.status == TestSuite.DRAFT:
+            suite = current
+            ordered_pks = requested_pks
+        else:
+            # The pks in the request came from the page as it was rendered, before this fork -
+            # translate them to their counterparts in the new draft (see _fork_draft).
+            suite, old_pk_to_new = _fork_draft(design, current)
+            ordered_pks = [old_pk_to_new[pk].pk for pk in requested_pks if pk in old_pk_to_new]
+
+        steps_by_id = {step.pk: step for step in suite.steps.all()}
+        for index, step_pk in enumerate(ordered_pks, start=1):
+            step = steps_by_id.get(step_pk)
             if step and step.order != index:
                 step.order = index
                 step.save(update_fields=['order'])

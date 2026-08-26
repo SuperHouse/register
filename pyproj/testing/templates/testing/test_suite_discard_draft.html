@@ -1,0 +1,32 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Discard Draft - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Discard Draft
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-md-10 col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <p>
+                        Are you sure you want to discard draft version {{ suite.version }}
+                        ({{ suite.steps.count }} step{{ suite.steps.count|pluralize }})? Everything changed since the
+                        last saved version will be lost - this can't be undone.
+                    </p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-danger">Discard Draft</button>
+                            <a href="{% url 'design_detail' design.pk %}#test-suite" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

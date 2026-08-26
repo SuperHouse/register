@@ -23,6 +23,7 @@ urlpatterns = [
 
     path('design/<int:design_id>/test-suite/copy-steps-from/', views.test_suite_copy_steps_from, name='test_suite_copy_steps_from'),
     path('design/<int:design_id>/test-suite/save-new-version/', views.test_suite_save_new_version, name='test_suite_save_new_version'),
+    path('design/<int:design_id>/test-suite/discard-draft/', views.test_suite_discard_draft, name='test_suite_discard_draft'),
     path('design/<int:design_id>/test-suite/versions/', views.test_suite_version_list, name='test_suite_version_list'),
     path('design/<int:design_id>/test-suite/versions/<int:version>/', views.test_suite_version_detail, name='test_suite_version_detail'),
     path('design/<int:design_id>/test-suite/steps/add/', views.test_step_add, name='test_step_add'),

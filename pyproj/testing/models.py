@@ -53,18 +53,37 @@ class TestModule(models.Model):
 
 class TestSuite(models.Model):
     """One version of a Design's Test Suite (issue #101) - an ordered list of TestSteps.
-    Every Design has exactly one *current* Test Suite (the highest-`version` row for that
-    design, possibly with zero steps if nothing has been configured yet - see
-    `testing.views._get_or_create_current_suite`), which is freely editable in place; older
-    versions are frozen historical records, created by the "Save as New Version" action
-    (`testing.views.test_suite_save_new_version`), which copies the current version's steps
-    onto a new row and leaves the old one untouched. Hardware revisioning lives on Design
-    (hw_version, unique with sku), not on individual Devices, so a suite is scoped to a
-    Design rather than to one physical serialized board."""
+    Every Design has at most one *draft* Test Suite at a time (the highest-`version` row for
+    that design, when its `status` is DRAFT) - freely editable in place - plus zero or more
+    *saved* rows, which are immutable historical records. The highest-`version` SAVED row (i.e.
+    the one with no draft above it, or the newest one if there is a draft) is the *current*
+    version - what a future Testomatic tester would be given to run (issue #110).
+
+    A design with no rows at all has never had a step added. The very first step added to a
+    design creates version 1 as a DRAFT (see `testing.views._get_or_create_draft_suite`).
+    Editing/deleting/reordering a step, or adding a new one, always applies to the draft: if
+    the highest version is already a draft, it's edited directly; if it's SAVED (nothing
+    changed since the last save), a new draft is forked from it first (copying its steps -
+    see `testing.views._fork_draft`), so a SAVED version's content can never change retroactively
+    once created - this is the fix for issue #110's "same version number can mean two different
+    things" problem. "Save as New Version" (`testing.views.test_suite_save_new_version`) simply
+    flips the current draft's own status to SAVED in place, rather than copying it to yet another
+    row - the copy-forward now happens lazily, on the *next* edit, instead of unconditionally
+    at save time. Hardware revisioning lives on Design (hw_version, unique with sku), not on
+    individual Devices, so a suite is scoped to a Design rather than to one physical serialized
+    board."""
     __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    DRAFT = 'DRAFT'
+    SAVED = 'SAVED'
+    STATUS_CHOICES = [(DRAFT, 'Draft'), (SAVED, 'Saved')]
 
     design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='test_suites')
     version = models.PositiveIntegerField(default=1)
+    # Defaults to SAVED (immutable) since that's the safe assumption for any row created
+    # without explicitly opting into draft semantics; the views that actually create drafts
+    # (_get_or_create_draft_suite/_fork_draft) always pass status=DRAFT explicitly.
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=SAVED)
     notes = models.TextField(null=True, blank=True)
     created_dt = models.DateTimeField(auto_now_add=True)
 
@@ -76,6 +95,9 @@ class TestSuite(models.Model):
 
     def __str__(self):
         return f'{self.design} Test Suite v{self.version}'
+
+    def is_draft(self):
+        return self.status == self.DRAFT
 
 
 class TestStep(models.Model):

@@ -30,13 +30,15 @@
                         <tbody>
                             {% for suite in suites %}
                                 <tr style="cursor: pointer;"
-                                    onclick="window.location='{% if suite.pk == current.pk %}{% url 'design_detail' design.pk %}#test-suite{% else %}{% url 'testing:test_suite_version_detail' design.pk suite.version %}{% endif %}'">
+                                    onclick="window.location='{% if suite.pk == highest.pk %}{% url 'design_detail' design.pk %}#test-suite{% else %}{% url 'testing:test_suite_version_detail' design.pk suite.version %}{% endif %}'">
                                     <td>v{{ suite.version }}</td>
                                     <td>{{ suite.steps.all|length }}</td>
                                     <td>{{ suite.created_dt|date:"j-M-Y H:i" }}</td>
                                     <td>{{ suite.notes|default:"" }}</td>
                                     <td class="text-nowrap">
-                                        {% if suite.pk == current.pk %}
+                                        {% if suite.status == 'DRAFT' %}
+                                            <span class="badge bg-warning text-dark">Draft</span>
+                                        {% elif current and suite.pk == current.pk %}
                                             <span class="badge bg-primary">Current</span>
                                         {% endif %}
                                     </td>

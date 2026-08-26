@@ -26,7 +26,9 @@ def design():
 
 @pytest.fixture
 def suite(design):
-    return TestSuite.objects.create(design=design, version=1)
+    """A draft suite - the shape most tests want, since it's directly editable without
+    triggering the fork-on-write behaviour covered separately below (issue #110)."""
+    return TestSuite.objects.create(design=design, version=1, status=TestSuite.DRAFT)
 
 
 @pytest.fixture
@@ -38,6 +40,7 @@ def step(suite):
 def test_non_staff_users_are_redirected(client, plain_user, design, suite, step):
     urls = [
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
+        reverse('testing:test_suite_discard_draft', args=[design.pk]),
         reverse('testing:test_suite_version_list', args=[design.pk]),
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
         reverse('testing:test_step_edit', args=[step.pk]),
@@ -54,6 +57,7 @@ def test_staff_sees_pages(client, staff_user, design, suite, step):
     client.force_login(staff_user)
     for url in [
         reverse('testing:test_suite_save_new_version', args=[design.pk]),
+        reverse('testing:test_suite_discard_draft', args=[design.pk]),
         reverse('testing:test_suite_version_list', args=[design.pk]),
         reverse('testing:test_suite_version_detail', args=[design.pk, suite.version]),
         reverse('testing:test_step_edit', args=[step.pk]),
@@ -213,7 +217,9 @@ def test_step_reorder(client, staff_user, design, suite):
 
 
 @pytest.mark.django_db
-def test_save_new_version_freezes_current_and_copies_steps_forward(client, staff_user, design, suite, step):
+def test_save_new_version_promotes_draft_in_place(client, staff_user, design, suite, step):
+    """Issue #110: saving no longer copies the draft to a new row - it just flips the draft's
+    own status to SAVED, so the version number keeps meaning exactly one thing."""
     client.force_login(staff_user)
     response = client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {
         'notes': 'First production release',
@@ -223,24 +229,33 @@ def test_save_new_version_freezes_current_and_copies_steps_forward(client, staff
 
     suite.refresh_from_db()
     assert suite.notes == 'First production release'
+    assert suite.status == TestSuite.SAVED
 
-    assert design.test_suites.count() == 2
-    new_suite = design.test_suites.first()  # highest version = current
-    assert new_suite.version == 2
-    assert new_suite.pk != suite.pk
+    assert design.test_suites.count() == 1
+    assert design.test_suites.first().pk == suite.pk
+    assert design.test_suites.first().version == 1
 
-    # The new version's steps are independent copies, not the same rows.
-    assert list(new_suite.steps.values_list('step_type', 'name', 'config')) == \
-        list(suite.steps.values_list('step_type', 'name', 'config'))
-    assert new_suite.steps.first().pk != step.pk
+
+@pytest.mark.django_db
+def test_save_new_version_with_no_draft_is_a_noop(client, staff_user, design, suite):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {'notes': 'x'})
+    assert response.status_code == 302
+    assert design.test_suites.count() == 1
+    suite.refresh_from_db()
+    assert suite.notes != 'x'
 
 
 @pytest.mark.django_db
 def test_editing_or_deleting_a_step_on_a_historical_version_is_blocked(client, staff_user, design, suite, step):
     client.force_login(staff_user)
-    # Freeze v1 (with `step` on it) and move to v2.
+    # Save v1 (with `step` on it), then make a further edit - this forks v2, leaving v1
+    # genuinely historical (as opposed to merely SAVED-but-still-current).
     client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {'notes': ''})
-    suite.refresh_from_db()
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})
     assert design.test_suites.first().version == 2  # v1 (`suite`/`step`) is now historical
 
     edit_response = client.post(reverse('testing:test_step_edit', args=[step.pk]), {
@@ -257,13 +272,165 @@ def test_editing_or_deleting_a_step_on_a_historical_version_is_blocked(client, s
 
 
 @pytest.mark.django_db
-def test_version_list_shows_all_versions(client, staff_user, design, suite):
+def test_editing_a_step_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, step):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_step_edit', args=[step.pk]), {
+        'step_type': TestStep.DELAY, 'name': 'Settle Longer', 'delay_ms': '1000',
+    })
+    assert response.status_code == 302
+
+    # The original SAVED step/suite are untouched.
+    step.refresh_from_db()
+    assert step.name == 'Settle'
+    suite.refresh_from_db()
+    assert suite.status == TestSuite.SAVED
+
+    # A new draft was forked, with the edit applied to its copy of the step.
+    assert design.test_suites.count() == 2
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    new_step = draft.steps.get()
+    assert new_step.pk != step.pk
+    assert new_step.name == 'Settle Longer'
+    assert new_step.config['delay_ms'] == 1000
+
+
+@pytest.mark.django_db
+def test_deleting_a_step_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, step):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_step_delete', args=[step.pk]))
+    assert response.status_code == 302
+
+    assert TestStep.objects.filter(pk=step.pk).exists()  # the original SAVED step is untouched
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    assert draft.steps.count() == 0  # the copy was deleted
+
+
+@pytest.mark.django_db
+def test_adding_a_step_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite, step):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})
+    assert response.status_code == 302
+
+    assert design.test_suites.count() == 2
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    assert draft.status == TestSuite.DRAFT
+    # The draft has both the copied original step and the newly-added one.
+    assert list(draft.steps.order_by('order').values_list('step_type', flat=True)) == [TestStep.DELAY, TestStep.BEEP]
+
+    suite.refresh_from_db()
+    assert suite.steps.count() == 1  # the SAVED version is untouched
+
+
+@pytest.mark.django_db
+def test_reordering_steps_on_the_saved_current_version_forks_a_new_draft(client, staff_user, design, suite):
+    step_a = TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='A', order=1)
+    step_b = TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='B', order=2)
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    # The payload carries the *pre-fork* pks, exactly as the page would have rendered them.
+    response = client.post(
+        reverse('testing:test_step_reorder', args=[design.pk]),
+        data=json.dumps({'order': [step_b.pk, step_a.pk]}),
+        content_type='application/json',
+    )
+    assert response.status_code == 200
+
+    step_a.refresh_from_db()
+    step_b.refresh_from_db()
+    assert step_a.order == 1 and step_b.order == 2  # originals untouched
+
+    draft = design.test_suites.first()
+    assert draft.status == TestSuite.DRAFT
+    assert draft.steps.get(name='B').order == 1
+    assert draft.steps.get(name='A').order == 2
+
+
+@pytest.mark.django_db
+def test_invalid_step_edit_does_not_fork_a_draft(client, staff_user, design, suite, step):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_step_edit', args=[step.pk]), {
+        'step_type': TestStep.DELAY, 'name': 'Bad', 'delay_ms': '',  # delay_ms is required
+    })
+    assert response.status_code == 200  # re-renders the form with errors, no redirect
+    assert design.test_suites.count() == 1  # nothing forked for a rejected submission
+
+
+@pytest.mark.django_db
+def test_viewing_edit_page_for_a_saved_step_does_not_fork(client, staff_user, design, suite, step):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.get(reverse('testing:test_step_edit', args=[step.pk]))
+    assert response.status_code == 200
+    assert design.test_suites.count() == 1  # merely viewing doesn't fork
+
+
+@pytest.mark.django_db
+def test_discard_draft(client, staff_user, design, suite, step):
+    client.force_login(staff_user)
+    response = client.post(reverse('testing:test_suite_discard_draft', args=[design.pk]))
+    assert response.status_code == 302
+    assert not TestSuite.objects.filter(pk=suite.pk).exists()
+    assert not TestStep.objects.filter(pk=step.pk).exists()
+
+
+@pytest.mark.django_db
+def test_discard_draft_with_no_draft_is_a_noop(client, staff_user, design, suite):
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    response = client.post(reverse('testing:test_suite_discard_draft', args=[design.pk]))
+    assert response.status_code == 302
+    assert TestSuite.objects.filter(pk=suite.pk).exists()
+
+
+@pytest.mark.django_db
+def test_copy_steps_from_uses_source_saved_version_not_its_draft(client, staff_user, design):
+    org2 = Org.objects.create(company_name='Source Org 2')
+    source_design = Design.objects.create(client=org2, sku='SRC2', name='Source Design 2', hw_version='1.0')
+    saved_suite = TestSuite.objects.create(design=source_design, version=1, status=TestSuite.SAVED)
+    TestStep.objects.create(suite=saved_suite, order=1, step_type=TestStep.DELAY, name='Saved Step', config={'delay_ms': 5})
+    draft_suite = TestSuite.objects.create(design=source_design, version=2, status=TestSuite.DRAFT)
+    TestStep.objects.create(suite=draft_suite, order=1, step_type=TestStep.DELAY, name='Draft Step', config={'delay_ms': 5})
+
+    client.force_login(staff_user)
+    client.post(reverse('testing:test_suite_copy_steps_from', args=[design.pk]), {'source_design': source_design.pk})
+
+    copied_names = list(TestStep.objects.filter(suite__design=design).values_list('name', flat=True))
+    assert copied_names == ['Saved Step']
+
+
+@pytest.mark.django_db
+def test_version_list_shows_all_versions(client, staff_user, design, suite, step):
     client.force_login(staff_user)
     client.post(reverse('testing:test_suite_save_new_version', args=[design.pk]), {'notes': ''})
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})  # forks v2
 
     content = client.get(reverse('testing:test_suite_version_list', args=[design.pk])).content.decode()
-    assert 'v1' in content
-    assert 'v2' in content
+    assert '>v1<' in content
+    assert '>v2<' in content
 
 
 @pytest.mark.django_db
@@ -272,3 +439,22 @@ def test_version_detail_shows_read_only_steps(client, staff_user, design, suite,
     content = client.get(reverse('testing:test_suite_version_detail', args=[design.pk, suite.version])).content.decode()
     assert 'Settle' in content
     assert 'Delay' in content
+
+
+@pytest.mark.django_db
+def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staff_user, design, suite, step):
+    """A version can be simultaneously "Current" (the latest saved one - what a Tester would
+    fetch) and no longer directly editable (because a newer draft has since forked off it).
+    That's a different situation from a version superseded by another *saved* version, and
+    must not be mislabelled "Historical" just because it's not the highest row any more."""
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})  # forks v2
+
+    content = client.get(reverse('testing:test_suite_version_detail', args=[design.pk, suite.version])).content.decode()
+    assert 'Current' in content
+    assert 'Historical' not in content
+    assert 'newer draft' in content
+    assert '(v2)' in content
+    assert 'frozen historical record' not in content

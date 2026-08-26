@@ -82,14 +82,14 @@ def test_non_staff_with_firmware_asset_sees_test_suite_tab_but_not_step_manageme
 
 @pytest.mark.django_db
 def test_test_suite_tab_shows_current_suite_steps(client, staff_user, design):
-    suite = TestSuite.objects.create(design=design, version=1)
+    suite = TestSuite.objects.create(design=design, version=1, status=TestSuite.DRAFT)
     TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='Settle', config={'delay_ms': 250})
 
     client.force_login(staff_user)
     content = client.get(reverse('design_detail', args=[design.pk])).content.decode()
 
     assert 'Settle' in content
-    assert 'Editing version 1' in content
+    assert 'Editing draft version 1' in content
 
 
 @pytest.mark.django_db

@@ -210,7 +210,9 @@ def design_detail(request, design_id):
     # Test Suite tab (issue #102 folded the standalone testing:test_suite_current page into
     # this page). Deliberately doesn't create a TestSuite row just from viewing this page -
     # design.test_suites.first() is None until a step is actually added (see
-    # testing.views._get_or_create_current_suite, called lazily by the step-mutating views).
+    # testing.views._get_or_create_draft_suite, called lazily by the step-mutating views).
+    # first() here is the draft if one exists, else the current saved version (issue #110) -
+    # exactly what should be shown/edited on this tab either way.
     if request.user.is_staff:
         test_suite_current = design.test_suites.first()
         test_suite_steps = test_suite_current.steps.all() if test_suite_current else []

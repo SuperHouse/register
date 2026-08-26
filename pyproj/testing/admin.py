@@ -38,7 +38,7 @@ class TestStepInline(admin.TabularInline):
 
 @admin.register(TestSuite)
 class TestSuiteAdmin(admin.ModelAdmin):
-    list_display = ['design', 'version', 'created_dt']
+    list_display = ['design', 'version', 'status', 'created_dt']
     list_select_related = ['design']
     search_fields = ['design__sku', 'design__name']
     inlines = [TestStepInline]

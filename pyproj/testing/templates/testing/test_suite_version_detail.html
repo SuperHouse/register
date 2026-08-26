@@ -6,13 +6,19 @@
 
 {% block h1 %}
     Test Suite v{{ suite.version }}
-    {% if is_current %}<span class="badge bg-primary">Current</span>{% else %}<span class="badge bg-secondary">Historical</span>{% endif %}
+    {% if suite.status == 'DRAFT' %}
+        <span class="badge bg-warning text-dark">Draft</span>
+    {% elif is_current_saved %}
+        <span class="badge bg-primary">Current</span>
+    {% else %}
+        <span class="badge bg-secondary">Historical</span>
+    {% endif %}
 {% endblock h1 %}
 
 {% block content %}
     <p class="text-body-secondary">
         <a href="{% url 'testing:test_suite_version_list' design.pk %}">&laquo; Back to Version History</a>
-        {% if is_current %}&mdash; <a href="{% url 'design_detail' design.pk %}#test-suite">edit this version</a>{% endif %}
+        {% if is_highest %}&mdash; <a href="{% url 'design_detail' design.pk %}#test-suite">edit this version</a>{% endif %}
     </p>
 
     <div class="row">
@@ -29,9 +35,15 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Test Steps</h5>
-                    {% if not is_current %}
+                    {% if is_current_saved and not is_highest %}
                         <p class="text-body-secondary small">
-                            This is a frozen historical record and can't be edited. Use Save as New Version on the current version to make further changes.
+                            This is the current saved version, but a newer draft (v{{ highest.version }}) is already in
+                            progress - <a href="{% url 'design_detail' design.pk %}#test-suite">go there</a> to keep making changes.
+                        </p>
+                    {% elif not is_highest %}
+                        <p class="text-body-secondary small">
+                            This is a frozen historical record and can't be edited. Go to the design's current version to make further changes -
+                            editing it will automatically start a new draft version.
                         </p>
                     {% endif %}
 

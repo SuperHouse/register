@@ -13,6 +13,13 @@
         <div class="col-12 col-md-10 col-lg-8">
             <div class="card">
                 <div class="card-body">
+                    {% if step.suite.status != 'DRAFT' %}
+                        <div class="alert alert-info">
+                            Version {{ step.suite.version }} is already saved. Saving this change will start a new
+                            draft version, v{{ step.suite.version|add:1 }}.
+                        </div>
+                    {% endif %}
+
                     <form method="post">
                         {% csrf_token %}
 
