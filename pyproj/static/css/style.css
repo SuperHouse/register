@@ -306,3 +306,37 @@ body.display-mode .body.flex-grow-1 {
     background: rgba(0, 0, 0, 0.5);
     z-index: 1029;
 }
+
+/* Tabs (issue #103): CoreUI's default nav-tabs leaves inactive tabs looking
+   like plain (blue) links, and nothing visually ties the active tab to the
+   content below it. Give inactive tabs a chip-like background so they read
+   as tabs, and pair with .tab-panel below so the strip attaches to a bordered
+   panel instead of floating over bare page background. */
+.nav-tabs .nav-link {
+    color: var(--cui-body-color);
+}
+
+.nav-tabs .nav-link:not(.active) {
+    background-color: var(--cui-tertiary-bg);
+}
+
+.nav-tabs .nav-link:not(.active):hover {
+    background-color: var(--cui-secondary-bg);
+    color: var(--cui-body-color);
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: 600;
+}
+
+/* Bordered panel a .nav-tabs strip sits directly on top of (no gap), so the
+   active tab's bottom border merges into the panel's top edge. */
+.tab-panel {
+    background-color: var(--cui-card-bg);
+    border: var(--cui-border-width, 1px) solid var(--cui-card-border-color);
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+    border-bottom-left-radius: var(--cui-card-border-radius);
+    border-bottom-right-radius: var(--cui-card-border-radius);
+    padding: 1.25rem;
+}

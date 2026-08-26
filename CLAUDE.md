@@ -516,3 +516,24 @@ Loaded in `device/templates/device/base.html` for all pages:
 | SimpleBar | latest | Custom scrollbar for the sidebar |
 
 Custom icons (SVG files) live in `static/img/filetypes/` and are referenced via `{% static %}` in templates.
+
+## Claude Code Memory Sync (Mac Mini ↔ MacBook Pro)
+
+Jon works on this repo from two machines, checked out at different absolute paths: the Mac Mini uses `/Volumes/ExtSSD/Dropbox/src/register` (this Dropbox-synced copy), the MacBook Pro uses `/Users/jon/src/register`. Claude Code's persistent memory (`~/.claude/projects/<project-key>/memory/`) is namespaced by that absolute path, so the two machines normally get two separate, unsynced memory folders even though `~/.claude` itself already appears to be shared/synced between the machines by some other means (both machines' project folders are visible under `~/.claude/projects/` regardless of which machine you're on).
+
+Fixed on 2026-08-26 by replacing the Mac Mini's (empty) memory directory with a symlink to the MacBook Pro's (populated) one:
+
+```
+~/.claude/projects/-Volumes-ExtSSD-Dropbox-src-register/memory
+  -> ~/.claude/projects/-Users-jon-src-register/memory
+```
+
+If this link is ever missing or broken (e.g. after a `~/.claude` reset on either machine), recreate it with:
+
+```bash
+rmdir ~/.claude/projects/-Volumes-ExtSSD-Dropbox-src-register/memory   # only if empty
+ln -s ~/.claude/projects/-Users-jon-src-register/memory \
+      ~/.claude/projects/-Volumes-ExtSSD-Dropbox-src-register/memory
+```
+
+Before doing this again, check both `memory/` directories first — if either has real content, symlinking away the emptier one loses nothing, but if both have diverged content since 2026-08-26, they'll need a manual merge instead of a straight symlink.

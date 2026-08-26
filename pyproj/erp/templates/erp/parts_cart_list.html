@@ -9,7 +9,7 @@
 {% endblock h1 %}
 
 {% block content %}
-    <ul class="nav nav-tabs mb-3">
+    <ul class="nav nav-tabs">
         <li class="nav-item">
             <a class="nav-link {% if show == 'queued' %}active{% endif %}" href="{% url 'erp:parts_cart_list' %}">Queued</a>
         </li>
@@ -18,8 +18,7 @@
         </li>
     </ul>
 
-    <div class="card mb-4">
-        <div class="card-body">
+    <div class="tab-panel mb-4">
             {% if lines %}
                 <table class="table table-striped align-middle mb-0">
                     <thead>
@@ -111,7 +110,6 @@
                     {% if show == 'ordered' %}No parts have been marked as ordered yet.{% else %}The cart is empty.{% endif %}
                 </p>
             {% endif %}
-        </div>
     </div>
 
     <div class="card">
