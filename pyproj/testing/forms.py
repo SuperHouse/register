@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import ast
+
 from django import forms
 
 from device.models import Design
@@ -146,6 +148,29 @@ class TestStepForm(forms.ModelForm):
 
     action = forms.ChoiceField(required=False, choices=TestStep.RAIL_ACTION_CHOICES, widget=forms.RadioSelect)
 
+    python_code = forms.CharField(required=False, label='Python Code',
+                                   widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 10,
+                                                                 'style': 'font-family: monospace;'}))
+
+    # Shared by all four IOMOD step types (issues #105-#108), same as `rail` above.
+    iomod = forms.ChoiceField(required=False, label='IOMOD', choices=TestStep.IOMOD_CHOICES,
+                               widget=forms.Select(attrs={'class': 'form-select'}))
+    pin = forms.ChoiceField(required=False, label='Pin', choices=TestStep.IOMOD_PIN_CHOICES,
+                             widget=forms.Select(attrs={'class': 'form-select'}))
+    expect_min = forms.IntegerField(required=False, label='Expect Min',
+                                     widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    expect_max = forms.IntegerField(required=False, label='Expect Max',
+                                     widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    expect = forms.ChoiceField(required=False, label='Expect', choices=TestStep.BINARY_CHOICES,
+                                widget=forms.RadioSelect)
+    # Distinct field names/types for IOMOD Digital Write vs IOMOD Analog Write even though
+    # both issues call this "Write" - one is a 0/1 radio pair, the other a free integer, so
+    # they can't share a single form field.
+    digital_write = forms.ChoiceField(required=False, label='Write', choices=TestStep.BINARY_CHOICES,
+                                       widget=forms.RadioSelect)
+    analog_write = forms.IntegerField(required=False, label='Write',
+                                       widget=forms.NumberInput(attrs={'class': 'form-control'}))
+
     # Maps each step type to the config fields it actually uses (a subset of the fields
     # declared above): 'required' fields must be filled for that type; 'optional' fields are
     # included in config only when given (their absence lets a consumer apply its own
@@ -157,6 +182,11 @@ class TestStepForm(forms.ModelForm):
         TestStep.READ_RAIL_VOLTAGE: {'required': ['rail', 'min_v', 'max_v'], 'optional': []},
         TestStep.READ_RAIL_CURRENT: {'required': ['rail', 'min_ma', 'max_ma'], 'optional': []},
         TestStep.CONTROL_POWER_RAIL: {'required': ['rail', 'action'], 'optional': []},
+        TestStep.PYTHON: {'required': ['python_code'], 'optional': []},
+        TestStep.IOMOD_ANALOG_READ: {'required': ['iomod', 'pin'], 'optional': ['expect_min', 'expect_max']},
+        TestStep.IOMOD_DIGITAL_READ: {'required': ['iomod', 'pin', 'expect'], 'optional': []},
+        TestStep.IOMOD_DIGITAL_WRITE: {'required': ['iomod', 'pin', 'digital_write'], 'optional': []},
+        TestStep.IOMOD_ANALOG_WRITE: {'required': ['iomod', 'pin', 'analog_write'], 'optional': []},
     }
 
     class Meta:
@@ -191,6 +221,16 @@ class TestStepForm(forms.ModelForm):
             value = cleaned.get(field_name)
             if value not in (None, ''):
                 config[field_name] = value
+
+        # Cheap server-side typo-catcher for the Python step (issue #104): this app never
+        # executes the code itself (it's stored config for external Testomatic hardware to
+        # run later), so this only checks it parses, not that it's safe to run.
+        if cleaned.get('step_type') == TestStep.PYTHON and 'python_code' in config:
+            try:
+                ast.parse(config['python_code'])
+            except SyntaxError as e:
+                self.add_error('python_code', f'Invalid Python syntax: {e}')
+
         cleaned['config'] = config
         return cleaned
 

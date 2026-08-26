@@ -67,6 +67,68 @@ def test_step_config_summary_per_type(design):
     )
     assert rail_v.get_config_summary() == '5V: 4.8–5.2 V'
 
+    py = TestStep.objects.create(
+        suite=suite, step_type=TestStep.PYTHON, name='Script',
+        config={'python_code': 'print("hello")'},
+    )
+    assert py.get_config_summary() == 'print("hello")'
+
+    analog_read = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_ANALOG_READ, name='Check A0',
+        config={'iomod': 'A', 'pin': '0', 'expect_min': 10, 'expect_max': 50},
+    )
+    assert analog_read.get_config_summary() == 'IOMOD A Pin 0: expect 10–50'
+
+    digital_read = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_DIGITAL_READ, name='Check B3',
+        config={'iomod': 'B', 'pin': '3', 'expect': '1'},
+    )
+    assert digital_read.get_config_summary() == 'IOMOD B Pin 3: expect 1'
+
+    digital_write = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_DIGITAL_WRITE, name='Set C4',
+        config={'iomod': 'C', 'pin': '4', 'digital_write': '0'},
+    )
+    assert digital_write.get_config_summary() == 'IOMOD C Pin 4: write 0'
+
+    analog_write = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_ANALOG_WRITE, name='Set D5',
+        config={'iomod': 'D', 'pin': '5', 'analog_write': 200},
+    )
+    assert analog_write.get_config_summary() == 'IOMOD D Pin 5: write 200'
+
+
+@pytest.mark.django_db
+def test_step_config_summary_range_with_only_one_bound(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    min_only = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_ANALOG_READ, name='Min only',
+        config={'iomod': 'A', 'pin': '0', 'expect_min': 10},
+    )
+    assert min_only.get_config_summary() == 'IOMOD A Pin 0: expect ≥10'
+
+    max_only = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_ANALOG_READ, name='Max only',
+        config={'iomod': 'A', 'pin': '0', 'expect_max': 50},
+    )
+    assert max_only.get_config_summary() == 'IOMOD A Pin 0: expect ≤50'
+
+    neither = TestStep.objects.create(
+        suite=suite, step_type=TestStep.IOMOD_ANALOG_READ, name='Neither',
+        config={'iomod': 'A', 'pin': '0'},
+    )
+    assert neither.get_config_summary() == 'IOMOD A Pin 0: expect any'
+
+
+@pytest.mark.django_db
+def test_step_config_summary_python_truncates_and_counts_extra_lines(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    code = ('x' * 80) + '\nsecond line\nthird line'
+    step = TestStep.objects.create(suite=suite, step_type=TestStep.PYTHON, name='Long script', config={'python_code': code})
+    summary = step.get_config_summary()
+    assert summary.startswith('x' * 57 + '...')
+    assert summary.endswith('(+2 more lines)')
+
 
 @pytest.mark.django_db
 def test_steps_ordered_by_order(design):
@@ -109,6 +171,43 @@ def test_step_type_choices_alphabetical_is_sorted_by_label():
     assert labels == sorted(labels)
     # Same set of types as the canonical (definition-order) choices, just reordered.
     assert set(TestStep.STEP_TYPE_CHOICES_ALPHABETICAL) == set(TestStep.STEP_TYPE_CHOICES)
+
+
+@pytest.mark.django_db
+def test_step_form_python_requires_code_and_validates_syntax():
+    missing = TestStepForm(data={'step_type': TestStep.PYTHON, 'name': 'Script'})
+    assert not missing.is_valid()
+    assert 'python_code' in missing.errors
+
+    invalid = TestStepForm(data={'step_type': TestStep.PYTHON, 'name': 'Script', 'python_code': 'def ('})
+    assert not invalid.is_valid()
+    assert 'python_code' in invalid.errors
+
+    valid = TestStepForm(data={'step_type': TestStep.PYTHON, 'name': 'Script', 'python_code': 'print(1)'})
+    assert valid.is_valid(), valid.errors
+    assert valid.cleaned_data['config'] == {'python_code': 'print(1)'}
+
+
+@pytest.mark.django_db
+def test_step_form_iomod_analog_read_bounds_are_optional():
+    form = TestStepForm(data={'step_type': TestStep.IOMOD_ANALOG_READ, 'name': 'Check', 'iomod': 'A', 'pin': '0'})
+    assert form.is_valid(), form.errors
+    assert form.cleaned_data['config'] == {'iomod': 'A', 'pin': '0'}
+
+
+@pytest.mark.django_db
+def test_step_form_iomod_digital_write_and_analog_write_use_distinct_config_keys():
+    digital = TestStepForm(data={
+        'step_type': TestStep.IOMOD_DIGITAL_WRITE, 'name': 'Set', 'iomod': 'C', 'pin': '4', 'digital_write': '1',
+    })
+    assert digital.is_valid(), digital.errors
+    assert digital.cleaned_data['config'] == {'iomod': 'C', 'pin': '4', 'digital_write': '1'}
+
+    analog = TestStepForm(data={
+        'step_type': TestStep.IOMOD_ANALOG_WRITE, 'name': 'Set', 'iomod': 'D', 'pin': '5', 'analog_write': '200',
+    })
+    assert analog.is_valid(), analog.errors
+    assert analog.cleaned_data['config'] == {'iomod': 'D', 'pin': '5', 'analog_write': 200}
 
 
 @pytest.mark.django_db

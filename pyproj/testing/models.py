@@ -91,6 +91,11 @@ class TestStep(models.Model):
     READ_RAIL_VOLTAGE = 'READ_RAIL_VOLTAGE'
     READ_RAIL_CURRENT = 'READ_RAIL_CURRENT'
     CONTROL_POWER_RAIL = 'CONTROL_POWER_RAIL'
+    PYTHON = 'PYTHON'
+    IOMOD_ANALOG_READ = 'IOMOD_ANALOG_READ'
+    IOMOD_DIGITAL_READ = 'IOMOD_DIGITAL_READ'
+    IOMOD_DIGITAL_WRITE = 'IOMOD_DIGITAL_WRITE'
+    IOMOD_ANALOG_WRITE = 'IOMOD_ANALOG_WRITE'
     STEP_TYPE_CHOICES = [
         (DELAY, 'Delay'),
         (UPLOAD_FIRMWARE, 'Upload Firmware'),
@@ -98,6 +103,11 @@ class TestStep(models.Model):
         (READ_RAIL_VOLTAGE, 'Read Rail Voltage'),
         (READ_RAIL_CURRENT, 'Read Rail Current'),
         (CONTROL_POWER_RAIL, 'Control Power Rail'),
+        (PYTHON, 'Python'),
+        (IOMOD_ANALOG_READ, 'IOMOD Analog Read'),
+        (IOMOD_DIGITAL_READ, 'IOMOD Digital Read'),
+        (IOMOD_DIGITAL_WRITE, 'IOMOD Digital Write'),
+        (IOMOD_ANALOG_WRITE, 'IOMOD Analog Write'),
     ]
     # Alphabetical-by-label rendering of the above, computed once rather than hand-sorted, so
     # this stays correct as more step types are added later without anyone remembering to
@@ -115,10 +125,20 @@ class TestStep(models.Model):
         READ_RAIL_VOLTAGE: '#198754',
         READ_RAIL_CURRENT: '#20c997',
         CONTROL_POWER_RAIL: '#dc3545',
+        PYTHON: '#6f42c1',
+        IOMOD_DIGITAL_READ: '#0dcaf0',
+        IOMOD_ANALOG_READ: '#0aa2c0',
+        IOMOD_DIGITAL_WRITE: '#d63384',
+        IOMOD_ANALOG_WRITE: '#ad1457',
     }
     # Placeholder rail names until this project integrates with Testomatic, which defines
     # power rails more fully.
     POWER_RAIL_CHOICES = [('3.3V', '3.3V'), ('5V', '5V'), ('12V', '12V')]
+    # Placeholder IOMOD identifiers/pin numbers (issues #105-#108), same "hardcoded list
+    # pending Testomatic integration" convention as POWER_RAIL_CHOICES above.
+    IOMOD_CHOICES = [(letter, letter) for letter in 'ABCDEFG']
+    IOMOD_PIN_CHOICES = [(str(n), str(n)) for n in range(8)]
+    BINARY_CHOICES = [('0', '0'), ('1', '1')]
     UPLOAD_TOOL_CHOICES = [
         ('avrdude', 'avrdude'),
         ('esptool.py', 'esptool.py'),
@@ -137,7 +157,7 @@ class TestStep(models.Model):
 
     suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, related_name='steps')
     order = models.PositiveIntegerField(default=0)
-    step_type = models.CharField(max_length=20, choices=STEP_TYPE_CHOICES)
+    step_type = models.CharField(max_length=32, choices=STEP_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     hard_fail = models.BooleanField(default=False)
     config = models.JSONField(default=dict, blank=True)
@@ -167,4 +187,42 @@ class TestStep(models.Model):
             return f"{c.get('rail', '?')}: {c.get('min_ma', '?')}–{c.get('max_ma', '?')} mA"
         if self.step_type == self.CONTROL_POWER_RAIL:
             return f"{c.get('rail', '?')}: {c.get('action', '?')}"
+        if self.step_type == self.PYTHON:
+            return self._python_code_summary(c.get('python_code', ''))
+        if self.step_type == self.IOMOD_ANALOG_READ:
+            return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: expect {self._range_summary(c.get('expect_min'), c.get('expect_max'))}"
+        if self.step_type == self.IOMOD_DIGITAL_READ:
+            return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: expect {c.get('expect', '?')}"
+        if self.step_type == self.IOMOD_DIGITAL_WRITE:
+            return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: write {c.get('digital_write', '?')}"
+        if self.step_type == self.IOMOD_ANALOG_WRITE:
+            return f"IOMOD {c.get('iomod', '?')} Pin {c.get('pin', '?')}: write {c.get('analog_write', '?')}"
         return ''
+
+    @staticmethod
+    def _range_summary(lo, hi):
+        """Renders an optional (min, max) bound pair for the config summary - either bound
+        may be absent ("or null", issue #105), meaning that side is unconstrained."""
+        if lo is not None and hi is not None:
+            return f"{lo}–{hi}"
+        if lo is not None:
+            return f"≥{lo}"
+        if hi is not None:
+            return f"≤{hi}"
+        return 'any'
+
+    @staticmethod
+    def _python_code_summary(code):
+        """A one-line rendering of a Python step's code for the config summary row, which is
+        shared with the delete-confirm and frozen version-history pages and isn't built to
+        hold a multi-line code block (issue #104)."""
+        lines = [line for line in code.splitlines() if line.strip()]
+        if not lines:
+            return 'No code'
+        first = lines[0].strip()
+        if len(first) > 60:
+            first = first[:57] + '...'
+        remaining = len(lines) - 1
+        if remaining:
+            return f"{first} (+{remaining} more line{'s' if remaining != 1 else ''})"
+        return first

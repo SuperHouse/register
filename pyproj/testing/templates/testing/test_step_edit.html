@@ -129,6 +129,72 @@
                             </div>
                         </div>
 
+                        <div data-step-type-fields="PYTHON">
+                            <div class="mb-3">
+                                <label for="{{ form.python_code.id_for_label }}" class="form-label">{{ form.python_code.label }}</label>
+                                {{ form.python_code }}
+                                {% if form.python_code.errors %}<div class="text-danger small">{{ form.python_code.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        {% comment %}
+                            IOMOD and Pin are shared by all four IOMOD step types below, rendered once
+                            to avoid duplicate widget ids / duplicate POSTed values.
+                        {% endcomment %}
+                        <div data-step-type-fields="IOMOD_ANALOG_READ IOMOD_DIGITAL_READ IOMOD_DIGITAL_WRITE IOMOD_ANALOG_WRITE">
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.iomod.id_for_label }}" class="form-label">{{ form.iomod.label }}</label>
+                                    {{ form.iomod }}
+                                    {% if form.iomod.errors %}<div class="text-danger small">{{ form.iomod.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.pin.id_for_label }}" class="form-label">{{ form.pin.label }}</label>
+                                    {{ form.pin }}
+                                    {% if form.pin.errors %}<div class="text-danger small">{{ form.pin.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="IOMOD_ANALOG_READ">
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.expect_min.id_for_label }}" class="form-label">{{ form.expect_min.label }}</label>
+                                    {{ form.expect_min }}
+                                    {% if form.expect_min.errors %}<div class="text-danger small">{{ form.expect_min.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.expect_max.id_for_label }}" class="form-label">{{ form.expect_max.label }}</label>
+                                    {{ form.expect_max }}
+                                    {% if form.expect_max.errors %}<div class="text-danger small">{{ form.expect_max.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="IOMOD_DIGITAL_READ">
+                            <div class="mb-3">
+                                <label class="form-label d-block">{{ form.expect.label }}</label>
+                                {{ form.expect }}
+                                {% if form.expect.errors %}<div class="text-danger small">{{ form.expect.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="IOMOD_DIGITAL_WRITE">
+                            <div class="mb-3">
+                                <label class="form-label d-block">{{ form.digital_write.label }}</label>
+                                {{ form.digital_write }}
+                                {% if form.digital_write.errors %}<div class="text-danger small">{{ form.digital_write.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="IOMOD_ANALOG_WRITE">
+                            <div class="mb-3">
+                                <label for="{{ form.analog_write.id_for_label }}" class="form-label">{{ form.analog_write.label }}</label>
+                                {{ form.analog_write }}
+                                {% if form.analog_write.errors %}<div class="text-danger small">{{ form.analog_write.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'design_detail' step.suite.design_id %}#test-suite" class="btn btn-secondary">Cancel</a>
