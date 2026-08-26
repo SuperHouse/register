@@ -139,7 +139,7 @@ class TestStepForm(forms.ModelForm):
 
     count = forms.IntegerField(required=False, min_value=1, initial=1, label='Count',
                                 widget=forms.NumberInput(attrs={'class': 'form-control'}))
-    duration_ms = forms.IntegerField(required=False, min_value=0, label='Duration (ms)',
+    duration_ms = forms.IntegerField(required=False, min_value=0, initial=100, label='Duration (ms)',
                                       widget=forms.NumberInput(attrs={'class': 'form-control'}))
 
     rail = forms.ChoiceField(required=False, choices=TestStep.POWER_RAIL_CHOICES,
@@ -202,6 +202,9 @@ class TestStepForm(forms.ModelForm):
     ir_min = forms.IntegerField(required=False, label='IRMin', widget=forms.NumberInput(attrs={'class': 'form-control'}))
     ir_max = forms.IntegerField(required=False, label='IRMax', widget=forms.NumberInput(attrs={'class': 'form-control'}))
 
+    message = forms.CharField(required=False, label='Message',
+                               widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}))
+
     # Maps each step type to the config fields it actually uses (a subset of the fields
     # declared above): 'required' fields must be filled for that type; 'optional' fields are
     # included in config only when given (their absence lets a consumer apply its own
@@ -223,6 +226,7 @@ class TestStepForm(forms.ModelForm):
             'optional': ['mux_addr', 'r_min', 'r_max', 'g_min', 'g_max',
                          'b_min', 'b_max', 'lux_min', 'lux_max', 'ir_min', 'ir_max'],
         },
+        TestStep.OPERATOR_INTERVENTION: {'required': ['message'], 'optional': []},
     }
 
     class Meta:

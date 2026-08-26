@@ -167,6 +167,29 @@ def test_step_config_summary_led_spectral_reading(design):
 
 
 @pytest.mark.django_db
+def test_step_config_summary_operator_intervention(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.OPERATOR_INTERVENTION, name='Connect probe',
+        config={'message': 'Connect the probe to J3 before continuing.'},
+    )
+    assert step.get_config_summary() == 'Connect the probe to J3 before continuing.'
+
+    empty = TestStep.objects.create(
+        suite=suite, step_type=TestStep.OPERATOR_INTERVENTION, name='No message', config={},
+    )
+    assert empty.get_config_summary() == 'No message'
+
+    long_message = TestStep.objects.create(
+        suite=suite, step_type=TestStep.OPERATOR_INTERVENTION, name='Long',
+        config={'message': 'x' * 100},
+    )
+    summary = long_message.get_config_summary()
+    assert len(summary) == 80
+    assert summary.endswith('...')
+
+
+@pytest.mark.django_db
 def test_steps_ordered_by_order(design):
     suite = TestSuite.objects.create(design=design, version=1)
     TestStep.objects.create(suite=suite, step_type=TestStep.DELAY, name='Second', order=2)
@@ -200,6 +223,19 @@ def test_step_form_beep_optional_count_omitted_when_blank():
     assert form.is_valid(), form.errors
     assert 'count' not in form.cleaned_data['config']
     assert form.cleaned_data['config']['duration_ms'] == 100
+
+
+@pytest.mark.django_db
+def test_step_form_beep_duration_defaults_but_doesnt_override_saved_value(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+
+    fresh_step = TestStep.objects.create(suite=suite, step_type=TestStep.BEEP, name='Beep', config={'schema_version': 1})
+    assert TestStepForm(instance=fresh_step)['duration_ms'].value() == 100
+
+    configured_step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.BEEP, name='Beep 2', config={'duration_ms': 300, 'schema_version': 1},
+    )
+    assert TestStepForm(instance=configured_step)['duration_ms'].value() == 300
 
 
 def test_step_type_choices_alphabetical_is_sorted_by_label():
@@ -302,6 +338,20 @@ def test_step_form_led_spectral_reading_accepts_mux_addr_and_validates_hex():
     invalid_i2c = TestStepForm(data=_led_spectral_reading_data(i2c_addr='zz'))
     assert not invalid_i2c.is_valid()
     assert 'i2c_addr' in invalid_i2c.errors
+
+
+@pytest.mark.django_db
+def test_step_form_operator_intervention_requires_message():
+    missing = TestStepForm(data={'step_type': TestStep.OPERATOR_INTERVENTION, 'name': 'Intervention'})
+    assert not missing.is_valid()
+    assert 'message' in missing.errors
+
+    valid = TestStepForm(data={
+        'step_type': TestStep.OPERATOR_INTERVENTION, 'name': 'Intervention',
+        'message': 'Connect the probe to J3 before continuing.',
+    })
+    assert valid.is_valid(), valid.errors
+    assert valid.cleaned_data['config'] == {'message': 'Connect the probe to J3 before continuing.'}
 
 
 @pytest.mark.django_db

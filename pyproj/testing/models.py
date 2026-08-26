@@ -119,6 +119,7 @@ class TestStep(models.Model):
     IOMOD_DIGITAL_WRITE = 'IOMOD_DIGITAL_WRITE'
     IOMOD_ANALOG_WRITE = 'IOMOD_ANALOG_WRITE'
     LED_SPECTRAL_READING = 'LED_SPECTRAL_READING'
+    OPERATOR_INTERVENTION = 'OPERATOR_INTERVENTION'
     STEP_TYPE_CHOICES = [
         (DELAY, 'Delay'),
         (UPLOAD_FIRMWARE, 'Upload Firmware'),
@@ -132,6 +133,7 @@ class TestStep(models.Model):
         (IOMOD_DIGITAL_WRITE, 'IOMOD Digital Write'),
         (IOMOD_ANALOG_WRITE, 'IOMOD Analog Write'),
         (LED_SPECTRAL_READING, 'LED Spectral Reading'),
+        (OPERATOR_INTERVENTION, 'Operator Intervention'),
     ]
     # Alphabetical-by-label rendering of the above, computed once rather than hand-sorted, so
     # this stays correct as more step types are added later without anyone remembering to
@@ -155,6 +157,7 @@ class TestStep(models.Model):
         IOMOD_DIGITAL_WRITE: '#d63384',
         IOMOD_ANALOG_WRITE: '#ad1457',
         LED_SPECTRAL_READING: '#ffc107',
+        OPERATOR_INTERVENTION: '#6610f2',
     }
     # Placeholder rail names until this project integrates with Testomatic, which defines
     # power rails more fully.
@@ -232,7 +235,16 @@ class TestStep(models.Model):
                 f"Lux {self._range_summary(c.get('lux_min'), c.get('lux_max'))}, "
                 f"IR {self._range_summary(c.get('ir_min'), c.get('ir_max'))}"
             )
+        if self.step_type == self.OPERATOR_INTERVENTION:
+            return self._truncate(c.get('message', ''), 80) or 'No message'
         return ''
+
+    @staticmethod
+    def _truncate(text, max_len):
+        text = text.strip()
+        if len(text) > max_len:
+            return text[:max_len - 3] + '...'
+        return text
 
     @staticmethod
     def _range_summary(lo, hi):

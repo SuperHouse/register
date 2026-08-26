@@ -282,6 +282,14 @@
                             </div>
                         </div>
 
+                        <div data-step-type-fields="OPERATOR_INTERVENTION">
+                            <div class="mb-3">
+                                <label for="{{ form.message.id_for_label }}" class="form-label">{{ form.message.label }}</label>
+                                {{ form.message }}
+                                {% if form.message.errors %}<div class="text-danger small">{{ form.message.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'design_detail' step.suite.design_id %}#test-suite" class="btn btn-secondary">Cancel</a>
