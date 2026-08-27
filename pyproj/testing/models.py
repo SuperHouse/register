@@ -120,6 +120,15 @@ class ManualCheck(models.Model):
     def __str__(self):
         return self.text
 
+    def get_color(self):
+        """Manual checks have no type/colour of their own (issue #112); issue #113 asks that
+        every item be outlined in the same colour as the Operator Intervention step type,
+        since a manual check is conceptually the same kind of thing - something a human does
+        or verifies rather than an automated reading. Read from TestStep.STEP_TYPE_COLORS
+        (referenced by name here since TestStep is defined later in this module) rather than
+        duplicating the hex value, so the two stay in sync if that colour is ever changed."""
+        return TestStep.STEP_TYPE_COLORS[TestStep.OPERATOR_INTERVENTION]
+
 
 class TestStep(models.Model):
     """A single step within a TestSuite, executed/examined in order (issue #101) - conceptually

@@ -610,7 +610,7 @@
                                             {% for step in test_suite_steps %}
                                                 <tr data-stage-id="{{ step.pk }}">
                                                     <td class="p-0 border-0">
-                                                        <div class="border rounded mb-2" style="border-left: 6px solid {{ step.get_color }} !important; overflow: hidden;">
+                                                        <div class="rounded mb-2" style="border: 1px solid {{ step.get_color }}; border-left-width: 6px; overflow: hidden;">
                                                             <div class="d-flex align-items-center gap-2 px-2 py-2 clickable-row"
                                                                  style="cursor: pointer;"
                                                                  onclick="window.location='{% url 'testing:test_step_edit' step.pk %}'">
@@ -628,7 +628,7 @@
                                                                     </button>
                                                                 </form>
                                                             </div>
-                                                            <div class="px-2 py-1 small text-body-secondary border-top clickable-row"
+                                                            <div class="px-2 py-1 small text-body-secondary clickable-row"
                                                                  style="cursor: pointer;"
                                                                  onclick="window.location='{% url 'testing:test_step_edit' step.pk %}'">
                                                                 {{ step.get_config_summary }}
@@ -664,8 +664,8 @@
                                             {% for check in test_suite_manual_checks %}
                                                 <tr data-stage-id="{{ check.pk }}">
                                                     <td class="p-0 border-0">
-                                                        <div class="border rounded mb-2 d-flex align-items-center gap-2 px-2 py-2 clickable-row"
-                                                             style="cursor: pointer;"
+                                                        <div class="rounded mb-2 d-flex align-items-center gap-2 px-2 py-2 clickable-row"
+                                                             style="cursor: pointer; border: 1px solid {{ check.get_color }}; border-left-width: 6px;"
                                                              onclick="window.location='{% url 'testing:manual_check_edit' check.pk %}'">
                                                             <i class="bi bi-grip-vertical" style="cursor: grab;" onclick="event.stopPropagation()"></i>
                                                             <span>{{ check.text }}</span>
