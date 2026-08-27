@@ -575,6 +575,11 @@
                                     {% endif %}
                                 </p>
                                 <div class="d-flex gap-2">
+                                    {% if test_suite_current %}
+                                        <a href="{% url 'testing:test_suite_download' design.pk %}" class="btn btn-outline-secondary" title="Download Test Suite">
+                                            <i class="cil-cloud-download"></i> Download
+                                        </a>
+                                    {% endif %}
                                     {% if test_suite_version_count > 1 %}
                                         <a href="{% url 'testing:test_suite_version_list' design.pk %}" class="btn btn-outline-secondary" title="Version History">
                                             <i class="cil-history"></i> Version History ({{ test_suite_version_count }})

@@ -26,6 +26,7 @@ urlpatterns = [
     path('design/<int:design_id>/test-suite/discard-draft/', views.test_suite_discard_draft, name='test_suite_discard_draft'),
     path('design/<int:design_id>/test-suite/versions/', views.test_suite_version_list, name='test_suite_version_list'),
     path('design/<int:design_id>/test-suite/versions/<int:version>/', views.test_suite_version_detail, name='test_suite_version_detail'),
+    path('design/<int:design_id>/test-suite/download/', views.test_suite_download, name='test_suite_download'),
     path('design/<int:design_id>/test-suite/steps/add/', views.test_step_add, name='test_step_add'),
     path('design/<int:design_id>/test-suite/steps/reorder/', views.test_step_reorder, name='test_step_reorder'),
     path('test-suites/steps/<int:step_id>/', views.test_step_edit, name='test_step_edit'),

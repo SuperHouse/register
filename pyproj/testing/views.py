@@ -5,9 +5,10 @@ import json
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import ProtectedError
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.text import slugify
 
 from device.models import Design
 from .forms import (
@@ -406,6 +407,77 @@ def test_suite_version_detail(request, design_id, version):
         'is_current_saved': latest_saved is not None and latest_saved.pk == suite.pk,
         'highest': highest,
     })
+
+
+# Version of the *export envelope* itself (the overall JSON shape returned by
+# _serialize_test_suite - top-level keys, nesting, field names) - distinct from
+# TestStep.CONFIG_SCHEMA_VERSION, which versions the shape of one step's own `config` blob and
+# is carried through unchanged inside each step's `config_schema_version` below. Bump this if
+# the envelope shape itself changes (e.g. a top-level key is renamed or restructured); bumping
+# TestStep.CONFIG_SCHEMA_VERSION instead is what's needed when a step type's config fields
+# change.
+TEST_SUITE_EXPORT_SCHEMA_VERSION = 1
+
+
+def _serialize_test_suite(suite):
+    """Flat, external-consumer-friendly representation of a TestSuite (issue #114) - Test Steps
+    and Manual Checks together, since they're versioned as one unit (see TestSuite's
+    docstring). Intended to double as the shape a future Testomatic tester API endpoint
+    returns (issue #101), so this is the single place that shape is defined."""
+    return {
+        'export_schema_version': TEST_SUITE_EXPORT_SCHEMA_VERSION,
+        'design': {
+            'id': suite.design.pk,
+            'sku': suite.design.sku,
+            'name': suite.design.name,
+            'hw_version': suite.design.hw_version,
+        },
+        'test_suite': {
+            'version': suite.version,
+            'status': suite.status,
+            'notes': suite.notes,
+            'created_dt': suite.created_dt.isoformat(),
+        },
+        'test_steps': [
+            {
+                'order': step.order,
+                'step_type': step.step_type,
+                'name': step.name,
+                'hard_fail': step.hard_fail,
+                # Pulled out alongside config rather than left for a consumer to dig out of
+                # the nested blob - step.config already carries this same value under its own
+                # 'schema_version' key (stamped by TestStepForm.save(), see TestStep.CONFIG_
+                # SCHEMA_VERSION), so this is just a more discoverable copy of it, not a
+                # separate value.
+                'config_schema_version': step.config.get('schema_version'),
+                'config': step.config,
+            }
+            for step in suite.steps.all()
+        ],
+        'manual_checks': [
+            {'order': check.order, 'text': check.text}
+            for check in suite.manual_checks.all()
+        ],
+    }
+
+
+@staff_member_required
+def test_suite_download(request, design_id):
+    """Downloads the design's current Test Suite (the draft being edited, or the latest saved
+    version if there's no draft - i.e. whatever the Test Suite tab is showing) as a single JSON
+    file covering both Test Steps and Manual Checks (issue #114)."""
+    design = get_object_or_404(Design, pk=design_id)
+    suite = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
+
+    if suite is None:
+        messages.info(request, 'There is no Test Suite to download yet.')
+        return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
+
+    data = _serialize_test_suite(suite)
+    filename = f'{slugify(design.sku)}-hw{slugify(design.hw_version)}-test-suite-v{suite.version}.json'
+    response = HttpResponse(json.dumps(data, indent=2), content_type='application/json')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
 
 
 @staff_member_required

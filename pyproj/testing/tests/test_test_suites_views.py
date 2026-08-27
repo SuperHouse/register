@@ -469,6 +469,65 @@ def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staf
     assert 'frozen historical record' not in content
 
 
+# --- Download (issue #114) ---
+
+@pytest.mark.django_db
+def test_download_returns_json_with_steps_and_manual_checks(client, staff_user, design, suite, step, check):
+    client.force_login(staff_user)
+    response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
+
+    assert response.status_code == 200
+    assert response['Content-Type'] == 'application/json'
+    assert response['Content-Disposition'] == f'attachment; filename="sv1-hw10-test-suite-v{suite.version}.json"'
+
+    data = json.loads(response.content)
+    assert data['export_schema_version'] == 1
+    assert data['design'] == {'id': design.pk, 'sku': 'SV1', 'name': 'Suite View Design', 'hw_version': '1.0'}
+    assert data['test_suite']['version'] == suite.version
+    assert data['test_suite']['status'] == TestSuite.DRAFT
+    # This step's config predates any schema_version stamp (the fixture creates it directly,
+    # bypassing TestStepForm.save() - see TestStep.CONFIG_SCHEMA_VERSION) - config_schema_version
+    # should come through as None rather than erroring, same as get_config_summary()'s c.get(...)
+    # fallbacks handle a missing key elsewhere.
+    assert data['test_steps'] == [
+        {
+            'order': step.order, 'step_type': TestStep.DELAY, 'name': 'Settle', 'hard_fail': False,
+            'config_schema_version': None, 'config': {'delay_ms': 250},
+        },
+    ]
+    assert data['manual_checks'] == [{'order': 1, 'text': 'Confirm LED lights up'}]
+
+
+@pytest.mark.django_db
+def test_download_surfaces_each_step_config_schema_version(client, staff_user, design, suite):
+    """A step whose config was stamped by TestStepForm.save() (the normal path) carries its
+    own schema_version - the export surfaces it as config_schema_version alongside (not instead
+    of) the raw config, so a consumer doesn't have to know to dig it out of the nested blob."""
+    TestStep.objects.create(
+        suite=suite, step_type=TestStep.BEEP, name='Beep',
+        config={'count': 2, 'duration_ms': 300, 'schema_version': TestStep.CONFIG_SCHEMA_VERSION},
+    )
+    client.force_login(staff_user)
+    response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
+    data = json.loads(response.content)
+    assert data['test_steps'][0]['config_schema_version'] == TestStep.CONFIG_SCHEMA_VERSION
+
+
+@pytest.mark.django_db
+def test_download_with_no_suite_redirects_with_message(client, staff_user, design):
+    client.force_login(staff_user)
+    response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
+    assert response.status_code == 302
+    assert response.url == reverse('design_detail', args=[design.pk]) + '#test-suite'
+
+
+@pytest.mark.django_db
+def test_download_requires_staff(client, plain_user, design, suite):
+    client.force_login(plain_user)
+    response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
+    assert response.status_code == 302
+
+
 # --- Manual Checks (issue #112) ---
 
 @pytest.mark.django_db
