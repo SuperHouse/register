@@ -45,7 +45,9 @@ nav:
     - Configuration Reference: admin/configuration.md
     - Supplier API Setup: admin/supplier-apis.md
     - Data Export & Import: admin/data.md
-  - API Reference: api/reference.md
+  - API Reference:
+    - REST API: api/reference.md
+    - Test Suite Export Format: api/test-suite-export.md
 
 plugins:
   - search

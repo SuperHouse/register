@@ -14,6 +14,12 @@ For example: `https://portal.superhouse.tv/api/v1/`
 
 An interactive API explorer (Swagger UI) is available at `/api/v1/docs` for any installation. It requires a staff login to access. Use it to browse all endpoints and try requests directly in the browser.
 
+## Test Suite export
+
+Each Design's Test Suite can be downloaded as a JSON file, independently of this REST API — see
+[Test Suite Export Format](test-suite-export.md) for the full schema, covering every Test Step
+type and its configuration fields.
+
 ## Authentication
 
 Most endpoints require an API key sent in a request header:
