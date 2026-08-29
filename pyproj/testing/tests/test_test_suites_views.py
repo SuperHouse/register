@@ -1,4 +1,6 @@
+import io
 import json
+import zipfile
 
 import pytest
 from django.urls import reverse
@@ -132,7 +134,7 @@ def test_copy_steps_from_appends_to_end_with_config_preserved(client, staff_user
     source_suite = TestSuite.objects.create(design=source_design, version=1)
     TestStep.objects.create(
         suite=source_suite, order=1, step_type=TestStep.BEEP, name='Beep Twice',
-        hard_fail=True, config={'count': 2, 'duration_ms': 300, 'schema_version': 1},
+        abort_on_fail=True, config={'count': 2, 'duration_ms': 300, 'schema_version': 1},
     )
 
     client.force_login(staff_user)
@@ -148,7 +150,7 @@ def test_copy_steps_from_appends_to_end_with_config_preserved(client, staff_user
     copied = suite_steps[1]
     assert copied.step_type == TestStep.BEEP
     assert copied.name == 'Beep Twice'
-    assert copied.hard_fail is True
+    assert copied.abort_on_fail is True
     assert copied.config == {'count': 2, 'duration_ms': 300, 'schema_version': 1}
     assert copied.order == step.order + 1
 
@@ -471,16 +473,23 @@ def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staf
 
 # --- Download (issue #114) ---
 
+def _extract_definition(response):
+    """Downloads are now a Test Suite Package: a ZIP archive holding test-suite-definition.json,
+    not a bare JSON file - see testing.views.test_suite_download."""
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    return json.loads(archive.read('test-suite-definition.json'))
+
+
 @pytest.mark.django_db
-def test_download_returns_json_with_steps_and_manual_checks(client, staff_user, design, suite, step, check):
+def test_download_returns_a_package_with_steps_and_manual_checks(client, staff_user, design, suite, step, check):
     client.force_login(staff_user)
     response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
 
     assert response.status_code == 200
-    assert response['Content-Type'] == 'application/json'
-    assert response['Content-Disposition'] == f'attachment; filename="sv1-hw10-test-suite-v{suite.version}.json"'
+    assert response['Content-Type'] == 'application/zip'
+    assert response['Content-Disposition'] == f'attachment; filename="sv1-hw10-test-suite-v{suite.version}.zip"'
 
-    data = json.loads(response.content)
+    data = _extract_definition(response)
     assert data['export_schema_version'] == 1
     assert data['design'] == {'id': design.pk, 'sku': 'SV1', 'name': 'Suite View Design', 'hw_version': '1.0'}
     assert data['test_suite']['version'] == suite.version
@@ -491,7 +500,7 @@ def test_download_returns_json_with_steps_and_manual_checks(client, staff_user, 
     # fallbacks handle a missing key elsewhere.
     assert data['test_steps'] == [
         {
-            'order': step.order, 'step_type': TestStep.DELAY, 'name': 'Settle', 'hard_fail': False,
+            'order': step.order, 'step_type': TestStep.DELAY, 'name': 'Settle', 'abort_on_fail': False,
             'config_schema_version': None, 'config': {'delay_ms': 250},
         },
     ]
@@ -509,7 +518,7 @@ def test_download_surfaces_each_step_config_schema_version(client, staff_user, d
     )
     client.force_login(staff_user)
     response = client.get(reverse('testing:test_suite_download', args=[design.pk]))
-    data = json.loads(response.content)
+    data = _extract_definition(response)
     assert data['test_steps'][0]['config_schema_version'] == TestStep.CONFIG_SCHEMA_VERSION
 
 

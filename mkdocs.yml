@@ -47,7 +47,7 @@ nav:
     - Data Export & Import: admin/data.md
   - API Reference:
     - REST API: api/reference.md
-    - Test Suite Export Format: api/test-suite-export.md
+    - Test Suite Package Format: api/test-suite-package.md
 
 plugins:
   - search

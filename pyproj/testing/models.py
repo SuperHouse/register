@@ -217,7 +217,7 @@ class TestStep(models.Model):
     order = models.PositiveIntegerField(default=0)
     step_type = models.CharField(max_length=32, choices=STEP_TYPE_CHOICES)
     name = models.CharField(max_length=100)
-    hard_fail = models.BooleanField(default=False)
+    abort_on_fail = models.BooleanField(default=False)
     config = models.JSONField(default=dict, blank=True)
 
     class Meta:

@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import io
 import json
+import zipfile
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -230,7 +232,7 @@ def _fork_draft(design, saved_suite):
         for step in saved_suite.steps.all():
             new_step = TestStep.objects.create(
                 suite=draft, order=step.order, step_type=step.step_type,
-                name=step.name, hard_fail=step.hard_fail, config=step.config,
+                name=step.name, abort_on_fail=step.abort_on_fail, config=step.config,
             )
             step_pk_map[step.pk] = new_step
         for check in saved_suite.manual_checks.all():
@@ -307,7 +309,7 @@ def test_suite_copy_steps_from(request, design_id):
                             order=next_order + offset,
                             step_type=step.step_type,
                             name=step.name,
-                            hard_fail=step.hard_fail,
+                            abort_on_fail=step.abort_on_fail,
                             config=step.config,
                         )
                 if source_checks:
@@ -443,7 +445,7 @@ def _serialize_test_suite(suite):
                 'order': step.order,
                 'step_type': step.step_type,
                 'name': step.name,
-                'hard_fail': step.hard_fail,
+                'abort_on_fail': step.abort_on_fail,
                 # Pulled out alongside config rather than left for a consumer to dig out of
                 # the nested blob - step.config already carries this same value under its own
                 # 'schema_version' key (stamped by TestStepForm.save(), see TestStep.CONFIG_
@@ -464,8 +466,13 @@ def _serialize_test_suite(suite):
 @staff_member_required
 def test_suite_download(request, design_id):
     """Downloads the design's current Test Suite (the draft being edited, or the latest saved
-    version if there's no draft - i.e. whatever the Test Suite tab is showing) as a single JSON
-    file covering both Test Steps and Manual Checks (issue #114)."""
+    version if there's no draft - i.e. whatever the Test Suite tab is showing) as a Test Suite
+    Package (issue #114): a ZIP archive containing a single test-suite-definition.json file
+    covering both Test Steps and Manual Checks. The package is the transport format an external
+    consumer (e.g. a Testomatic tester) reads; test-suite-definition.json's own shape is what
+    _serialize_test_suite() defines below. The archive also has room for other files a step
+    might reference by name (e.g. UPLOAD_FIRMWARE's firmware_file) - none are attached yet, since
+    associating firmware files with a Test Suite isn't designed yet."""
     design = get_object_or_404(Design, pk=design_id)
     suite = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
 
@@ -474,8 +481,12 @@ def test_suite_download(request, design_id):
         return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
 
     data = _serialize_test_suite(suite)
-    filename = f'{slugify(design.sku)}-hw{slugify(design.hw_version)}-test-suite-v{suite.version}.json'
-    response = HttpResponse(json.dumps(data, indent=2), content_type='application/json')
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('test-suite-definition.json', json.dumps(data, indent=2))
+
+    filename = f'{slugify(design.sku)}-hw{slugify(design.hw_version)}-test-suite-v{suite.version}.zip'
+    response = HttpResponse(buffer.getvalue(), content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
 
@@ -524,7 +535,7 @@ def test_step_edit(request, step_id):
             target = _ensure_editable_step(step)
             target.step_type = form.cleaned_data['step_type']
             target.name = form.cleaned_data['name']
-            target.hard_fail = form.cleaned_data['hard_fail']
+            target.abort_on_fail = form.cleaned_data['abort_on_fail']
             config = dict(form.cleaned_data.get('config', {}))
             config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
             target.config = config

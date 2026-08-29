@@ -51,7 +51,7 @@ class TestSuiteAdmin(admin.ModelAdmin):
 
 @admin.register(TestStep)
 class TestStepAdmin(admin.ModelAdmin):
-    list_display = ['name', 'step_type', 'suite', 'order', 'hard_fail']
+    list_display = ['name', 'step_type', 'suite', 'order', 'abort_on_fail']
     list_select_related = ['suite']
     search_fields = ['name', 'suite__design__sku', 'suite__design__name']
 

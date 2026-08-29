@@ -56,8 +56,8 @@
                                             <div class="d-flex align-items-center gap-2 px-2 py-2">
                                                 <span class="badge" style="background-color: {{ step.get_color }};">{{ step.get_step_type_display }}</span>
                                                 <strong>{{ step.name }}</strong>
-                                                {% if step.hard_fail %}
-                                                    <span class="badge bg-danger ms-auto">Hard Fail</span>
+                                                {% if step.abort_on_fail %}
+                                                    <span class="badge bg-danger ms-auto">Abort On Fail</span>
                                                 {% endif %}
                                             </div>
                                             <div class="px-2 py-1 small text-body-secondary">

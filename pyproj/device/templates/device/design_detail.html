@@ -622,11 +622,11 @@
                                                                 <i class="bi bi-grip-vertical" style="cursor: grab;" onclick="event.stopPropagation()"></i>
                                                                 <span class="badge" style="background-color: {{ step.get_color }};">{{ step.get_step_type_display }}</span>
                                                                 <strong>{{ step.name }}</strong>
-                                                                {% if step.hard_fail %}
-                                                                    <span class="badge bg-danger ms-auto">Hard Fail</span>
+                                                                {% if step.abort_on_fail %}
+                                                                    <span class="badge bg-danger ms-auto">Abort On Fail</span>
                                                                 {% endif %}
                                                                 <form method="post" action="{% url 'testing:test_step_delete' step.pk %}"
-                                                                      onclick="event.stopPropagation()" class="{% if not step.hard_fail %}ms-auto{% endif %}">
+                                                                      onclick="event.stopPropagation()" class="{% if not step.abort_on_fail %}ms-auto{% endif %}">
                                                                     {% csrf_token %}
                                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
                                                                         <i class="cil-trash"></i>
