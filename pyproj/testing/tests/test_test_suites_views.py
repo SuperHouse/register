@@ -474,10 +474,13 @@ def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staf
 # --- Download (issue #114) ---
 
 def _extract_definition(response):
-    """Downloads are now a Test Suite Package: a ZIP archive holding test-suite-definition.json,
-    not a bare JSON file - see testing.views.test_suite_download."""
+    """Downloads are now a Test Suite Package: a ZIP archive holding one top-level folder (named
+    after the package) containing test-suite-definition.json, not a bare JSON file at the archive
+    root - see testing.views.test_suite_download. Finds the entry by suffix rather than hardcoding
+    the folder name, since that name is per-design/version."""
     archive = zipfile.ZipFile(io.BytesIO(response.content))
-    return json.loads(archive.read('test-suite-definition.json'))
+    [name] = [n for n in archive.namelist() if n.endswith('test-suite-definition.json')]
+    return json.loads(archive.read(name))
 
 
 @pytest.mark.django_db
@@ -488,6 +491,11 @@ def test_download_returns_a_package_with_steps_and_manual_checks(client, staff_u
     assert response.status_code == 200
     assert response['Content-Type'] == 'application/zip'
     assert response['Content-Disposition'] == f'attachment; filename="sv1-hw10-test-suite-v{suite.version}.zip"'
+
+    # The archive wraps its contents in a folder named after itself, so extracting it can never
+    # scatter files loose into whatever directory it's extracted into.
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    assert archive.namelist() == [f'sv1-hw10-test-suite-v{suite.version}/test-suite-definition.json']
 
     data = _extract_definition(response)
     assert data['export_schema_version'] == 1

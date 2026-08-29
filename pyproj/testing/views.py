@@ -467,12 +467,16 @@ def _serialize_test_suite(suite):
 def test_suite_download(request, design_id):
     """Downloads the design's current Test Suite (the draft being edited, or the latest saved
     version if there's no draft - i.e. whatever the Test Suite tab is showing) as a Test Suite
-    Package (issue #114): a ZIP archive containing a single test-suite-definition.json file
-    covering both Test Steps and Manual Checks. The package is the transport format an external
-    consumer (e.g. a Testomatic tester) reads; test-suite-definition.json's own shape is what
-    _serialize_test_suite() defines below. The archive also has room for other files a step
-    might reference by name (e.g. UPLOAD_FIRMWARE's firmware_file) - none are attached yet, since
-    associating firmware files with a Test Suite isn't designed yet."""
+    Package (issue #114): a ZIP archive containing one top-level folder (named the same as the
+    archive, minus its extension) holding a single test-suite-definition.json file covering both
+    Test Steps and Manual Checks. Wrapping everything in a same-named folder means extracting the
+    archive - dragging it out of a Downloads folder, say - can never scatter its contents loose
+    into whatever directory it lands in; it always stays self-contained. The package is the
+    transport format an external consumer (e.g. a Testomatic tester) reads; test-suite-
+    definition.json's own shape is what _serialize_test_suite() defines below. The archive also
+    has room for other files a step might reference by name (e.g. UPLOAD_FIRMWARE's
+    firmware_file), stored in that same folder - none are attached yet, since associating
+    firmware files with a Test Suite isn't designed yet."""
     design = get_object_or_404(Design, pk=design_id)
     suite = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
 
@@ -481,13 +485,13 @@ def test_suite_download(request, design_id):
         return redirect(reverse('design_detail', args=[design.pk]) + '#test-suite')
 
     data = _serialize_test_suite(suite)
+    package_name = f'{slugify(design.sku)}-hw{slugify(design.hw_version)}-test-suite-v{suite.version}'
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr('test-suite-definition.json', json.dumps(data, indent=2))
+        archive.writestr(f'{package_name}/test-suite-definition.json', json.dumps(data, indent=2))
 
-    filename = f'{slugify(design.sku)}-hw{slugify(design.hw_version)}-test-suite-v{suite.version}.zip'
     response = HttpResponse(buffer.getvalue(), content_type='application/zip')
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Content-Disposition'] = f'attachment; filename="{package_name}.zip"'
     return response
 
 
