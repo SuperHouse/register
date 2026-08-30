@@ -25,6 +25,7 @@ from django.views.static import serve
 from api.app import api
 from device import api as device_api  # noqa: F401 — registers device endpoints on the shared router
 from crm.views import api as crm_api  # noqa: F401 — registers crm endpoints on the shared router
+from testing import api as testing_api  # noqa: F401 — registers testing endpoints on the shared router
 from crm import views as crm_views
 from device import views as device_views
 

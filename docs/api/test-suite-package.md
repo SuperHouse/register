@@ -83,6 +83,7 @@ This object describes this version of the Test Suite:
 
 | Field | Type | Description |
 |---|---|---|
+| `id` | integer | The Test Suite Package's own database ID — a definitive identifier for this specific version, usable with the [Test Suites API](reference.md#test-suites) |
 | `version` | integer | Version number, starting at 1 |
 | `status` | string | `"DRAFT"` or `"SAVED"` |
 | `notes` | string or `null` | Free-text notes the user enters when saving this version |
@@ -277,6 +278,7 @@ abc123-hw1-0-test-suite-v3.zip
     "hw_version": "1.0"
   },
   "test_suite": {
+    "id": 7,
     "version": 3,
     "status": "SAVED",
     "notes": "Added LED spectral check",

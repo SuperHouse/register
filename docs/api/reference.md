@@ -16,9 +16,10 @@ An interactive API explorer (Swagger UI) is available at `/api/v1/docs` for any 
 
 ## Test Suite Package download
 
-Each Design's Test Suite can be downloaded as a Test Suite Package (a ZIP archive), independently
-of this REST API — see [Test Suite Package Format](test-suite-package.md) for the full schema,
-covering every Test Step type and its configuration fields.
+Each Design's Test Suite can be downloaded as a Test Suite Package (a ZIP archive), either from
+the Design detail page's Test Suite tab or via the [Test Suites](#test-suites) API endpoints below
+— see [Test Suite Package Format](test-suite-package.md) for the full schema, covering every Test
+Step type and its configuration fields.
 
 ## Authentication
 
@@ -69,6 +70,45 @@ GET /api/v1/designs/?client_pk=1
   }
 ]
 ```
+
+---
+
+### Test Suites
+
+Staff-only — a non-staff key gets `403` from both endpoints. Both also only ever expose **finalised (`SAVED`)** Test Suite Packages — a `DRAFT` is never listed and can't be downloaded, even by a staff key, since a draft can still change mid-edit.
+
+#### List Test Suite Packages
+
+```http
+GET /api/v1/test-suites/
+X-API-Key: your-key
+```
+
+Returns every finalised (`SAVED`) Test Suite Package (one entry per saved version of a design's Test Suite — `DRAFT` versions are omitted). Optionally filter to one design:
+
+```
+GET /api/v1/test-suites/?design_id=1
+```
+
+**Response:**
+```json
+[
+  {"id": 7, "design_id": 1, "version": 2, "status": "SAVED", "created_dt": "2026-08-01T09:15:00Z"}
+]
+```
+
+`id` is the Test Suite Package's own primary key — pass it to the download endpoint below.
+
+---
+
+#### Download a Test Suite Package
+
+```http
+GET /api/v1/test-suites/{id}/download/
+X-API-Key: your-key
+```
+
+Downloads that Test Suite Package's ZIP archive — the same file as the Design page's "Download" link. See [Test Suite Package Format](test-suite-package.md) for the archive's contents. Returns `403` if the Test Suite Package is still a `DRAFT`.
 
 ---
 

@@ -150,6 +150,74 @@ curl -H "X-API-Key: your-key" https://example.com/api/v1/designs/
 curl -H "X-API-Key: your-key" https://example.com/api/v1/designs/?client_pk=1
 ```
 
+### Test Suite Endpoints
+
+Test Suite Package endpoints are staff-only (issue #116) — a non-staff key gets a `403` from both. Both endpoints also only ever expose **finalised (`SAVED`)** Test Suite Packages — a Testomatic tester must never see or fetch one that's still a `DRAFT`, since a draft can still change mid-edit. A draft is invisible to the list endpoint and its `suite_id` returns `403` from the download endpoint even for a staff key, until it's finalised.
+
+#### List Test Suite Packages
+```http
+GET /api/v1/test-suites/?design_id={design_id}
+```
+
+**Description:** Retrieve a list of Test Suite Packages — every finalised (`SAVED`) version of every design's Test Suite, or just those for one design when `design_id` is given. `DRAFT` versions are never included. Each entry's `id` is the Test Suite Package's own primary key, usable with the download endpoint below.
+
+**Headers:**
+- `X-API-Key`: Your API key (required, staff only)
+
+**Query Parameters:**
+- `design_id` (optional): Only return Test Suite Packages belonging to this design
+
+**Response:**
+```json
+[
+  {
+    "id": 7,
+    "design_id": 1,
+    "version": 2,
+    "status": "SAVED",
+    "created_dt": "2026-08-01T09:15:00Z"
+  }
+]
+```
+
+**Response Codes:**
+- `200`: Success
+- `403`: API key does not have staff access
+
+**Example:**
+```bash
+# Get every Test Suite Package
+curl -H "X-API-Key: your-key" https://example.com/api/v1/test-suites/
+
+# Get Test Suite Packages for one design
+curl -H "X-API-Key: your-key" https://example.com/api/v1/test-suites/?design_id=1
+```
+
+#### Download Test Suite Package
+```http
+GET /api/v1/test-suites/{suite_id}/download/
+```
+
+**Description:** Download one specific Test Suite Package as a ZIP archive — the same file produced by the "Download" link on the Design detail page's Test Suite tab. `suite_id` is the Test Suite Package's own primary key, as returned by the list endpoint above. Refuses (`403`) a Test Suite Package that's still a `DRAFT`, regardless of staff status — only a finalised (`SAVED`) version can be downloaded through this endpoint.
+
+**Headers:**
+- `X-API-Key`: Your API key (required, staff only)
+
+**Path Parameters:**
+- `suite_id`: Test Suite Package primary key
+
+**Response:** The ZIP archive (`application/zip`), containing `test-suite-definition.json`.
+
+**Response Codes:**
+- `200`: Success — ZIP archive body
+- `403`: API key does not have staff access, or the Test Suite Package is still a `DRAFT`
+- `404`: Test Suite Package not found
+
+**Example:**
+```bash
+curl -H "X-API-Key: your-key" -o test-suite.zip https://example.com/api/v1/test-suites/7/download/
+```
+
 ### Device Endpoints
 
 #### Add or Update Device
