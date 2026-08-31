@@ -371,6 +371,7 @@ Custom user model using **email as username** instead of a username field. Users
 
 - **[models.py](pyproj/authuser/models.py)** — `User` extends `AbstractBaseUser`. Get it via `from django.contrib.auth import get_user_model`. `api_key` is a unique, nullable `CharField`; `regenerate_api_key()` sets it to `secrets.token_urlsafe(32)`, saves, and returns the new key — the single place both the self-service and staff-side regenerate actions call, so key generation logic isn't duplicated.
 - **[views.py](pyproj/authuser/views.py)** / **[urls.py](pyproj/authuser/urls.py)** — alongside the existing `user_settings` page (`/accounts/settings/`), `user_settings_regenerate_key` (`/accounts/settings/regenerate-key/`, POST-only) lets a user regenerate their own API key from their settings page. Named distinctly from `crm.views.users.user_regenerate_key` (the staff-side equivalent) since neither app namespaces its URLs.
+- **[api.py](pyproj/authuser/api.py)** / **[schemas.py](pyproj/authuser/schemas.py)** (issue #4 on testomatic-ui) — `POST /api/v1/auth/verify/`, letting a Testomatic device check an operator's Register email/password (via Django's own `authenticate()`) without implementing a browser login flow. Gated by the *device's* `X-API-Key`, not the operator's — the device doesn't need to be staff itself, since it's only ever checking someone else's credentials. Refuses (`403`) valid credentials for a non-staff user; doesn't distinguish an unknown email from a wrong password (both `401`), to avoid confirming which addresses have accounts.
 
 ### `conf`
 

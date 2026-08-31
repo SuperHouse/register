@@ -23,6 +23,7 @@ from django.views.generic.base import RedirectView
 from django.views.static import serve
 
 from api.app import api
+from authuser import api as authuser_api  # noqa: F401 — registers authuser endpoints on the shared router
 from device import api as device_api  # noqa: F401 — registers device endpoints on the shared router
 from crm.views import api as crm_api  # noqa: F401 — registers crm endpoints on the shared router
 from testing import api as testing_api  # noqa: F401 — registers testing endpoints on the shared router

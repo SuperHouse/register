@@ -83,6 +83,49 @@ GET /api/v1/test-endpoint/
 }
 ```
 
+### Auth Endpoints
+
+#### Verify Operator Credentials
+```http
+POST /api/v1/auth/verify/
+```
+
+**Description:** Checks an email/password pair against Register's own user accounts, for a client (e.g. a Testomatic device) that wants to let someone log in with their Register credentials without implementing a browser-based login flow itself. Refuses (`403`) a valid email/password pair belonging to a non-staff user — this endpoint is for verifying an operator, not a general-purpose login check. Does not distinguish an unknown email from a wrong password in its response, to avoid confirming which email addresses have accounts.
+
+**Headers:**
+- `X-API-Key`: Your API key (required) — this is the calling device's own key, not the operator's. It does not need to belong to a staff user itself.
+
+**Body:**
+```json
+{
+  "email": "operator@example.com",
+  "password": "the-operators-password"
+}
+```
+
+**Response:**
+```json
+{
+  "id": 42,
+  "email": "operator@example.com",
+  "full_name": "Jane Operator",
+  "avatar_type": "gravatar",
+  "is_staff": true
+}
+```
+
+**Response Codes:**
+- `200`: Success
+- `401`: Invalid email or password
+- `403`: Credentials are valid, but the user is not staff
+
+**Example:**
+```bash
+curl -X POST -H "X-API-Key: your-key" -H "Content-Type: application/json" \
+  -d '{"email": "operator@example.com", "password": "the-operators-password"}' \
+  https://example.com/api/v1/auth/verify/
+```
+
 ### Client Endpoints
 
 #### List Clients
