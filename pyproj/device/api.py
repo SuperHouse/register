@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import mimetypes
 import re
 from datetime import datetime
 
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ninja import File, Form, UploadedFile
@@ -12,10 +14,11 @@ from ninja import File, Form, UploadedFile
 from api.auth import session_or_api_key_auth
 from api.routes import router
 from crm.models import Org
-from device.models import Design, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
+from device.models import Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 from erp.models import Batch, Part
 from .schemas import (
     DashboardStatsSchema,
+    DesignAssetSchema,
     DesignSchema,
     DeviceCreateSchema,
     DeviceImageFormSchema,
@@ -58,6 +61,36 @@ def get_designs(request, client_pk: int = None):
         ret = ret.filter(client__pk=client_pk)
 
     return ret
+
+
+@router.get('design-assets/', response=list[DesignAssetSchema])
+def list_design_assets(request, design_id: int = None, asset_type: str = None):
+    """List DesignAssets (issue #117) - e.g. a Design's PCB_TOP/PCB_BOTTOM images, for a
+    Testomatic device to show operators. Access follows the same org-scoping as get_designs
+    above, plus assets marked internal (not for clients) are hidden from non-staff keys."""
+    ret = DesignAsset.objects.select_related('design__client').order_by('asset_type', 'name')
+    if not request.auth.is_staff:
+        ret = ret.filter(design__client__in=Org.objects.filter(users=request.auth), internal=False)
+    if design_id is not None:
+        ret = ret.filter(design_id=design_id)
+    if asset_type is not None:
+        ret = ret.filter(asset_type=asset_type)
+
+    return ret
+
+
+@router.get('design-assets/{asset_id}/download/', response={403: Message})
+def download_design_asset(request, asset_id: int):
+    """Download one DesignAsset's file (issue #117)."""
+    asset = get_object_or_404(DesignAsset, pk=asset_id)
+    if not _user_can_access_design(request.auth, asset.design):
+        return 403, {'message': 'API key does not have access to this design'}
+    if asset.internal and not request.auth.is_staff:
+        return 403, {'message': 'This asset is internal and not available to non-staff API keys'}
+
+    content_type, _ = mimetypes.guess_type(asset.filename)
+    return FileResponse(asset.file.open('rb'), content_type=content_type or 'application/octet-stream',
+                         filename=asset.filename)
 
 
 @router.post('device/add/', response={200: Message, 201: Message, 400: Message, 403: Message})

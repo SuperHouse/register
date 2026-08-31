@@ -150,6 +150,74 @@ curl -H "X-API-Key: your-key" https://example.com/api/v1/designs/
 curl -H "X-API-Key: your-key" https://example.com/api/v1/designs/?client_pk=1
 ```
 
+### Design Asset Endpoints
+
+Design Asset endpoints (issue #117) expose files attached to a Design — e.g. the `PCB_TOP`/`PCB_BOTTOM` renders shown as a thumbnail elsewhere in this app — so a Testomatic device can fetch and display them to operators. Access follows the same org-scoping as the Design list endpoint above (a staff key sees every asset; a non-staff key only sees assets on designs belonging to its own org(s)), plus assets marked `internal` ("do not show this asset to clients") are hidden from non-staff keys entirely, on both endpoints.
+
+#### List Design Assets
+```http
+GET /api/v1/design-assets/?design_id={design_id}&asset_type={asset_type}
+```
+
+**Description:** Retrieve a list of Design Assets, optionally filtered to one design and/or one asset type. Each entry's `id` is the asset's own primary key, usable with the download endpoint below.
+
+**Headers:**
+- `X-API-Key`: Your API key (required)
+
+**Query Parameters:**
+- `design_id` (optional): Only return assets belonging to this design
+- `asset_type` (optional): Only return assets of this type, e.g. `PCB_TOP`. One of `FUSION`, `PCB_DESIGN`, `SCHEMATIC`, `BOM`, `PCB_TOP`, `PCB_BOTTOM`, `PCB_3D`, `FIRMWARE`, `ATTACHMENT`.
+
+**Response:**
+```json
+[
+  {
+    "id": 42,
+    "design_id": 1,
+    "asset_type": "PCB_TOP",
+    "name": "PCB Top View",
+    "uploaded_dt": "2026-08-01T09:15:00Z"
+  }
+]
+```
+
+**Response Codes:**
+- `200`: Success
+
+**Example:**
+```bash
+# Get every asset for a design
+curl -H "X-API-Key: your-key" https://example.com/api/v1/design-assets/?design_id=1
+
+# Get just the PCB top-view thumbnail for a design
+curl -H "X-API-Key: your-key" https://example.com/api/v1/design-assets/?design_id=1&asset_type=PCB_TOP
+```
+
+#### Download Design Asset
+```http
+GET /api/v1/design-assets/{asset_id}/download/
+```
+
+**Description:** Download one specific Design Asset's file. `asset_id` is the asset's own primary key, as returned by the list endpoint above.
+
+**Headers:**
+- `X-API-Key`: Your API key (required)
+
+**Path Parameters:**
+- `asset_id`: Design Asset primary key
+
+**Response:** The file's raw bytes, with `Content-Type` guessed from the filename (e.g. `image/png` for a PCB render) and `Content-Disposition: inline`.
+
+**Response Codes:**
+- `200`: Success — file body
+- `403`: API key does not have access to this design's org, or the asset is internal and the key isn't staff
+- `404`: Design Asset not found
+
+**Example:**
+```bash
+curl -H "X-API-Key: your-key" -o pcb-top.png https://example.com/api/v1/design-assets/42/download/
+```
+
 ### Test Suite Endpoints
 
 Test Suite Package endpoints are staff-only (issue #116) — a non-staff key gets a `403` from both. Both endpoints also only ever expose **finalised (`SAVED`)** Test Suite Packages — a Testomatic tester must never see or fetch one that's still a `DRAFT`, since a draft can still change mid-edit. A draft is invisible to the list endpoint and its `suite_id` returns `403` from the download endpoint even for a staff key, until it's finalised.

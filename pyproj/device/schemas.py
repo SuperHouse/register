@@ -18,6 +18,16 @@ class DesignSchema(ModelSchema):
         fields = ('id', 'sku', 'client', 'name', 'hw_version', 'description')
 
 
+class DesignAssetSchema(Schema):
+    id: int
+    design_id: int
+    asset_type: Literal[
+        'FUSION', 'PCB_DESIGN', 'SCHEMATIC', 'BOM', 'PCB_TOP', 'PCB_BOTTOM', 'PCB_3D', 'FIRMWARE', 'ATTACHMENT',
+    ]
+    name: str
+    uploaded_dt: datetime
+
+
 class ExistingDeviceResponseSchema(Schema):
     design_pk: int
     creation_dt: datetime
