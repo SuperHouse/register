@@ -434,7 +434,7 @@ Environment variables are loaded from `pyproj/.env` (see `.env.template`):
 | `SECRET_KEY` | Django secret key |
 | `DEPLOY_TYPE` | `dev`, `test`, or `prod` — controls background colour/image in the UI |
 | `DEMO_MODE` | `True` hides sensitive data in the UI |
-| `API_ALLOW_IPV4_SUBNET` | Additional IPv4 CIDR block allowed to use the API (e.g. `10.0.0.0/24`) |
+| `API_ALLOW_IPV4_SUBNET` | Additional IPv4 CIDR block(s) allowed to use the API — a single CIDR string (e.g. `10.0.0.0/24`) or a list of CIDR strings for devices on more than one subnet |
 | `ENABLE_GRAVATAR` | `True` to allow Gravatar avatars |
 | `EMAIL_HOST` / `EMAIL_PORT` / `EMAIL_HOST_USER` / `EMAIL_HOST_PASSWORD` | SMTP settings for password reset and onboarding emails |
 | `EMAIL_USE_TLS` / `EMAIL_USE_SSL` | `True`/`False` to select TLS vs SSL for the SMTP connection (default TLS on, SSL off). Must use these exact Django setting names — `EMAIL_TLS`/`EMAIL_SSL` are not real settings and are silently ignored. |

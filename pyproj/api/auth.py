@@ -6,6 +6,19 @@ from ninja.security import APIKeyHeader
 from authuser.models import User
 
 
+def _parse_allowed_networks(value):
+    """Normalise API_ALLOW_IPV4_SUBNET into a list of ip_network objects.
+
+    Accepts a single CIDR string, or a list/tuple of CIDR strings, for
+    devices reached via more than one subnet.
+    """
+    if not value:
+        return []
+    if isinstance(value, str):
+        value = [value]
+    return [ipaddress.ip_network(subnet) for subnet in value]
+
+
 def session_or_api_key_auth(request):
     """Auth that accepts either Django session auth or API key auth."""
     # Try session auth first
@@ -24,13 +37,13 @@ def session_or_api_key_auth(request):
         try:
             ip_addr = ipaddress.ip_address(request_from)
 
-            allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
+            allowed_ipv4_networks = _parse_allowed_networks(settings.API_ALLOW_IPV4_SUBNET)
             local_network = ipaddress.ip_network('127.0.0.0/24')
 
             allow = False
             if ip_addr in local_network:
                 allow = True
-            if allowed_ipv4_network and ip_addr in allowed_ipv4_network:
+            if any(ip_addr in network for network in allowed_ipv4_networks):
                 allow = True
 
             if allow:
@@ -46,7 +59,7 @@ def session_or_api_key_auth(request):
 class AuthByApiKey(APIKeyHeader):
     param_name = 'X-API-Key'
 
-    allowed_ipv4_network = ipaddress.ip_network(settings.API_ALLOW_IPV4_SUBNET) if settings.API_ALLOW_IPV4_SUBNET else None
+    allowed_ipv4_networks = _parse_allowed_networks(settings.API_ALLOW_IPV4_SUBNET)
     local_network = ipaddress.ip_network('127.0.0.0/24')
 
     # https://stackoverflow.com/questions/4581789/how-do-i-get-user-ip-address-in-django
@@ -65,7 +78,7 @@ class AuthByApiKey(APIKeyHeader):
         allow = False
         if ip_addr in self.local_network:
             allow = True
-        if self.allowed_ipv4_network and ip_addr in self.allowed_ipv4_network:
+        if any(ip_addr in network for network in self.allowed_ipv4_networks):
             allow = True
 
         if not allow:
