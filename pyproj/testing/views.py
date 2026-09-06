@@ -2,10 +2,12 @@
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import io
 import json
+import os
 import zipfile
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.files.base import ContentFile
 from django.db.models import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,9 +17,9 @@ from django.utils.text import slugify
 from device.models import Design
 from .forms import (
     CompatibleDesignAddForm, CopyTestStepsFromForm, ManualCheckForm, TesterForm, TestModuleForm,
-    TestModuleTypeForm, TestStepForm, TestStepTypeAddForm, TestSuiteSaveNewVersionForm,
+    TestModuleTypeForm, TestStepAssetAddForm, TestStepForm, TestStepTypeAddForm, TestSuiteSaveNewVersionForm,
 )
-from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestSuite
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset, TestSuite
 
 
 @staff_member_required
@@ -215,19 +217,32 @@ def test_module_type_design_remove(request, module_type_id, design_id):
     return redirect('testing:test_module_type_edit', module_type_id=module_type.pk)
 
 
+def _copy_step_asset(asset, new_step):
+    """Duplicates one TestStepAsset's file bytes onto `new_step` (issue #121 follow-up) - used
+    when forking a draft and when copying steps from another design's Test Suite. Always makes
+    an independent physical copy (via ContentFile) rather than pointing the new row at the same
+    storage path, so replacing/deleting one copy can never affect the other - same reasoning
+    `_fork_draft` already applies to TestStep/ManualCheck (full row copies, not shared rows)."""
+    new_asset = TestStepAsset(step=new_step, address=asset.address, order=asset.order)
+    new_asset.file.save(asset.filename, ContentFile(asset.file.read()), save=True)
+    return new_asset
+
+
 def _fork_draft(design, saved_suite):
-    """Creates a new draft version for `design`, copying `saved_suite`'s steps and manual
-    checks (both lists are versioned together - issue #112; `saved_suite` is None for a design
-    with no Test Suite at all yet). Returns (draft, step_pk_map, manual_check_pk_map) so a
-    caller holding pks from *before* the fork (e.g. a reorder payload built from the page as it
-    was rendered, before this request forked it) can translate them to their counterparts in
-    the new draft - see `_ensure_editable_step`/`_ensure_editable_manual_check` and the
-    `*_reorder` views."""
+    """Creates a new draft version for `design`, copying `saved_suite`'s steps (and each step's
+    attached TestStepAsset files, issue #121 follow-up) and manual checks (both lists are
+    versioned together - issue #112; `saved_suite` is None for a design with no Test Suite at
+    all yet). Returns (draft, step_pk_map, manual_check_pk_map, asset_pk_map) so a caller
+    holding pks from *before* the fork (e.g. a reorder payload built from the page as it was
+    rendered, before this request forked it) can translate them to their counterparts in the
+    new draft - see `_ensure_editable_step`/`_ensure_editable_manual_check`/
+    `_ensure_editable_asset` and the `*_reorder` views."""
     draft = TestSuite.objects.create(
         design=design, version=(saved_suite.version + 1 if saved_suite else 1), status=TestSuite.DRAFT,
     )
     step_pk_map = {}
     manual_check_pk_map = {}
+    asset_pk_map = {}
     if saved_suite is not None:
         for step in saved_suite.steps.all():
             new_step = TestStep.objects.create(
@@ -235,10 +250,12 @@ def _fork_draft(design, saved_suite):
                 name=step.name, abort_on_fail=step.abort_on_fail, config=step.config,
             )
             step_pk_map[step.pk] = new_step
+            for asset in step.assets.all():
+                asset_pk_map[asset.pk] = _copy_step_asset(asset, new_step)
         for check in saved_suite.manual_checks.all():
             new_check = ManualCheck.objects.create(suite=draft, order=check.order, text=check.text)
             manual_check_pk_map[check.pk] = new_check
-    return draft, step_pk_map, manual_check_pk_map
+    return draft, step_pk_map, manual_check_pk_map, asset_pk_map
 
 
 def _get_or_create_draft_suite(design):
@@ -249,7 +266,7 @@ def _get_or_create_draft_suite(design):
     current = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
     if current is not None and current.status == TestSuite.DRAFT:
         return current
-    draft, _step_pk_map, _manual_check_pk_map = _fork_draft(design, current)
+    draft, _step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
     return draft
 
 
@@ -268,7 +285,7 @@ def _ensure_editable_step(step):
     #110) - the caller should apply its edit/delete to the returned step, not `step`."""
     if step.suite.status == TestSuite.DRAFT:
         return step
-    _draft, step_pk_map, _manual_check_pk_map = _fork_draft(step.suite.design, step.suite)
+    _draft, step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(step.suite.design, step.suite)
     return step_pk_map[step.pk]
 
 
@@ -276,8 +293,44 @@ def _ensure_editable_manual_check(check):
     """Mirrors `_ensure_editable_step` for ManualCheck (issue #112) - see its docstring."""
     if check.suite.status == TestSuite.DRAFT:
         return check
-    _draft, _step_pk_map, manual_check_pk_map = _fork_draft(check.suite.design, check.suite)
+    _draft, _step_pk_map, manual_check_pk_map, _asset_pk_map = _fork_draft(check.suite.design, check.suite)
     return manual_check_pk_map[check.pk]
+
+
+def _ensure_editable_asset(asset):
+    """Mirrors `_ensure_editable_step` for TestStepAsset (issue #121 follow-up) - see its
+    docstring."""
+    if asset.step.suite.status == TestSuite.DRAFT:
+        return asset
+    _draft, _step_pk_map, _manual_check_pk_map, asset_pk_map = _fork_draft(asset.step.suite.design, asset.step.suite)
+    return asset_pk_map[asset.pk]
+
+
+def _sync_upload_firmware_config(step):
+    """Rebuilds config['firmware_file']/config['images'] for a firmware-upload step from its
+    actual TestStepAsset rows (issue #121 follow-up) - these are no longer typed text via
+    TestStepForm, they're derived from whatever's actually attached, so this is the only place
+    that writes them. Called after any TestStepAsset add/delete. Does not bump
+    CONFIG_SCHEMA_VERSION - the shape of config hasn't changed, only how these two keys get
+    written into it."""
+    config = dict(step.config)
+    if step.step_type == TestStep.UPLOAD_FIRMWARE_ESPTOOL:
+        images = [{'address': a.address, 'file': a.filename} for a in step.assets.order_by('order')]
+        if images:
+            config['images'] = images
+        else:
+            config.pop('images', None)
+    elif step.step_type in (
+        TestStep.UPLOAD_FIRMWARE_AVRDUDE, TestStep.UPLOAD_FIRMWARE_OPENOCD, TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER,
+    ):
+        asset = step.assets.first()
+        if asset:
+            config['firmware_file'] = asset.filename
+        else:
+            config.pop('firmware_file', None)
+    config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
+    step.config = config
+    step.save(update_fields=['config'])
 
 
 @staff_member_required
@@ -300,11 +353,12 @@ def test_suite_copy_steps_from(request, design_id):
                 messages.warning(request, f'{source_design} has no saved test steps or manual checks to copy.')
             else:
                 suite = _get_or_create_draft_suite(design)
+                skipped_assets = 0
                 if source_steps:
                     last_step = suite.steps.order_by('-order').first()
                     next_order = (last_step.order + 1) if last_step else 1
                     for offset, step in enumerate(source_steps):
-                        TestStep.objects.create(
+                        new_step = TestStep.objects.create(
                             suite=suite,
                             order=next_order + offset,
                             step_type=step.step_type,
@@ -312,15 +366,36 @@ def test_suite_copy_steps_from(request, design_id):
                             abort_on_fail=step.abort_on_fail,
                             config=step.config,
                         )
+                        # Copy this step's attached binaries too (issue #121 follow-up) - own
+                        # file-byte duplication, same as _fork_draft. A filename already used
+                        # by a *different* step already on the destination draft would clash
+                        # when the suite's files are bundled flat into one Test Suite Package
+                        # folder, so skip just that one asset rather than silently colliding -
+                        # config is then resynced to reflect what actually got attached.
+                        any_skipped = False
+                        for asset in step.assets.all():
+                            clash = TestStepAsset.objects.filter(
+                                step__suite=suite, file__endswith=f'/{asset.filename}',
+                            ).exclude(step=new_step).exists()
+                            if clash:
+                                any_skipped = True
+                                skipped_assets += 1
+                                continue
+                            _copy_step_asset(asset, new_step)
+                        if any_skipped:
+                            _sync_upload_firmware_config(new_step)
                 if source_checks:
                     last_check = suite.manual_checks.order_by('-order').first()
                     next_order = (last_check.order + 1) if last_check else 1
                     for offset, check in enumerate(source_checks):
                         ManualCheck.objects.create(suite=suite, order=next_order + offset, text=check.text)
-                messages.success(
-                    request,
-                    f'Copied {len(source_steps)} step(s) and {len(source_checks)} manual check(s) from {source_design}.',
-                )
+                message = f'Copied {len(source_steps)} step(s) and {len(source_checks)} manual check(s) from {source_design}.'
+                if skipped_assets:
+                    message += (
+                        f' {skipped_assets} attached file(s) were not copied because a file with the same '
+                        f'name is already attached to a different step in this Test Suite.'
+                    )
+                messages.success(request, message)
         else:
             messages.warning(request, 'Please select a design to copy from.')
 
@@ -473,9 +548,10 @@ def build_test_suite_package_response(suite):
     lands in; it always stays self-contained. The package is the transport format an external
     consumer (e.g. a Testomatic tester, or the API endpoint in testing.api - issue #116) reads;
     test-suite-definition.json's own shape is what _serialize_test_suite() defines above. The
-    archive also has room for other files a step might reference by name (e.g. UPLOAD_FIRMWARE's
-    firmware_file), stored in that same folder - none are attached yet, since associating
-    firmware files with a Test Suite isn't designed yet.
+    archive also holds any files a step references by name (e.g. a firmware-upload step's
+    firmware_file/images - issue #121 follow-up), stored flat in that same folder alongside the
+    JSON - the cross-step filename clash check in test_step_asset_add is what keeps this flat
+    namespace safe (two different steps in the same suite can never attach the same filename).
 
     Shared by test_suite_download (the UI's "Download" link, which always resolves to whatever
     the design's Test Suite tab is currently showing) and testing.api's download endpoint (which
@@ -487,6 +563,9 @@ def build_test_suite_package_response(suite):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(f'{package_name}/test-suite-definition.json', json.dumps(data, indent=2))
+        for step in suite.steps.all():
+            for asset in step.assets.all():
+                archive.writestr(f'{package_name}/{asset.filename}', asset.file.read())
 
     response = HttpResponse(buffer.getvalue(), content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="{package_name}.zip"'
@@ -554,6 +633,13 @@ def test_step_edit(request, step_id):
             target.name = form.cleaned_data['name']
             target.abort_on_fail = form.cleaned_data['abort_on_fail']
             config = dict(form.cleaned_data.get('config', {}))
+            # firmware_file/images (issue #121 follow-up) are derived from TestStepAsset
+            # uploads, not from this form - preserve whatever _sync_upload_firmware_config
+            # last wrote, since form.cleaned_data['config'] never includes them and would
+            # otherwise silently wipe them out on every other field edit.
+            for key in ('firmware_file', 'images'):
+                if key in target.config:
+                    config[key] = target.config[key]
             config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
             target.config = config
             target.save()
@@ -587,6 +673,91 @@ def test_step_delete(request, step_id):
 
 
 @staff_member_required
+def test_step_asset_add(request, step_id):
+    """Attaches a binary file to a firmware-upload step (issue #121 follow-up) - either its one
+    firmware file (avrdude/OpenOCD/STM32CubeProgrammer) or one more esptool.py image. Always
+    redirects back to the step edit page, which is the only place this is linked from."""
+    step = get_object_or_404(TestStep.objects.select_related('suite__design'), pk=step_id)
+
+    if not _is_current_suite(step.suite):
+        messages.warning(request, 'This step belongs to a historical version and can no longer be edited.')
+        return redirect('testing:test_suite_version_detail', design_id=step.suite.design_id, version=step.suite.version)
+
+    if request.method == 'POST':
+        form = TestStepAssetAddForm(request.POST, request.FILES)
+        if form.is_valid():
+            target = _ensure_editable_step(step)
+            uploaded = form.cleaned_data['file']
+            address = form.cleaned_data['address']
+            filename = os.path.basename(uploaded.name)
+
+            # The Test Suite Package bundles every step's files flat into one folder - a
+            # different step in the same suite already using this filename would silently
+            # collide with this one on export, so refuse rather than let one overwrite the
+            # other.
+            clash = TestStepAsset.objects.filter(
+                step__suite=target.suite, file__endswith=f'/{filename}',
+            ).exclude(step=target).exists()
+            if clash:
+                messages.warning(request, f'"{filename}" is already attached to a different step in this Test Suite.')
+                return redirect('testing:test_step_edit', step_id=target.pk)
+
+            if target.step_type == TestStep.UPLOAD_FIRMWARE_ESPTOOL:
+                if not address:
+                    messages.warning(request, 'An address is required for each image.')
+                    return redirect('testing:test_step_edit', step_id=target.pk)
+                # Re-adding the same filename replaces that one image; other images are untouched.
+                existing = next((a for a in target.assets.all() if a.filename == filename), None)
+                if existing:
+                    existing.file.delete(save=False)
+                    existing.delete()
+                last = target.assets.order_by('-order').first()
+                TestStepAsset.objects.create(step=target, file=uploaded, address=address, order=(last.order + 1 if last else 1))
+            else:
+                # These 3 types only ever have one firmware file - any existing one is replaced,
+                # regardless of its name, same "one per slot, replaced on re-upload" convention
+                # device.views.design_asset_add uses for DesignAsset core types.
+                for existing in target.assets.all():
+                    existing.file.delete(save=False)
+                    existing.delete()
+                TestStepAsset.objects.create(step=target, file=uploaded)
+
+            _sync_upload_firmware_config(target)
+            messages.success(request, 'File attached.')
+            return redirect('testing:test_step_edit', step_id=target.pk)
+        else:
+            messages.warning(request, 'Choose a file to attach.')
+
+    return redirect('testing:test_step_edit', step_id=step.pk)
+
+
+@staff_member_required
+def test_step_asset_delete(request, asset_id):
+    """Removes one attached binary file (issue #121 follow-up). POST-only, no confirm page - a
+    single attached file is a smaller-blast-radius action than deleting a whole step or manual
+    check (both of which do get confirm pages)."""
+    asset = get_object_or_404(TestStepAsset.objects.select_related('step__suite__design'), pk=asset_id)
+
+    if not _is_current_suite(asset.step.suite):
+        messages.warning(request, 'This step belongs to a historical version and can no longer be edited.')
+        return redirect('testing:test_suite_version_detail', design_id=asset.step.suite.design_id, version=asset.step.suite.version)
+
+    if request.method == 'POST':
+        target = _ensure_editable_asset(asset)
+        step_id = target.step_id
+        target.file.delete(save=False)
+        target.delete()
+        _sync_upload_firmware_config(TestStep.objects.get(pk=step_id))
+        messages.success(request, 'File removed.')
+        # target.step_id (not asset.step_id) - if this request forked a new draft, asset's own
+        # step now belongs to a superseded suite, and redirecting there would just bounce the
+        # user straight to the historical-version warning above.
+        return redirect('testing:test_step_edit', step_id=step_id)
+
+    return redirect('testing:test_step_edit', step_id=asset.step_id)
+
+
+@staff_member_required
 def test_step_reorder(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
 
@@ -601,7 +772,7 @@ def test_step_reorder(request, design_id):
         else:
             # The pks in the request came from the page as it was rendered, before this fork -
             # translate them to their counterparts in the new draft (see _fork_draft).
-            suite, step_pk_map, _manual_check_pk_map = _fork_draft(design, current)
+            suite, step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
             ordered_pks = [step_pk_map[pk].pk for pk in requested_pks if pk in step_pk_map]
 
         steps_by_id = {step.pk: step for step in suite.steps.all()}
@@ -697,7 +868,7 @@ def manual_check_reorder(request, design_id):
         else:
             # The pks in the request came from the page as it was rendered, before this fork -
             # translate them to their counterparts in the new draft (see _fork_draft).
-            suite, _step_pk_map, manual_check_pk_map = _fork_draft(design, current)
+            suite, _step_pk_map, manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
             ordered_pks = [manual_check_pk_map[pk].pk for pk in requested_pks if pk in manual_check_pk_map]
 
         checks_by_id = {check.pk: check for check in suite.manual_checks.all()}

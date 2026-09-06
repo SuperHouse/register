@@ -6,7 +6,7 @@ from django import forms
 from django.core.validators import RegexValidator
 
 from device.models import Design
-from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset
 
 # Used by the LED Spectral Reading step's MUX Addr/I2C Addr fields (issue #109) - a bare hex
 # string, with or without a "0x"/"0X" prefix.
@@ -140,16 +140,57 @@ class TestStepForm(forms.ModelForm):
     delay_ms = forms.IntegerField(required=False, min_value=0, label='Delay (ms)',
                                    widget=forms.NumberInput(attrs={'class': 'form-control'}))
 
-    upload_tool = forms.ChoiceField(required=False, choices=TestStep.UPLOAD_TOOL_CHOICES,
-                                     widget=forms.Select(attrs={'class': 'form-select'}))
-    # A live dropdown of available serial ports isn't possible from this web app - it has no
-    # connection to the physical Tester that would eventually run this step - so this is
-    # plain text for now (issue #101 asked for a drop-down; flagged as a deliberate
-    # simplification rather than silently reinterpreted).
+    # Firmware upload fields (issue #121 - split from one generic UPLOAD_FIRMWARE type into
+    # 4 tool-specific types, since each tool needs its own parameters). `port` is shared by
+    # whichever of the 4 types actually use it (see TYPE_FIELDS below); a live dropdown of
+    # available serial ports isn't possible from this web app - it has no connection to the
+    # physical Tester that would eventually run this step - so this is plain text for now
+    # (issue #101 asked for a drop-down; flagged as a deliberate simplification rather than
+    # silently reinterpreted). The actual firmware binary/binaries are handled entirely
+    # outside this form, as TestStepAsset uploads on the step edit page (issue #121 follow-up)
+    # - config['firmware_file']/config['images'] are derived from those uploads by
+    # testing.views._sync_upload_firmware_config(), not typed here.
     port = forms.CharField(required=False, label='Serial Port / Device',
                             widget=forms.TextInput(attrs={'class': 'form-control'}))
-    firmware_file = forms.CharField(required=False, label='Firmware Binary Image',
+    # Shared by avrdude/esptool.py - both take a baud rate for the upload connection.
+    baud_rate = forms.IntegerField(required=False, min_value=0, label='Baud Rate',
+                                    widget=forms.NumberInput(attrs={'class': 'form-control'}))
+    # Shared by OpenOCD/STM32CubeProgrammer - the address to start flashing at, when the
+    # tool/file doesn't already imply one. Reuses hex_address_validator, same "0x71"-style
+    # hex text convention as the LED Spectral Reading fields below.
+    flash_address = forms.CharField(required=False, label='Flash Address', validators=[hex_address_validator],
+                                     widget=forms.TextInput(attrs={'class': 'form-control',
+                                                                    'style': 'max-width: 150px;'}))
+
+    # avrdude only. Free text, not a fixed choice list - avrdude has dozens of programmer
+    # types (-c) and MCU signatures (-p), and both sets change as new hardware is added, so
+    # (like `port` above) this is plain text for now rather than a guessed-at enum.
+    programmer_type = forms.CharField(required=False, label='Programmer Type',
+                                       widget=forms.TextInput(attrs={'class': 'form-control'}))
+    mcu = forms.CharField(required=False, label='Target MCU',
+                           widget=forms.TextInput(attrs={'class': 'form-control'}))
+
+    # esptool.py only. Same "plain text, not a fixed choice list" reasoning as `mcu` above -
+    # esptool.py's supported chip names grow over time.
+    chip = forms.CharField(required=False, label='Chip',
+                            widget=forms.TextInput(attrs={'class': 'form-control'}))
+
+    # OpenOCD only. OpenOCD selects the debug probe/target through config files rather than a
+    # serial port - `adapter_serial` optionally picks one specific probe when more than one is
+    # attached.
+    interface_config = forms.CharField(required=False, label='Interface Config File',
+                                        widget=forms.TextInput(attrs={'class': 'form-control'}))
+    target_config = forms.CharField(required=False, label='Target Config File',
                                      widget=forms.TextInput(attrs={'class': 'form-control'}))
+    adapter_serial = forms.CharField(required=False, label='Adapter Serial',
+                                      widget=forms.TextInput(attrs={'class': 'form-control'}))
+
+    # STM32CubeProgrammer only. Its `-c port=` connection interface is a genuinely fixed,
+    # small set (unlike avrdude's programmer types), so this is a real choice field - same
+    # convention as `rail`/`action` above.
+    connection_interface = forms.ChoiceField(required=False, label='Connection Interface',
+                                              choices=TestStep.STM32_CONNECTION_INTERFACE_CHOICES,
+                                              widget=forms.Select(attrs={'class': 'form-select'}))
 
     count = forms.IntegerField(required=False, min_value=1, initial=1, label='Count',
                                 widget=forms.NumberInput(attrs={'class': 'form-control'}))
@@ -225,7 +266,26 @@ class TestStepForm(forms.ModelForm):
     # default, e.g. Beep's count defaulting to 1).
     TYPE_FIELDS = {
         TestStep.DELAY: {'required': ['delay_ms'], 'optional': []},
-        TestStep.UPLOAD_FIRMWARE: {'required': ['upload_tool', 'port', 'firmware_file'], 'optional': []},
+        # firmware_file/images aren't listed here any more (issue #121 follow-up) - they're
+        # derived from TestStepAsset uploads (testing.views._sync_upload_firmware_config), not
+        # typed through this form. A step missing its firmware is a soft "not yet attached"
+        # state, not a validation error blocking these other fields from being saved.
+        TestStep.UPLOAD_FIRMWARE_AVRDUDE: {
+            'required': ['port', 'programmer_type', 'mcu'],
+            'optional': ['baud_rate'],
+        },
+        TestStep.UPLOAD_FIRMWARE_ESPTOOL: {
+            'required': ['port', 'chip'],
+            'optional': ['baud_rate'],
+        },
+        TestStep.UPLOAD_FIRMWARE_OPENOCD: {
+            'required': ['interface_config', 'target_config'],
+            'optional': ['adapter_serial', 'flash_address'],
+        },
+        TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER: {
+            'required': ['connection_interface'],
+            'optional': ['port', 'flash_address'],
+        },
         TestStep.BEEP: {'required': ['duration_ms'], 'optional': ['count']},
         TestStep.READ_RAIL_VOLTAGE: {'required': ['rail', 'min_v', 'max_v'], 'optional': []},
         TestStep.READ_RAIL_CURRENT: {'required': ['rail', 'min_ma', 'max_ma'], 'optional': []},
@@ -301,8 +361,27 @@ class TestStepForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         config = dict(self.cleaned_data.get('config', {}))
+        # firmware_file/images (issue #121 follow-up) are derived from TestStepAsset uploads
+        # via testing.views._sync_upload_firmware_config(), not from this form's own fields -
+        # preserve whatever was last written there, since self.cleaned_data['config'] never
+        # includes them and would otherwise silently wipe them out on every other edit.
+        for key in ('firmware_file', 'images'):
+            if key in instance.config:
+                config[key] = instance.config[key]
         config['schema_version'] = TestStep.CONFIG_SCHEMA_VERSION
         instance.config = config
         if commit:
             instance.save()
         return instance
+
+
+class TestStepAssetAddForm(forms.Form):
+    """Backs the "Upload"/"Add Image" mini-forms on the step edit page (issue #121 follow-up) -
+    a plain Form (not a ModelForm) since `step` isn't user-supplied (testing.views resolves it,
+    forking a draft first if needed) and `address` is only required for one step type
+    (UPLOAD_FIRMWARE_ESPTOOL), which the view checks itself rather than this form, since
+    validity here doesn't depend on which step it's for."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    file = forms.FileField()
+    address = forms.CharField(required=False, validators=[hex_address_validator])

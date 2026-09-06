@@ -429,3 +429,139 @@ def test_step_form_mux_addr_left_blank_stays_blank_whether_or_not_previously_sav
     saved_form = TestStepForm(instance=saved_step)
     assert saved_form['i2c_addr'].value() == '0x2a'
     assert saved_form['mux_addr'].value() in (None, '')
+
+
+# --- Upload Firmware step types (issue #121) --------------------------------------------
+
+
+@pytest.mark.django_db
+def test_step_config_summary_upload_firmware_types(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+
+    avrdude = TestStep.objects.create(
+        suite=suite, step_type=TestStep.UPLOAD_FIRMWARE_AVRDUDE, name='Program',
+        config={'port': '/dev/ttyUSB0', 'firmware_file': 'main.hex', 'programmer_type': 'arduino', 'mcu': 'atmega328p'},
+    )
+    assert avrdude.get_config_summary() == 'atmega328p via /dev/ttyUSB0 — main.hex'
+
+    esptool = TestStep.objects.create(
+        suite=suite, step_type=TestStep.UPLOAD_FIRMWARE_ESPTOOL, name='Program',
+        config={
+            'port': '/dev/ttyUSB0', 'chip': 'esp32',
+            'images': [{'address': '0x1000', 'file': 'bootloader.bin'}, {'address': '0x10000', 'file': 'app.bin'}],
+        },
+    )
+    assert esptool.get_config_summary() == 'esp32 via /dev/ttyUSB0 — 2 image(s)'
+
+    openocd = TestStep.objects.create(
+        suite=suite, step_type=TestStep.UPLOAD_FIRMWARE_OPENOCD, name='Program',
+        config={'interface_config': 'interface/stlink.cfg', 'target_config': 'target/stm32f4x.cfg', 'firmware_file': 'main.elf'},
+    )
+    assert openocd.get_config_summary() == 'target/stm32f4x.cfg via interface/stlink.cfg — main.elf'
+
+    stm32 = TestStep.objects.create(
+        suite=suite, step_type=TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, name='Program',
+        config={'connection_interface': 'SWD', 'firmware_file': 'main.bin'},
+    )
+    assert stm32.get_config_summary() == 'SWD — main.bin'
+
+
+@pytest.mark.django_db
+def test_step_form_upload_firmware_avrdude_requires_fields():
+    """firmware_file is no longer a form field at all (issue #121 follow-up) - it's derived
+    from a TestStepAsset upload, managed outside this form entirely on the step edit page."""
+    missing = TestStepForm(data={'step_type': TestStep.UPLOAD_FIRMWARE_AVRDUDE, 'name': 'Program'})
+    assert not missing.is_valid()
+    assert 'port' in missing.errors
+    assert 'programmer_type' in missing.errors
+    assert 'mcu' in missing.errors
+    assert 'firmware_file' not in missing.fields
+
+    valid = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_AVRDUDE, 'name': 'Program',
+        'port': '/dev/ttyUSB0', 'programmer_type': 'arduino', 'mcu': 'atmega328p',
+    })
+    assert valid.is_valid(), valid.errors
+    assert valid.cleaned_data['config'] == {
+        'port': '/dev/ttyUSB0', 'programmer_type': 'arduino', 'mcu': 'atmega328p',
+    }
+
+    with_baud = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_AVRDUDE, 'name': 'Program',
+        'port': '/dev/ttyUSB0', 'programmer_type': 'arduino', 'mcu': 'atmega328p',
+        'baud_rate': '115200',
+    })
+    assert with_baud.is_valid(), with_baud.errors
+    assert with_baud.cleaned_data['config']['baud_rate'] == 115200
+
+
+@pytest.mark.django_db
+def test_step_form_upload_firmware_openocd_requires_fields():
+    missing = TestStepForm(data={'step_type': TestStep.UPLOAD_FIRMWARE_OPENOCD, 'name': 'Program'})
+    assert not missing.is_valid()
+    assert 'interface_config' in missing.errors
+    assert 'target_config' in missing.errors
+
+    valid = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_OPENOCD, 'name': 'Program',
+        'interface_config': 'interface/stlink.cfg', 'target_config': 'target/stm32f4x.cfg',
+    })
+    assert valid.is_valid(), valid.errors
+    assert 'port' not in valid.cleaned_data['config']  # OpenOCD has no serial port
+
+
+@pytest.mark.django_db
+def test_step_form_upload_firmware_stm32cubeprogrammer_requires_fields():
+    missing = TestStepForm(data={'step_type': TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, 'name': 'Program'})
+    assert not missing.is_valid()
+    assert 'connection_interface' in missing.errors
+
+    valid = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, 'name': 'Program',
+        'connection_interface': 'SWD',
+    })
+    assert valid.is_valid(), valid.errors  # port left blank - auto-detect
+
+    with_port = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, 'name': 'Program',
+        'connection_interface': 'JTAG', 'port': 'ST-LINK-001',
+    })
+    assert with_port.is_valid(), with_port.errors
+    assert with_port.cleaned_data['config']['port'] == 'ST-LINK-001'
+
+
+@pytest.mark.django_db
+def test_step_form_upload_firmware_esptool_requires_fields():
+    """esptool_images is no longer a form field (issue #121 follow-up) - each image's address +
+    file are managed outside this form via the Binary Images card's per-image add/remove forms."""
+    missing = TestStepForm(data={'step_type': TestStep.UPLOAD_FIRMWARE_ESPTOOL, 'name': 'Program'})
+    assert not missing.is_valid()
+    assert 'port' in missing.errors
+    assert 'chip' in missing.errors
+    assert 'esptool_images' not in missing.fields
+
+    valid = TestStepForm(data={'step_type': TestStep.UPLOAD_FIRMWARE_ESPTOOL, 'name': 'Program',
+                                'port': '/dev/ttyUSB0', 'chip': 'esp32'})
+    assert valid.is_valid(), valid.errors
+    assert valid.cleaned_data['config'] == {'port': '/dev/ttyUSB0', 'chip': 'esp32'}
+
+
+@pytest.mark.django_db
+def test_step_form_save_preserves_firmware_config_derived_from_assets(design):
+    """TestStepForm.save()/test_step_edit only ever touch the typed TYPE_FIELDS - a previously
+    synced firmware_file/images key (issue #121 follow-up) must survive an ordinary edit to the
+    other fields, not be silently wiped by cleaned_data['config'] never containing it."""
+    suite = TestSuite.objects.create(design=design, version=1)
+    step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.UPLOAD_FIRMWARE_AVRDUDE, name='Program',
+        config={'port': '/dev/ttyUSB0', 'programmer_type': 'arduino', 'mcu': 'atmega328p',
+                'firmware_file': 'main.hex', 'schema_version': 1},
+    )
+    form = TestStepForm(data={
+        'step_type': TestStep.UPLOAD_FIRMWARE_AVRDUDE, 'name': 'Program',
+        'port': '/dev/ttyUSB0', 'programmer_type': 'arduino', 'mcu': 'atmega5', 'abort_on_fail': False,
+    }, instance=step)
+    assert form.is_valid(), form.errors
+    saved = form.save()
+    assert saved.config['firmware_file'] == 'main.hex'
+    assert saved.config['mcu'] == 'atmega5'

@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import os
+
 from django.db import models
+from django.utils import timezone
 
 from device.models import Design
 
@@ -138,7 +141,10 @@ class TestStep(models.Model):
     __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
 
     DELAY = 'DELAY'
-    UPLOAD_FIRMWARE = 'UPLOAD_FIRMWARE'
+    UPLOAD_FIRMWARE_AVRDUDE = 'UPLOAD_FIRMWARE_AVRDUDE'
+    UPLOAD_FIRMWARE_ESPTOOL = 'UPLOAD_FIRMWARE_ESPTOOL'
+    UPLOAD_FIRMWARE_OPENOCD = 'UPLOAD_FIRMWARE_OPENOCD'
+    UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER = 'UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER'
     BEEP = 'BEEP'
     READ_RAIL_VOLTAGE = 'READ_RAIL_VOLTAGE'
     READ_RAIL_CURRENT = 'READ_RAIL_CURRENT'
@@ -152,7 +158,10 @@ class TestStep(models.Model):
     OPERATOR_INTERVENTION = 'OPERATOR_INTERVENTION'
     STEP_TYPE_CHOICES = [
         (DELAY, 'Delay'),
-        (UPLOAD_FIRMWARE, 'Upload Firmware'),
+        (UPLOAD_FIRMWARE_AVRDUDE, 'Upload Firmware (avrdude)'),
+        (UPLOAD_FIRMWARE_ESPTOOL, 'Upload Firmware (esptool.py)'),
+        (UPLOAD_FIRMWARE_OPENOCD, 'Upload Firmware (OpenOCD)'),
+        (UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, 'Upload Firmware (STM32CubeProgrammer)'),
         (BEEP, 'Beep'),
         (READ_RAIL_VOLTAGE, 'Read Rail Voltage'),
         (READ_RAIL_CURRENT, 'Read Rail Current'),
@@ -173,10 +182,16 @@ class TestStep(models.Model):
     STEP_TYPE_CHOICES_ALPHABETICAL = sorted(STEP_TYPE_CHOICES, key=lambda choice: choice[1])
     # Fixed per-type colour coding for the step's box header (issue #101) - types are
     # predefined by this codebase, not user-created rows, so (unlike ProductionStage.color)
-    # there's no per-instance colour picker.
+    # there's no per-instance colour picker. The 4 UPLOAD_FIRMWARE_* types (issue #121) all
+    # share one colour rather than getting one each - they're alternative methods for the same
+    # part of the workflow (uploading firmware), not unrelated concerns, so keeping one colour
+    # keeps that grouping visible instead of the palette gaining a new hue per upload tool.
     STEP_TYPE_COLORS = {
         DELAY: '#6c757d',
-        UPLOAD_FIRMWARE: '#0d6efd',
+        UPLOAD_FIRMWARE_AVRDUDE: '#0d6efd',
+        UPLOAD_FIRMWARE_ESPTOOL: '#0d6efd',
+        UPLOAD_FIRMWARE_OPENOCD: '#0d6efd',
+        UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER: '#0d6efd',
         BEEP: '#fd7e14',
         READ_RAIL_VOLTAGE: '#198754',
         READ_RAIL_CURRENT: '#20c997',
@@ -197,11 +212,13 @@ class TestStep(models.Model):
     IOMOD_CHOICES = [(letter, letter) for letter in 'ABCDEFG']
     IOMOD_PIN_CHOICES = [(str(n), str(n)) for n in range(8)]
     BINARY_CHOICES = [('0', '0'), ('1', '1')]
-    UPLOAD_TOOL_CHOICES = [
-        ('avrdude', 'avrdude'),
-        ('esptool.py', 'esptool.py'),
-        ('openocd', 'OpenOCD'),
-        ('stm32cubeprogrammer', 'STM32CubeProgrammer'),
+    # Placeholder connection-interface list for STM32CubeProgrammer (issue #121), same
+    # "hardcoded list pending Testomatic integration" convention as POWER_RAIL_CHOICES above.
+    STM32_CONNECTION_INTERFACE_CHOICES = [
+        ('SWD', 'SWD'),
+        ('JTAG', 'JTAG'),
+        ('UART', 'UART'),
+        ('USB_DFU', 'USB DFU'),
     ]
     RAIL_ACTION_ON = 'ON'
     RAIL_ACTION_OFF = 'OFF'
@@ -215,7 +232,9 @@ class TestStep(models.Model):
 
     suite = models.ForeignKey(TestSuite, on_delete=models.CASCADE, related_name='steps')
     order = models.PositiveIntegerField(default=0)
-    step_type = models.CharField(max_length=32, choices=STEP_TYPE_CHOICES)
+    # max_length=40: the longest current choice, UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER, is 35
+    # characters - bumped from 32 (issue #121) with headroom for a future longer type.
+    step_type = models.CharField(max_length=40, choices=STEP_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     abort_on_fail = models.BooleanField(default=False)
     config = models.JSONField(default=dict, blank=True)
@@ -235,8 +254,14 @@ class TestStep(models.Model):
         c = self.config
         if self.step_type == self.DELAY:
             return f"{c.get('delay_ms', '?')} ms"
-        if self.step_type == self.UPLOAD_FIRMWARE:
-            return f"{c.get('upload_tool', '?')} via {c.get('port', '?')} — {c.get('firmware_file', '?')}"
+        if self.step_type == self.UPLOAD_FIRMWARE_AVRDUDE:
+            return f"{c.get('mcu', '?')} via {c.get('port', '?')} — {c.get('firmware_file', '?')}"
+        if self.step_type == self.UPLOAD_FIRMWARE_ESPTOOL:
+            return f"{c.get('chip', '?')} via {c.get('port', '?')} — {len(c.get('images', []))} image(s)"
+        if self.step_type == self.UPLOAD_FIRMWARE_OPENOCD:
+            return f"{c.get('target_config', '?')} via {c.get('interface_config', '?')} — {c.get('firmware_file', '?')}"
+        if self.step_type == self.UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER:
+            return f"{c.get('connection_interface', '?')} — {c.get('firmware_file', '?')}"
         if self.step_type == self.BEEP:
             return f"{c.get('count', 1)} × {c.get('duration_ms', '?')} ms"
         if self.step_type == self.READ_RAIL_VOLTAGE:
@@ -303,3 +328,39 @@ class TestStep(models.Model):
         if remaining:
             return f"{first} (+{remaining} more line{'s' if remaining != 1 else ''})"
         return first
+
+
+def test_step_asset_upload_path(instance, filename):
+    return f'test_step_assets/{instance.step_id}/{filename}'
+
+
+class TestStepAsset(models.Model):
+    """A binary file attached to a firmware-upload TestStep (issue #121 follow-up) - the actual
+    bytes a step's config names by filename (`config['firmware_file']` for the 3 single-file
+    upload types, or one entry in `config['images']` for UPLOAD_FIRMWARE_ESPTOOL). Scoped to the
+    step rather than the suite, so file management lives in the same place as the rest of that
+    step's configuration; `testing.views._sync_upload_firmware_config()` is the only place that
+    writes those config keys, derived from whichever TestStepAsset rows exist for the step.
+
+    `address`/`order` are only meaningful for UPLOAD_FIRMWARE_ESPTOOL, which can have more than
+    one image, each at its own flash address - same "field only meaningful for certain contexts"
+    convention as e.g. erp.PartsOrderLine.design (JLCPCB-only). Display order has no functional
+    meaning of its own (an image's address determines behaviour, not its position), so there's
+    no drag-and-drop reordering for these, unlike TestStep/ManualCheck order."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    step = models.ForeignKey(TestStep, on_delete=models.CASCADE, related_name='assets')
+    file = models.FileField(upload_to=test_step_asset_upload_path)
+    address = models.CharField(max_length=32, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    uploaded_dt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['order', 'pk']
+
+    def __str__(self):
+        return f'{self.step}: {self.filename}'
+
+    @property
+    def filename(self):
+        return os.path.basename(self.file.name)

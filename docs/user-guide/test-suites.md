@@ -82,6 +82,27 @@ Click the trash icon on a step's row.
 Each step has an **Abort On Fail** checkbox. When checked, a failed reading on this step stops
 the tester from running the remaining steps.
 
+### Attaching firmware files
+
+The 4 firmware-upload step types (avrdude, esptool.py, OpenOCD, STM32CubeProgrammer) each show
+a file-management section below the main step fields, once you have saved the step:
+
+- The 3 single-file tools (avrdude, OpenOCD, STM32CubeProgrammer) show a **Firmware File**
+  section. Choose a file and click **Upload**. Once a file is attached, its name is shown, with
+  a **Replace** button (choose a different file and upload again) and a **Remove** button.
+- esptool.py shows a **Binary Images** section instead, since it can flash more than one
+  binary in a single run, each at its own address. Type the flash address, choose the file, and
+  click **Add Image**. Repeat for each binary. Each row has its own **Remove** button. To
+  change an image's file or address, remove it and add it again.
+
+Uploading a file always replaces typing a filename by hand — there's no way for the name shown
+and the file that's actually bundled into the Test Suite Package to drift apart, since the name
+always comes from whatever you uploaded.
+
+Two different steps in the same Test Suite can't attach a file with the same name — the Register
+refuses the upload and shows a warning, since the two files would collide when they're bundled
+into the download.
+
 ## Test Step types
 
 Every step type is listed below, with its configuration fields as they appear on the edit page.
@@ -95,15 +116,55 @@ Waits before running the next step.
 |---|---|---|
 | Delay (ms) | Yes | How long to wait, in milliseconds |
 
-### Upload Firmware
+### Upload Firmware (avrdude)
 
-Uploads a firmware image to the device under test.
+Uploads a firmware image using avrdude. Attach the firmware file itself using the **Firmware
+File** section — see [Attaching firmware files](#attaching-firmware-files) above.
 
 | Field | Required | Description |
 |---|---|---|
-| Upload Tool | Yes | The tool that writes the firmware: avrdude, esptool.py, OpenOCD, or STM32CubeProgrammer |
 | Serial Port / Device | Yes | The serial port or device identifier to upload through |
-| Firmware Binary Image | Yes | The firmware file name, matched against a file in the Test Suite Package |
+| Programmer Type | Yes | avrdude's programmer type, for example "arduino" |
+| Target MCU | Yes | The target chip's signature, for example "atmega328p" |
+| Baud Rate | No | The upload connection's speed |
+
+### Upload Firmware (esptool.py)
+
+Uploads one or more firmware images using esptool.py. Unlike the other upload tools, this step
+can flash several binaries in one run, each at its own address in flash memory. Attach the
+images using the **Binary Images** section — see
+[Attaching firmware files](#attaching-firmware-files) above.
+
+| Field | Required | Description |
+|---|---|---|
+| Serial Port / Device | Yes | The serial port or device identifier to upload through |
+| Chip | Yes | The target chip, for example "esp32" |
+| Baud Rate | No | The upload connection's speed |
+
+### Upload Firmware (OpenOCD)
+
+Uploads a firmware image using OpenOCD. Unlike avrdude and esptool.py, OpenOCD does not connect
+through a serial port. It selects the debug probe and target through config files instead.
+Attach the firmware file itself using the **Firmware File** section — see
+[Attaching firmware files](#attaching-firmware-files) above.
+
+| Field | Required | Description |
+|---|---|---|
+| Interface Config File | Yes | OpenOCD's interface config file, for example "interface/stlink.cfg" |
+| Target Config File | Yes | OpenOCD's target config file, for example "target/stm32f4x.cfg" |
+| Adapter Serial | No | The serial number of one specific debug adapter, when more than one is connected |
+| Flash Address | No | The address to start flashing at |
+
+### Upload Firmware (STM32CubeProgrammer)
+
+Uploads a firmware image using STM32CubeProgrammer. Attach the firmware file itself using the
+**Firmware File** section — see [Attaching firmware files](#attaching-firmware-files) above.
+
+| Field | Required | Description |
+|---|---|---|
+| Connection Interface | Yes | SWD, JTAG, UART, or USB DFU |
+| Serial Port / Device | No | The debug probe or port identifier. Leave blank to auto-detect |
+| Flash Address | No | The address to start flashing at |
 
 ### Beep
 

@@ -55,21 +55,85 @@
                             </div>
                         </div>
 
-                        <div data-step-type-fields="UPLOAD_FIRMWARE">
-                            <div class="mb-3">
-                                <label for="{{ form.upload_tool.id_for_label }}" class="form-label">Upload Tool</label>
-                                {{ form.upload_tool }}
-                                {% if form.upload_tool.errors %}<div class="text-danger small">{{ form.upload_tool.errors }}</div>{% endif %}
-                            </div>
+                        {% comment %}
+                            Serial Port / Device and Baud Rate are each shared by whichever of the 4
+                            firmware-upload step types actually use them (issue #121), rendered once to avoid
+                            duplicate widget ids / duplicate POSTed values - same pattern as Power Rail above.
+                            The actual firmware file(s) are managed below, outside this form - see the
+                            Firmware File / Binary Images cards after the closing </form> tag.
+                        {% endcomment %}
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_AVRDUDE UPLOAD_FIRMWARE_ESPTOOL UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER">
                             <div class="mb-3">
                                 <label for="{{ form.port.id_for_label }}" class="form-label">{{ form.port.label }}</label>
                                 {{ form.port }}
                                 {% if form.port.errors %}<div class="text-danger small">{{ form.port.errors }}</div>{% endif %}
                             </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_AVRDUDE UPLOAD_FIRMWARE_ESPTOOL">
                             <div class="mb-3">
-                                <label for="{{ form.firmware_file.id_for_label }}" class="form-label">{{ form.firmware_file.label }}</label>
-                                {{ form.firmware_file }}
-                                {% if form.firmware_file.errors %}<div class="text-danger small">{{ form.firmware_file.errors }}</div>{% endif %}
+                                <label for="{{ form.baud_rate.id_for_label }}" class="form-label">{{ form.baud_rate.label }}</label>
+                                {{ form.baud_rate }}
+                                {% if form.baud_rate.errors %}<div class="text-danger small">{{ form.baud_rate.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_OPENOCD UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER">
+                            <div class="mb-3">
+                                <label for="{{ form.flash_address.id_for_label }}" class="form-label">{{ form.flash_address.label }}</label>
+                                {{ form.flash_address }}
+                                {% if form.flash_address.errors %}<div class="text-danger small">{{ form.flash_address.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_AVRDUDE">
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.programmer_type.id_for_label }}" class="form-label">{{ form.programmer_type.label }}</label>
+                                    {{ form.programmer_type }}
+                                    {% if form.programmer_type.errors %}<div class="text-danger small">{{ form.programmer_type.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.mcu.id_for_label }}" class="form-label">{{ form.mcu.label }}</label>
+                                    {{ form.mcu }}
+                                    {% if form.mcu.errors %}<div class="text-danger small">{{ form.mcu.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_ESPTOOL">
+                            <div class="mb-3">
+                                <label for="{{ form.chip.id_for_label }}" class="form-label">{{ form.chip.label }}</label>
+                                {{ form.chip }}
+                                {% if form.chip.errors %}<div class="text-danger small">{{ form.chip.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_OPENOCD">
+                            <div class="row">
+                                <div class="col mb-3">
+                                    <label for="{{ form.interface_config.id_for_label }}" class="form-label">{{ form.interface_config.label }}</label>
+                                    {{ form.interface_config }}
+                                    {% if form.interface_config.errors %}<div class="text-danger small">{{ form.interface_config.errors }}</div>{% endif %}
+                                </div>
+                                <div class="col mb-3">
+                                    <label for="{{ form.target_config.id_for_label }}" class="form-label">{{ form.target_config.label }}</label>
+                                    {{ form.target_config }}
+                                    {% if form.target_config.errors %}<div class="text-danger small">{{ form.target_config.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="{{ form.adapter_serial.id_for_label }}" class="form-label">{{ form.adapter_serial.label }}</label>
+                                {{ form.adapter_serial }}
+                                {% if form.adapter_serial.errors %}<div class="text-danger small">{{ form.adapter_serial.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+
+                        <div data-step-type-fields="UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER">
+                            <div class="mb-3">
+                                <label for="{{ form.connection_interface.id_for_label }}" class="form-label">{{ form.connection_interface.label }}</label>
+                                {{ form.connection_interface }}
+                                {% if form.connection_interface.errors %}<div class="text-danger small">{{ form.connection_interface.errors }}</div>{% endif %}
                             </div>
                         </div>
 
@@ -294,6 +358,68 @@
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'design_detail' step.suite.design_id %}#test-suite" class="btn btn-secondary">Cancel</a>
                         </div>
+                    </form>
+                </div>
+            </div>
+
+            {% comment %}
+                Firmware File / Binary Images live in their own cards, outside the form above -
+                HTML forms can't nest, and these each need their own <form> to upload/remove a
+                file (issue #121 follow-up). Still toggled by the same data-step-type-fields/
+                updateVisibility() JS, which queries the whole document, not just inside the form.
+            {% endcomment %}
+            <div class="card mt-3" data-step-type-fields="UPLOAD_FIRMWARE_AVRDUDE UPLOAD_FIRMWARE_OPENOCD UPLOAD_FIRMWARE_STM32CUBEPROGRAMMER">
+                <div class="card-body">
+                    <h5 class="card-title">Firmware File</h5>
+                    {% with asset=step.assets.first %}
+                        {% if asset %}
+                            <p>
+                                Attached: <strong>{{ asset.filename }}</strong>
+                                <form method="post" action="{% url 'testing:test_step_asset_delete' asset.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger ms-2">Remove</button>
+                                </form>
+                            </p>
+                        {% else %}
+                            <p class="text-body-secondary">Not yet attached.</p>
+                        {% endif %}
+                        <form method="post" action="{% url 'testing:test_step_asset_add' step.pk %}" enctype="multipart/form-data"
+                              class="d-flex gap-2">
+                            {% csrf_token %}
+                            <input type="file" name="file" class="form-control" required>
+                            <button type="submit" class="btn btn-primary text-nowrap">{% if asset %}Replace{% else %}Upload{% endif %}</button>
+                        </form>
+                    {% endwith %}
+                </div>
+            </div>
+
+            <div class="card mt-3" data-step-type-fields="UPLOAD_FIRMWARE_ESPTOOL">
+                <div class="card-body">
+                    <h5 class="card-title">Binary Images</h5>
+                    <table class="table mb-3">
+                        <tbody>
+                            {% for asset in step.assets.all %}
+                                <tr>
+                                    <td class="text-nowrap">{{ asset.address }}</td>
+                                    <td>{{ asset.filename }}</td>
+                                    <td class="text-end">
+                                        <form method="post" action="{% url 'testing:test_step_asset_delete' asset.pk %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3"><i>No images have been attached yet.</i></td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <form method="post" action="{% url 'testing:test_step_asset_add' step.pk %}" enctype="multipart/form-data"
+                          class="d-flex gap-2">
+                        {% csrf_token %}
+                        <input type="text" name="address" class="form-control" placeholder="0x1000" style="max-width: 150px;" required>
+                        <input type="file" name="file" class="form-control" required>
+                        <button type="submit" class="btn btn-primary text-nowrap">Add Image</button>
                     </form>
                 </div>
             </div>
