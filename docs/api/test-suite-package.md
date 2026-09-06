@@ -27,9 +27,9 @@ before it moved inside a ZIP archive — only the extension changed, from `.json
 ## Package contents
 
 Everything in the archive sits inside one top-level folder, named the same as the archive itself
-(without the `.zip` extension). Extracting `abc123-hw1-0-test-suite-v3.zip` therefore always
-produces a single `abc123-hw1-0-test-suite-v3/` folder, never loose files dropped into whatever
-directory it was extracted into — the package stays self-contained regardless of how it's opened.
+(without the `.zip` extension). Extracting `abc123-hw1-0-test-suite-v3.zip` always produces a
+single `abc123-hw1-0-test-suite-v3/` folder. It never drops loose files into the directory it was
+extracted into. The package stays self-contained no matter how a tool opens it.
 
 At minimum, that folder contains one file:
 
@@ -118,11 +118,23 @@ alongside the Test Steps. Each item has no type or config fields of its own:
 | `order` | integer | Position within the list (ascending) |
 | `text` | string | The checklist item's text |
 
+## Executing a Test Suite
+
+A tester runs a Test Suite Package like this:
+
+1. Read `test_steps`, sorted by `order`.
+2. For each step, look at `step_type` and run the action listed for that type below.
+3. Read `config` for the fields that action needs. Apply your own default for an optional field
+   that `config` omits.
+4. If a step fails and its `abort_on_fail` is `true`, stop. Do not run the remaining steps.
+5. After the steps, work through `manual_checks` in order, and show each `text` value to the
+   operator.
+
 ## Test Step types
 
 Each step's `config` object holds only the fields for its `step_type`. The Register omits an
-**optional** field from `config` when it has no value. A consumer should apply its own default
-instead of expecting a null or empty value for that key.
+**optional** field from `config` when it has no value. Apply your own default instead of
+expecting a null or empty value for that key.
 
 ### `DELAY`
 

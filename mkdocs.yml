@@ -35,6 +35,7 @@ nav:
     - Dashboard: user-guide/dashboard.md
     - Boards: user-guide/boards.md
     - Designs: user-guide/designs.md
+    - Test Suites: user-guide/test-suites.md
     - Organisations: user-guide/organisations.md
     - Parts Library: user-guide/parts.md
     - Production Batches: user-guide/batches.md

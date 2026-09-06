@@ -58,6 +58,11 @@ The design detail page also lists all boards registered against this design, wit
 
 Staff can start a new production batch for a design using the **Add New Batch** button. See [Production Batches](batches.md).
 
+### Test Suite
+
+The **Test Suite** tab lists the Test Steps and Manual Checks a tester system runs against boards
+of this design. See [Test Suites](test-suites.md).
+
 ## Creating and editing designs
 
 Staff can create and edit designs from the Designs list page. Each design requires a name, SKU, hardware version, and an associated organisation.
