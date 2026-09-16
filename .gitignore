@@ -178,3 +178,4 @@ cython_debug/
 /.claude/settings.local.json
 /.claude/scheduled_tasks.lock
 /.claude/skills/run-register/.test-account-password
+/.claude/memory
