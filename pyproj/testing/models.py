@@ -237,6 +237,10 @@ class TestStep(models.Model):
     step_type = models.CharField(max_length=40, choices=STEP_TYPE_CHOICES)
     name = models.CharField(max_length=100)
     abort_on_fail = models.BooleanField(default=False)
+    # issue #123: lets a step (e.g. DELAY) still run and be recorded without cluttering the
+    # printed Test Docket. A step that fails is always printed regardless of this value - see
+    # testomatic-ui's docket.py.
+    include_on_docket = models.BooleanField(default=True)
     config = models.JSONField(default=dict, blank=True)
 
     class Meta:

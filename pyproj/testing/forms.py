@@ -305,10 +305,11 @@ class TestStepForm(forms.ModelForm):
 
     class Meta:
         model = TestStep
-        fields = ['step_type', 'name', 'abort_on_fail']
+        fields = ['step_type', 'name', 'abort_on_fail', 'include_on_docket']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'abort_on_fail': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'include_on_docket': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):

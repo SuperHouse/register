@@ -52,6 +52,13 @@ def test_step_str_and_color(design):
 
 
 @pytest.mark.django_db
+def test_step_include_on_docket_defaults_true(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    step = TestStep.objects.create(suite=suite, step_type=TestStep.BEEP, name='Beep', config={})
+    assert step.include_on_docket is True
+
+
+@pytest.mark.django_db
 def test_step_config_summary_per_type(design):
     suite = TestSuite.objects.create(design=design, version=1)
 
@@ -223,6 +230,21 @@ def test_step_form_stamps_schema_version_and_picks_type_fields(design):
     step.save()
 
     assert step.config == {'delay_ms': 500, 'schema_version': TestStep.CONFIG_SCHEMA_VERSION}
+
+
+@pytest.mark.django_db
+def test_step_form_include_on_docket_checkbox_round_trips(design):
+    suite = TestSuite.objects.create(design=design, version=1)
+    form = TestStepForm(data={
+        'step_type': TestStep.DELAY, 'name': 'Settle', 'delay_ms': '500', 'include_on_docket': 'on',
+    })
+    assert form.is_valid(), form.errors
+
+    step = form.save(commit=False)
+    step.suite = suite
+    step.save()
+
+    assert step.include_on_docket is True
 
 
 @pytest.mark.django_db

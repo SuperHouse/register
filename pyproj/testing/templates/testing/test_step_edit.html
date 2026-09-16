@@ -45,6 +45,12 @@
                             <div class="form-text">If checked, a failure of this step stops the rest of the suite from running.</div>
                         </div>
 
+                        <div class="form-check mb-3">
+                            {{ form.include_on_docket }}
+                            <label class="form-check-label" for="{{ form.include_on_docket.id_for_label }}">Include on Test Docket</label>
+                            <div class="form-text">If unchecked, this step still runs and is recorded, but is left off the printed Test Docket unless it fails.</div>
+                        </div>
+
                         <hr>
 
                         <div data-step-type-fields="DELAY">

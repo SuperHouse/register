@@ -109,7 +109,32 @@ def test_step_add_targets_current_suite(client, staff_user, design, suite):
 
     new_step = TestStep.objects.get(suite=suite, step_type=TestStep.BEEP)
     assert new_step.name == 'Beep'
+    assert new_step.include_on_docket is True
     assert response.url == reverse('testing:test_step_edit', args=[new_step.pk])
+
+
+@pytest.mark.django_db
+def test_step_add_defaults_include_on_docket_false_for_delay(client, staff_user, design, suite):
+    client.force_login(staff_user)
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.DELAY})
+
+    new_step = TestStep.objects.get(suite=suite, step_type=TestStep.DELAY)
+    assert new_step.include_on_docket is False
+
+
+@pytest.mark.django_db
+def test_step_edit_updates_include_on_docket(client, staff_user, design, suite, step):
+    client.force_login(staff_user)
+    assert step.include_on_docket is True  # model default
+
+    response = client.post(reverse('testing:test_step_edit', args=[step.pk]), {
+        'step_type': TestStep.DELAY, 'name': step.name, 'delay_ms': '250',
+        # include_on_docket deliberately omitted - an unchecked checkbox isn't sent at all.
+    })
+    assert response.status_code == 302
+
+    step.refresh_from_db()
+    assert step.include_on_docket is False
 
 
 @pytest.mark.django_db
@@ -134,7 +159,8 @@ def test_copy_steps_from_appends_to_end_with_config_preserved(client, staff_user
     source_suite = TestSuite.objects.create(design=source_design, version=1)
     TestStep.objects.create(
         suite=source_suite, order=1, step_type=TestStep.BEEP, name='Beep Twice',
-        abort_on_fail=True, config={'count': 2, 'duration_ms': 300, 'schema_version': 1},
+        abort_on_fail=True, include_on_docket=False,
+        config={'count': 2, 'duration_ms': 300, 'schema_version': 1},
     )
 
     client.force_login(staff_user)
@@ -151,6 +177,7 @@ def test_copy_steps_from_appends_to_end_with_config_preserved(client, staff_user
     assert copied.step_type == TestStep.BEEP
     assert copied.name == 'Beep Twice'
     assert copied.abort_on_fail is True
+    assert copied.include_on_docket is False
     assert copied.config == {'count': 2, 'duration_ms': 300, 'schema_version': 1}
     assert copied.order == step.order + 1
 
@@ -308,6 +335,25 @@ def test_editing_a_step_on_the_saved_current_version_forks_a_new_draft(client, s
     assert new_step.pk != step.pk
     assert new_step.name == 'Settle Longer'
     assert new_step.config['delay_ms'] == 1000
+
+
+@pytest.mark.django_db
+def test_forking_a_draft_preserves_include_on_docket(client, staff_user, design, suite, step):
+    step.include_on_docket = False
+    step.save(update_fields=['include_on_docket'])
+    suite.status = TestSuite.SAVED
+    suite.save(update_fields=['status'])
+    client.force_login(staff_user)
+
+    # Any edit that forks a new draft (deleting a different, freshly-added step here) should
+    # carry every existing step's include_on_docket value across untouched.
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})
+
+    draft = design.test_suites.first()
+    assert draft.version == 2
+    forked_step = draft.steps.get(step_type=TestStep.DELAY)
+    assert forked_step.pk != step.pk
+    assert forked_step.include_on_docket is False
 
 
 @pytest.mark.django_db
@@ -509,7 +555,7 @@ def test_download_returns_a_package_with_steps_and_manual_checks(client, staff_u
     assert data['test_steps'] == [
         {
             'order': step.order, 'step_type': TestStep.DELAY, 'name': 'Settle', 'abort_on_fail': False,
-            'config_schema_version': None, 'config': {'delay_ms': 250},
+            'include_on_docket': True, 'config_schema_version': None, 'config': {'delay_ms': 250},
         },
     ]
     assert data['manual_checks'] == [{'order': 1, 'text': 'Confirm LED lights up'}]

@@ -247,7 +247,8 @@ def _fork_draft(design, saved_suite):
         for step in saved_suite.steps.all():
             new_step = TestStep.objects.create(
                 suite=draft, order=step.order, step_type=step.step_type,
-                name=step.name, abort_on_fail=step.abort_on_fail, config=step.config,
+                name=step.name, abort_on_fail=step.abort_on_fail,
+                include_on_docket=step.include_on_docket, config=step.config,
             )
             step_pk_map[step.pk] = new_step
             for asset in step.assets.all():
@@ -364,6 +365,7 @@ def test_suite_copy_steps_from(request, design_id):
                             step_type=step.step_type,
                             name=step.name,
                             abort_on_fail=step.abort_on_fail,
+                            include_on_docket=step.include_on_docket,
                             config=step.config,
                         )
                         # Copy this step's attached binaries too (issue #121 follow-up) - own
@@ -522,6 +524,11 @@ def _serialize_test_suite(suite):
                 'step_type': step.step_type,
                 'name': step.name,
                 'abort_on_fail': step.abort_on_fail,
+                # issue #123: whether this step is printed on the Test Docket when it passes -
+                # always executed/recorded regardless, and a failing step is always printed
+                # regardless too (see testomatic-ui's docket.py). No export_schema_version bump:
+                # purely additive, an absent key is treated as `true` by consumers.
+                'include_on_docket': step.include_on_docket,
                 # Pulled out alongside config rather than left for a consumer to dig out of
                 # the nested blob - step.config already carries this same value under its own
                 # 'schema_version' key (stamped by TestStepForm.save(), see TestStep.CONFIG_
@@ -604,6 +611,9 @@ def test_step_add(request, design_id):
                 order=next_order,
                 step_type=step_type,
                 name=dict(TestStep.STEP_TYPE_CHOICES).get(step_type, step_type),
+                # issue #123: Delay steps add nothing useful to a printed Test Docket, so default
+                # them off. Every other type defaults on, same as the model field's own default.
+                include_on_docket=(step_type != TestStep.DELAY),
                 config={'schema_version': TestStep.CONFIG_SCHEMA_VERSION},
             )
             messages.success(request, 'Step added - fill in its configuration below.')
@@ -632,6 +642,7 @@ def test_step_edit(request, step_id):
             target.step_type = form.cleaned_data['step_type']
             target.name = form.cleaned_data['name']
             target.abort_on_fail = form.cleaned_data['abort_on_fail']
+            target.include_on_docket = form.cleaned_data['include_on_docket']
             config = dict(form.cleaned_data.get('config', {}))
             # firmware_file/images (issue #121 follow-up) are derived from TestStepAsset
             # uploads, not from this form - preserve whatever _sync_upload_firmware_config
