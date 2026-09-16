@@ -209,9 +209,9 @@ def process_images(config: dict):
             skipped_count += 1
             # Move to uploaded anyway to avoid reprocessing
             try:
-                dest_path = uploaded_dir / filename
-                shutil.move(str(image_path), str(dest_path))
-                print(f"  Moved to uploaded directory (no device ID found)")
+#                dest_path = uploaded_dir / filename
+#                shutil.move(str(image_path), str(dest_path))
+                print(f"  No device ID found)")
             except Exception as e:
                 print(f"  Error moving file: {e}")
             print()
@@ -225,9 +225,9 @@ def process_images(config: dict):
             skipped_count += 1
             # Move to uploaded anyway to avoid reprocessing
             try:
-                dest_path = uploaded_dir / filename
-                shutil.move(str(image_path), str(dest_path))
-                print(f"  Moved to uploaded directory (device not found)")
+#                dest_path = uploaded_dir / filename
+#                shutil.move(str(image_path), str(dest_path))
+                print(f"  Device not found")
             except Exception as e:
                 print(f"  Error moving file: {e}")
             print()
