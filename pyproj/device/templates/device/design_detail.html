@@ -625,11 +625,11 @@
                                                                 {% if step.abort_on_fail %}
                                                                     <span class="badge bg-danger ms-auto">Abort On Fail</span>
                                                                 {% endif %}
-                                                                {% if not step.include_on_docket %}
-                                                                    <span class="badge bg-secondary {% if not step.abort_on_fail %}ms-auto{% endif %}">Not on Docket</span>
+                                                                {% if step.include_on_docket %}
+                                                                    <span class="badge bg-secondary {% if not step.abort_on_fail %}ms-auto{% endif %}">On Docket</span>
                                                                 {% endif %}
                                                                 <form method="post" action="{% url 'testing:test_step_delete' step.pk %}"
-                                                                      onclick="event.stopPropagation()" class="{% if not step.abort_on_fail and step.include_on_docket %}ms-auto{% endif %}">
+                                                                      onclick="event.stopPropagation()" class="{% if not step.abort_on_fail and not step.include_on_docket %}ms-auto{% endif %}">
                                                                     {% csrf_token %}
                                                                     <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
                                                                         <i class="cil-trash"></i>

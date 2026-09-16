@@ -204,6 +204,19 @@ class TestStep(models.Model):
         LED_SPECTRAL_READING: '#ffc107',
         OPERATOR_INTERVENTION: '#6610f2',
     }
+    # issue #123/#126: step types whose result adds nothing useful to a printed Test Docket -
+    # a rig action or a bare "ok" with no measured value - so a freshly-added step of one of
+    # these types defaults to include_on_docket=False rather than the model field's own
+    # default=True. Used only at creation time (views.test_step_add); it's a starting point
+    # the operator can still override per step, not an enforced rule - existing steps aren't
+    # touched when this set changes.
+    DOCKET_DEFAULT_OFF_STEP_TYPES = {
+        DELAY,
+        BEEP,
+        CONTROL_POWER_RAIL,
+        IOMOD_ANALOG_WRITE,
+        IOMOD_DIGITAL_WRITE,
+    }
     # Placeholder rail names until this project integrates with Testomatic, which defines
     # power rails more fully.
     POWER_RAIL_CHOICES = [('3.3V', '3.3V'), ('5V', '5V'), ('12V', '12V')]

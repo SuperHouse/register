@@ -82,6 +82,18 @@ Click the trash icon on a step's row.
 Each step has an **Abort On Fail** checkbox. When checked, a failed reading on this step stops
 the tester from running the remaining steps.
 
+### Include on Test Docket
+
+Each step also has an **Include on Test Docket** checkbox. A step is always run and its result
+always recorded regardless of this checkbox — it only controls whether a *passing* step gets its
+own line on the printed Test Docket. A failing step is always printed, whatever this is set to.
+
+New steps of these types default to unchecked, since they have nothing useful to add to the
+docket — a rig action with no result of its own, or a plain "ok" with no measured value: Delay,
+Beep, Control Power Rail, IOMOD Digital Write, IOMOD Analog Write. Every other type defaults to
+checked. This is only a starting point for a newly added step — change the checkbox on any step
+if you want different behaviour.
+
 ### Attaching firmware files
 
 The 4 firmware-upload step types (avrdude, esptool.py, OpenOCD, STM32CubeProgrammer) each show

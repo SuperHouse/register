@@ -104,22 +104,34 @@ def test_step_add_lazily_creates_version_one_when_none_exists(client, staff_user
 @pytest.mark.django_db
 def test_step_add_targets_current_suite(client, staff_user, design, suite):
     client.force_login(staff_user)
-    response = client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.BEEP})
+    response = client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.PYTHON})
     assert response.status_code == 302
 
-    new_step = TestStep.objects.get(suite=suite, step_type=TestStep.BEEP)
-    assert new_step.name == 'Beep'
+    new_step = TestStep.objects.get(suite=suite, step_type=TestStep.PYTHON)
+    assert new_step.name == 'Python'
     assert new_step.include_on_docket is True
     assert response.url == reverse('testing:test_step_edit', args=[new_step.pk])
 
 
 @pytest.mark.django_db
-def test_step_add_defaults_include_on_docket_false_for_delay(client, staff_user, design, suite):
+@pytest.mark.parametrize('step_type', sorted(TestStep.DOCKET_DEFAULT_OFF_STEP_TYPES))
+def test_step_add_defaults_include_on_docket_false_for_rig_actions(client, staff_user, design, suite, step_type):
+    # issue #123/#126: these step types are either a rig action with no result to report, or a
+    # bare "ok" with no measured value - see TestStep.DOCKET_DEFAULT_OFF_STEP_TYPES.
     client.force_login(staff_user)
-    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.DELAY})
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': step_type})
 
-    new_step = TestStep.objects.get(suite=suite, step_type=TestStep.DELAY)
+    new_step = TestStep.objects.get(suite=suite, step_type=step_type)
     assert new_step.include_on_docket is False
+
+
+@pytest.mark.django_db
+def test_step_add_defaults_include_on_docket_true_for_a_measuring_step(client, staff_user, design, suite):
+    client.force_login(staff_user)
+    client.post(reverse('testing:test_step_add', args=[design.pk]), {'step_type': TestStep.READ_RAIL_VOLTAGE})
+
+    new_step = TestStep.objects.get(suite=suite, step_type=TestStep.READ_RAIL_VOLTAGE)
+    assert new_step.include_on_docket is True
 
 
 @pytest.mark.django_db
@@ -171,6 +183,32 @@ def test_step_edit_get_still_blanks_defaulted_config_field(client, staff_user, d
     form = TestStepForm(instance=step)
 
     assert form['i2c_addr'].value() == ''
+
+
+@pytest.mark.django_db
+def test_step_list_shows_on_docket_badge_when_included(client, staff_user, design, suite, step):
+    # The badge is positive logic (present = will print on the Test Docket), the opposite of
+    # the old "Not on Docket" badge that showed for the exception case - a step's absence of a
+    # badge, rather than its presence, used to mean "on the docket", which read backwards
+    # against the "Include on Test Docket" checkbox it mirrors.
+    client.force_login(staff_user)
+    assert step.include_on_docket is True
+
+    content = client.get(reverse('design_detail', args=[design.pk])).content.decode()
+
+    assert 'On Docket' in content
+    assert 'Not on Docket' not in content
+
+
+@pytest.mark.django_db
+def test_step_list_shows_no_badge_when_not_included(client, staff_user, design, suite, step):
+    client.force_login(staff_user)
+    step.include_on_docket = False
+    step.save()
+
+    content = client.get(reverse('design_detail', args=[design.pk])).content.decode()
+
+    assert 'On Docket' not in content
 
 
 @pytest.mark.django_db

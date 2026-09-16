@@ -611,9 +611,11 @@ def test_step_add(request, design_id):
                 order=next_order,
                 step_type=step_type,
                 name=dict(TestStep.STEP_TYPE_CHOICES).get(step_type, step_type),
-                # issue #123: Delay steps add nothing useful to a printed Test Docket, so default
-                # them off. Every other type defaults on, same as the model field's own default.
-                include_on_docket=(step_type != TestStep.DELAY),
+                # issue #123/#126: some step types add nothing useful to a printed Test Docket
+                # (a rig action, or a bare "ok" with no measured value), so default those off -
+                # see TestStep.DOCKET_DEFAULT_OFF_STEP_TYPES. Every other type defaults on,
+                # same as the model field's own default.
+                include_on_docket=(step_type not in TestStep.DOCKET_DEFAULT_OFF_STEP_TYPES),
                 config={'schema_version': TestStep.CONFIG_SCHEMA_VERSION},
             )
             messages.success(request, 'Step added - fill in its configuration below.')
