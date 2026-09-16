@@ -103,6 +103,17 @@ Two different steps in the same Test Suite can't attach a file with the same nam
 refuses the upload and shows a warning, since the two files would collide when they're bundled
 into the download.
 
+### Naming firmware upload steps
+
+A tester reports every firmware-upload step's **name** on the printed Test Docket, as the record
+of what firmware ended up on the board — this covers boards with more than one MCU, each uploaded
+by its own step, with no single overall "firmware version" to report instead. Name each of these
+steps after what it uploads, for example "Firmware v8.1.1" or "IO Expander v1.3", not a generic
+label like "Upload Firmware" — the name is exactly what appears on the docket. If a step uploads a
+test or bootloader image that a later step replaces before testing finishes, both steps' names are
+reported, so name the earlier one accordingly too (for example "Test image") rather than leaving it
+looking like the final firmware version.
+
 ## Test Step types
 
 Every step type is listed below, with its configuration fields as they appear on the edit page.
