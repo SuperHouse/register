@@ -138,6 +138,42 @@ def test_step_edit_updates_include_on_docket(client, staff_user, design, suite, 
 
 
 @pytest.mark.django_db
+def test_step_edit_get_shows_include_on_docket_checked_when_true(client, staff_user, design, suite, step):
+    # issue #126: opening an already-True step for editing must render the checkbox as
+    # checked, not silently show it unchecked - a bug in TestStepForm.__init__'s
+    # blank-out-defaulted-config-fields loop (added to stop e.g. mux_addr's "0x71" default
+    # resurfacing over a deliberately-cleared value) accidentally also caught
+    # include_on_docket, since its auto-generated BooleanField carries initial=True copied
+    # from the model field's own default.
+    client.force_login(staff_user)
+    assert step.include_on_docket is True
+    step.config = {'delay_ms': 250, 'schema_version': TestStep.CONFIG_SCHEMA_VERSION}
+    step.save()
+
+    response = client.get(reverse('testing:test_step_edit', args=[step.pk]))
+
+    assert response.context['form']['include_on_docket'].value() is True
+
+
+@pytest.mark.django_db
+def test_step_edit_get_still_blanks_defaulted_config_field(client, staff_user, design):
+    # Regression guard for the fix above: a config-derived field with a field-level default
+    # (i2c_addr's "0x10") must still show blank, not resurface its default, when the step was
+    # saved with that field deliberately left blank.
+    from testing.forms import TestStepForm
+
+    suite = TestSuite.objects.create(design=design, version=1, status=TestSuite.DRAFT)
+    step = TestStep.objects.create(
+        suite=suite, step_type=TestStep.LED_SPECTRAL_READING, name='LED check',
+        config={'mux_chan': '0', 'schema_version': TestStep.CONFIG_SCHEMA_VERSION},
+    )
+
+    form = TestStepForm(instance=step)
+
+    assert form['i2c_addr'].value() == ''
+
+
+@pytest.mark.django_db
 def test_add_step_dropdown_and_edit_page_type_dropdown_are_alphabetical(client, staff_user, design, suite, step):
     client.force_login(staff_user)
 

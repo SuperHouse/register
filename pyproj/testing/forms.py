@@ -324,8 +324,20 @@ class TestStepForm(forms.ModelForm):
             # whose config is just {'schema_version': ...}) must show a field it was saved
             # with left blank as blank - not silently resurface a field-level default (e.g.
             # mux_addr's "0x71") for a value the user deliberately cleared or never set.
+            #
+            # issue #126: this must only touch config-derived fields (i2c_addr and friends),
+            # never a real model field like `include_on_docket` - those are seeded correctly
+            # from the instance by ModelForm's own __init__ already, and this loop used to
+            # blank any of them that happened to declare a truthy field-level `initial`
+            # (include_on_docket=True's auto-generated BooleanField has initial=True, copied
+            # from the model field's own default). That blanked the checkbox's displayed state
+            # to unchecked on every edit of an already-True step, even though the instance's
+            # real value was never touched - silently flipping the flag off for real the
+            # moment someone saved without noticing and re-checking it.
             if any(k != 'schema_version' for k in config):
                 for name, field in self.fields.items():
+                    if name in self.Meta.fields:
+                        continue
                     if field.initial and name not in config:
                         self.initial[name] = ''
 
