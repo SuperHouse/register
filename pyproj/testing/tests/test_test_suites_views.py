@@ -573,6 +573,31 @@ def test_version_detail_shows_read_only_steps(client, staff_user, design, suite,
 
 
 @pytest.mark.django_db
+def test_version_detail_shows_on_docket_badge_for_included_step(client, staff_user, design, suite, step):
+    # register#126: this read-only page must use the same badge logic as the editable Test
+    # Suite tab (design_detail.html) - positive logic, badge present when the step is on the
+    # docket, absent when it's not.
+    client.force_login(staff_user)
+    assert step.include_on_docket is True
+
+    content = client.get(reverse('testing:test_suite_version_detail', args=[design.pk, suite.version])).content.decode()
+
+    assert 'On Docket' in content
+    assert 'Not on Docket' not in content
+
+
+@pytest.mark.django_db
+def test_version_detail_shows_no_badge_for_excluded_step(client, staff_user, design, suite, step):
+    client.force_login(staff_user)
+    step.include_on_docket = False
+    step.save()
+
+    content = client.get(reverse('testing:test_suite_version_detail', args=[design.pk, suite.version])).content.decode()
+
+    assert 'On Docket' not in content
+
+
+@pytest.mark.django_db
 def test_version_detail_for_saved_version_superseded_by_newer_draft(client, staff_user, design, suite, step):
     """A version can be simultaneously "Current" (the latest saved one - what a Tester would
     fetch) and no longer directly editable (because a newer draft has since forked off it).
