@@ -6,7 +6,7 @@ from django import forms
 from django.core.validators import RegexValidator
 
 from device.models import Design
-from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset
+from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset, TestStepDiagnosticImage
 
 # Used by the LED Spectral Reading step's MUX Addr/I2C Addr fields (issue #109) - a bare hex
 # string, with or without a "0x"/"0X" prefix.
@@ -305,11 +305,12 @@ class TestStepForm(forms.ModelForm):
 
     class Meta:
         model = TestStep
-        fields = ['step_type', 'name', 'abort_on_fail', 'include_on_docket']
+        fields = ['step_type', 'name', 'abort_on_fail', 'include_on_docket', 'diagnostic_note']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'abort_on_fail': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'include_on_docket': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'diagnostic_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -398,3 +399,13 @@ class TestStepAssetAddForm(forms.Form):
 
     file = forms.FileField()
     address = forms.CharField(required=False, validators=[hex_address_validator])
+
+
+class TestStepDiagnosticImageAddForm(forms.Form):
+    """Backs the "Add Diagnostic Image" mini-form on the step edit page (register#127) - a
+    plain Form, not a ModelForm, same reasoning as TestStepAssetAddForm above: `step` is
+    resolved by the view rather than user-supplied."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    image = forms.ImageField()
+    caption = forms.CharField(required=False, max_length=255)

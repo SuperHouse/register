@@ -255,6 +255,12 @@ class TestStep(models.Model):
     # testomatic-ui's docket.py.
     include_on_docket = models.BooleanField(default=True)
     config = models.JSONField(default=dict, blank=True)
+    # register#127: free-text guidance shown to the operator when this step fails - e.g. which
+    # part of the board to examine. Applies to every step type (not just firmware uploads, unlike
+    # TestStepAsset above), so it's a plain field on TestStep itself rather than living in
+    # `config` - it's display-only, never read by an executor, so it doesn't need config's
+    # polymorphic/schema_version machinery.
+    diagnostic_note = models.TextField(blank=True)
 
     class Meta:
         ordering = ['order']
@@ -381,3 +387,39 @@ class TestStepAsset(models.Model):
     @property
     def filename(self):
         return os.path.basename(self.file.name)
+
+
+def test_step_diagnostic_image_upload_path(instance, filename):
+    return f'test_step_diagnostic_images/{instance.step_id}/{filename}'
+
+
+class TestStepDiagnosticImage(models.Model):
+    """An image attached to a TestStep's diagnostic guidance (register#127) - e.g. a board
+    photo with the area to check highlighted, shown to the operator alongside
+    `TestStep.diagnostic_note` when this step fails. A separate model from TestStepAsset rather
+    than an extension of it: diagnostic images apply to *every* step type (not just firmware
+    uploads), there can be several per step, and they're for human display rather than something
+    an executor reads by filename out of `config` - different enough concerns that folding them
+    into TestStepAsset would overload what that model means.
+
+    Unlike TestStepAsset, there's no cross-step flat-filename collision check here - the Test
+    Suite Package stores these under a per-step `diagnostics/{step_id}/` folder (see
+    testing.views.build_test_suite_package_response) rather than flat alongside firmware files,
+    so two steps attaching same-named images can never collide."""
+    __test__ = False  # not a test class, despite the Test* name matching pytest's pattern
+
+    step = models.ForeignKey(TestStep, on_delete=models.CASCADE, related_name='diagnostic_images')
+    image = models.ImageField(upload_to=test_step_diagnostic_image_upload_path)
+    caption = models.CharField(max_length=255, blank=True)
+    order = models.PositiveIntegerField(default=0)
+    uploaded_dt = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ['order', 'pk']
+
+    def __str__(self):
+        return f'{self.step}: {self.filename}'
+
+    @property
+    def filename(self):
+        return os.path.basename(self.image.name)

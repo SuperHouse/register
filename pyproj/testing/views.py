@@ -17,9 +17,12 @@ from django.utils.text import slugify
 from device.models import Design
 from .forms import (
     CompatibleDesignAddForm, CopyTestStepsFromForm, ManualCheckForm, TesterForm, TestModuleForm,
-    TestModuleTypeForm, TestStepAssetAddForm, TestStepForm, TestStepTypeAddForm, TestSuiteSaveNewVersionForm,
+    TestModuleTypeForm, TestStepAssetAddForm, TestStepDiagnosticImageAddForm, TestStepForm, TestStepTypeAddForm,
+    TestSuiteSaveNewVersionForm,
 )
-from .models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset, TestSuite
+from .models import (
+    ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestStepAsset, TestStepDiagnosticImage, TestSuite,
+)
 
 
 @staff_member_required
@@ -228,35 +231,49 @@ def _copy_step_asset(asset, new_step):
     return new_asset
 
 
+def _copy_step_diagnostic_image(image, new_step):
+    """Duplicates one TestStepDiagnosticImage's file bytes onto `new_step` (register#127) - same
+    "always make an independent physical copy" reasoning as `_copy_step_asset` above, so editing
+    a copy's image can never affect the original."""
+    new_image = TestStepDiagnosticImage(step=new_step, caption=image.caption, order=image.order)
+    new_image.image.save(image.filename, ContentFile(image.image.read()), save=True)
+    return new_image
+
+
 def _fork_draft(design, saved_suite):
     """Creates a new draft version for `design`, copying `saved_suite`'s steps (and each step's
-    attached TestStepAsset files, issue #121 follow-up) and manual checks (both lists are
-    versioned together - issue #112; `saved_suite` is None for a design with no Test Suite at
-    all yet). Returns (draft, step_pk_map, manual_check_pk_map, asset_pk_map) so a caller
-    holding pks from *before* the fork (e.g. a reorder payload built from the page as it was
-    rendered, before this request forked it) can translate them to their counterparts in the
-    new draft - see `_ensure_editable_step`/`_ensure_editable_manual_check`/
-    `_ensure_editable_asset` and the `*_reorder` views."""
+    attached TestStepAsset files, issue #121 follow-up, and TestStepDiagnosticImage files,
+    register#127) and manual checks (both lists are versioned together - issue #112;
+    `saved_suite` is None for a design with no Test Suite at all yet). Returns (draft,
+    step_pk_map, manual_check_pk_map, asset_pk_map, diagnostic_image_pk_map) so a caller holding
+    pks from *before* the fork (e.g. a reorder payload built from the page as it was rendered,
+    before this request forked it) can translate them to their counterparts in the new draft -
+    see `_ensure_editable_step`/`_ensure_editable_manual_check`/`_ensure_editable_asset`/
+    `_ensure_editable_diagnostic_image` and the `*_reorder` views."""
     draft = TestSuite.objects.create(
         design=design, version=(saved_suite.version + 1 if saved_suite else 1), status=TestSuite.DRAFT,
     )
     step_pk_map = {}
     manual_check_pk_map = {}
     asset_pk_map = {}
+    diagnostic_image_pk_map = {}
     if saved_suite is not None:
         for step in saved_suite.steps.all():
             new_step = TestStep.objects.create(
                 suite=draft, order=step.order, step_type=step.step_type,
                 name=step.name, abort_on_fail=step.abort_on_fail,
                 include_on_docket=step.include_on_docket, config=step.config,
+                diagnostic_note=step.diagnostic_note,
             )
             step_pk_map[step.pk] = new_step
             for asset in step.assets.all():
                 asset_pk_map[asset.pk] = _copy_step_asset(asset, new_step)
+            for image in step.diagnostic_images.all():
+                diagnostic_image_pk_map[image.pk] = _copy_step_diagnostic_image(image, new_step)
         for check in saved_suite.manual_checks.all():
             new_check = ManualCheck.objects.create(suite=draft, order=check.order, text=check.text)
             manual_check_pk_map[check.pk] = new_check
-    return draft, step_pk_map, manual_check_pk_map, asset_pk_map
+    return draft, step_pk_map, manual_check_pk_map, asset_pk_map, diagnostic_image_pk_map
 
 
 def _get_or_create_draft_suite(design):
@@ -267,7 +284,7 @@ def _get_or_create_draft_suite(design):
     current = design.test_suites.first()  # TestSuite.Meta.ordering = ['design', '-version']
     if current is not None and current.status == TestSuite.DRAFT:
         return current
-    draft, _step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
+    draft, _step_pk_map, _manual_check_pk_map, _asset_pk_map, _diagnostic_image_pk_map = _fork_draft(design, current)
     return draft
 
 
@@ -286,7 +303,7 @@ def _ensure_editable_step(step):
     #110) - the caller should apply its edit/delete to the returned step, not `step`."""
     if step.suite.status == TestSuite.DRAFT:
         return step
-    _draft, step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(step.suite.design, step.suite)
+    _draft, step_pk_map, _manual_check_pk_map, _asset_pk_map, _diagnostic_image_pk_map = _fork_draft(step.suite.design, step.suite)
     return step_pk_map[step.pk]
 
 
@@ -294,7 +311,7 @@ def _ensure_editable_manual_check(check):
     """Mirrors `_ensure_editable_step` for ManualCheck (issue #112) - see its docstring."""
     if check.suite.status == TestSuite.DRAFT:
         return check
-    _draft, _step_pk_map, manual_check_pk_map, _asset_pk_map = _fork_draft(check.suite.design, check.suite)
+    _draft, _step_pk_map, manual_check_pk_map, _asset_pk_map, _diagnostic_image_pk_map = _fork_draft(check.suite.design, check.suite)
     return manual_check_pk_map[check.pk]
 
 
@@ -303,8 +320,17 @@ def _ensure_editable_asset(asset):
     docstring."""
     if asset.step.suite.status == TestSuite.DRAFT:
         return asset
-    _draft, _step_pk_map, _manual_check_pk_map, asset_pk_map = _fork_draft(asset.step.suite.design, asset.step.suite)
+    _draft, _step_pk_map, _manual_check_pk_map, asset_pk_map, _diagnostic_image_pk_map = _fork_draft(asset.step.suite.design, asset.step.suite)
     return asset_pk_map[asset.pk]
+
+
+def _ensure_editable_diagnostic_image(image):
+    """Mirrors `_ensure_editable_step` for TestStepDiagnosticImage (register#127) - see its
+    docstring."""
+    if image.step.suite.status == TestSuite.DRAFT:
+        return image
+    _draft, _step_pk_map, _manual_check_pk_map, _asset_pk_map, diagnostic_image_pk_map = _fork_draft(image.step.suite.design, image.step.suite)
+    return diagnostic_image_pk_map[image.pk]
 
 
 def _sync_upload_firmware_config(step):
@@ -367,6 +393,7 @@ def test_suite_copy_steps_from(request, design_id):
                             abort_on_fail=step.abort_on_fail,
                             include_on_docket=step.include_on_docket,
                             config=step.config,
+                            diagnostic_note=step.diagnostic_note,
                         )
                         # Copy this step's attached binaries too (issue #121 follow-up) - own
                         # file-byte duplication, same as _fork_draft. A filename already used
@@ -386,6 +413,11 @@ def test_suite_copy_steps_from(request, design_id):
                             _copy_step_asset(asset, new_step)
                         if any_skipped:
                             _sync_upload_firmware_config(new_step)
+                        # Diagnostic images (register#127) live under a per-step folder in the
+                        # package, not a flat namespace, so there's no clash to check for here -
+                        # unlike the asset copy above, every image is always copied.
+                        for image in step.diagnostic_images.all():
+                            _copy_step_diagnostic_image(image, new_step)
                 if source_checks:
                     last_check = suite.manual_checks.order_by('-order').first()
                     next_order = (last_check.order + 1) if last_check else 1
@@ -498,6 +530,57 @@ def test_suite_version_detail(request, design_id, version):
 TEST_SUITE_EXPORT_SCHEMA_VERSION = 1
 
 
+def _diagnostic_image_package_path(step, image):
+    """The path a TestStepDiagnosticImage is stored at inside a Test Suite Package (register#127)
+    - a per-step `diagnostics/{step_id}/` folder, unlike TestStepAsset's flat firmware-file
+    layout, since diagnostic images have no cross-step filename-clash check to keep a flat
+    namespace safe (any step type can carry any number of them)."""
+    return f'diagnostics/{step.pk}/{image.filename}'
+
+
+def _serialize_diagnostic(step):
+    """Builds a step's optional `diagnostic` key (register#127): a free-text note plus any
+    attached images, resolved to their package-relative path (see
+    `_diagnostic_image_package_path` above). Returns None when the step has neither a note nor
+    any images, so `_serialize_test_suite` can omit the key entirely - same "absent means nothing
+    to show" convention as every other optional field in this format."""
+    note = step.diagnostic_note
+    images = [_diagnostic_image_package_path(step, image) for image in step.diagnostic_images.all()]
+    if not note and not images:
+        return None
+    return {'note': note, 'images': images}
+
+
+def _serialize_test_step(step):
+    """One entry in `_serialize_test_suite()`'s `test_steps` list - split out purely so the
+    register#127 `diagnostic` key (optional, only added when there's something to show) can be
+    merged in afterwards without a walrus/comprehension one-liner."""
+    data = {
+        'order': step.order,
+        'step_type': step.step_type,
+        'name': step.name,
+        'abort_on_fail': step.abort_on_fail,
+        # issue #123: whether this step is printed on the Test Docket when it passes - always
+        # executed/recorded regardless, and a failing step is always printed regardless too
+        # (see testomatic-ui's docket.py). No export_schema_version bump: purely additive, an
+        # absent key is treated as `true` by consumers.
+        'include_on_docket': step.include_on_docket,
+        # Pulled out alongside config rather than left for a consumer to dig out of the nested
+        # blob - step.config already carries this same value under its own 'schema_version' key
+        # (stamped by TestStepForm.save(), see TestStep.CONFIG_SCHEMA_VERSION), so this is just
+        # a more discoverable copy of it, not a separate value.
+        'config_schema_version': step.config.get('schema_version'),
+        'config': step.config,
+    }
+    # register#127: operator-facing note/images shown on a failure - omitted entirely (not just
+    # null) when the step has neither, same convention as every other optional field here; no
+    # export_schema_version bump, purely additive.
+    diagnostic = _serialize_diagnostic(step)
+    if diagnostic is not None:
+        data['diagnostic'] = diagnostic
+    return data
+
+
 def _serialize_test_suite(suite):
     """Flat, external-consumer-friendly representation of a TestSuite (issue #114) - Test Steps
     and Manual Checks together, since they're versioned as one unit (see TestSuite's
@@ -518,27 +601,7 @@ def _serialize_test_suite(suite):
             'notes': suite.notes,
             'created_dt': suite.created_dt.isoformat(),
         },
-        'test_steps': [
-            {
-                'order': step.order,
-                'step_type': step.step_type,
-                'name': step.name,
-                'abort_on_fail': step.abort_on_fail,
-                # issue #123: whether this step is printed on the Test Docket when it passes -
-                # always executed/recorded regardless, and a failing step is always printed
-                # regardless too (see testomatic-ui's docket.py). No export_schema_version bump:
-                # purely additive, an absent key is treated as `true` by consumers.
-                'include_on_docket': step.include_on_docket,
-                # Pulled out alongside config rather than left for a consumer to dig out of
-                # the nested blob - step.config already carries this same value under its own
-                # 'schema_version' key (stamped by TestStepForm.save(), see TestStep.CONFIG_
-                # SCHEMA_VERSION), so this is just a more discoverable copy of it, not a
-                # separate value.
-                'config_schema_version': step.config.get('schema_version'),
-                'config': step.config,
-            }
-            for step in suite.steps.all()
-        ],
+        'test_steps': [_serialize_test_step(step) for step in suite.steps.all()],
         'manual_checks': [
             {'order': check.order, 'text': check.text}
             for check in suite.manual_checks.all()
@@ -559,6 +622,9 @@ def build_test_suite_package_response(suite):
     firmware_file/images - issue #121 follow-up), stored flat in that same folder alongside the
     JSON - the cross-step filename clash check in test_step_asset_add is what keeps this flat
     namespace safe (two different steps in the same suite can never attach the same filename).
+    Diagnostic images (register#127) are stored separately, under a per-step
+    `diagnostics/{step_id}/` folder rather than flat, so they need no equivalent clash check -
+    see `_diagnostic_image_package_path`.
 
     Shared by test_suite_download (the UI's "Download" link, which always resolves to whatever
     the design's Test Suite tab is currently showing) and testing.api's download endpoint (which
@@ -573,6 +639,8 @@ def build_test_suite_package_response(suite):
         for step in suite.steps.all():
             for asset in step.assets.all():
                 archive.writestr(f'{package_name}/{asset.filename}', asset.file.read())
+            for image in step.diagnostic_images.all():
+                archive.writestr(f'{package_name}/{_diagnostic_image_package_path(step, image)}', image.image.read())
 
     response = HttpResponse(buffer.getvalue(), content_type='application/zip')
     response['Content-Disposition'] = f'attachment; filename="{package_name}.zip"'
@@ -645,6 +713,7 @@ def test_step_edit(request, step_id):
             target.name = form.cleaned_data['name']
             target.abort_on_fail = form.cleaned_data['abort_on_fail']
             target.include_on_docket = form.cleaned_data['include_on_docket']
+            target.diagnostic_note = form.cleaned_data['diagnostic_note']
             config = dict(form.cleaned_data.get('config', {}))
             # firmware_file/images (issue #121 follow-up) are derived from TestStepAsset
             # uploads, not from this form - preserve whatever _sync_upload_firmware_config
@@ -771,6 +840,60 @@ def test_step_asset_delete(request, asset_id):
 
 
 @staff_member_required
+def test_step_diagnostic_image_add(request, step_id):
+    """Attaches a diagnostic image to a step (register#127) - shown to the operator alongside
+    the step's diagnostic note when it fails. Unlike test_step_asset_add, any step type can
+    carry any number of these, and a same-named file attached to a different step is never a
+    problem (see TestStepDiagnosticImage's docstring), so there's no clash check here."""
+    step = get_object_or_404(TestStep.objects.select_related('suite__design'), pk=step_id)
+
+    if not _is_current_suite(step.suite):
+        messages.warning(request, 'This step belongs to a historical version and can no longer be edited.')
+        return redirect('testing:test_suite_version_detail', design_id=step.suite.design_id, version=step.suite.version)
+
+    if request.method == 'POST':
+        form = TestStepDiagnosticImageAddForm(request.POST, request.FILES)
+        if form.is_valid():
+            target = _ensure_editable_step(step)
+            last = target.diagnostic_images.order_by('-order').first()
+            TestStepDiagnosticImage.objects.create(
+                step=target,
+                image=form.cleaned_data['image'],
+                caption=form.cleaned_data['caption'],
+                order=(last.order + 1 if last else 1),
+            )
+            messages.success(request, 'Diagnostic image added.')
+            return redirect('testing:test_step_edit', step_id=target.pk)
+        else:
+            messages.warning(request, 'Choose an image to attach.')
+
+    return redirect('testing:test_step_edit', step_id=step.pk)
+
+
+@staff_member_required
+def test_step_diagnostic_image_delete(request, image_id):
+    """Removes one diagnostic image (register#127). POST-only, no confirm page - same
+    smaller-blast-radius reasoning as test_step_asset_delete."""
+    image = get_object_or_404(TestStepDiagnosticImage.objects.select_related('step__suite__design'), pk=image_id)
+
+    if not _is_current_suite(image.step.suite):
+        messages.warning(request, 'This step belongs to a historical version and can no longer be edited.')
+        return redirect('testing:test_suite_version_detail', design_id=image.step.suite.design_id, version=image.step.suite.version)
+
+    if request.method == 'POST':
+        target = _ensure_editable_diagnostic_image(image)
+        step_id = target.step_id
+        target.image.delete(save=False)
+        target.delete()
+        messages.success(request, 'Diagnostic image removed.')
+        # target.step_id (not image.step_id) - same "redirect to the post-fork step" reasoning
+        # as test_step_asset_delete.
+        return redirect('testing:test_step_edit', step_id=step_id)
+
+    return redirect('testing:test_step_edit', step_id=image.step_id)
+
+
+@staff_member_required
 def test_step_reorder(request, design_id):
     design = get_object_or_404(Design, pk=design_id)
 
@@ -785,7 +908,7 @@ def test_step_reorder(request, design_id):
         else:
             # The pks in the request came from the page as it was rendered, before this fork -
             # translate them to their counterparts in the new draft (see _fork_draft).
-            suite, step_pk_map, _manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
+            suite, step_pk_map, _manual_check_pk_map, _asset_pk_map, _diagnostic_image_pk_map = _fork_draft(design, current)
             ordered_pks = [step_pk_map[pk].pk for pk in requested_pks if pk in step_pk_map]
 
         steps_by_id = {step.pk: step for step in suite.steps.all()}
@@ -881,7 +1004,7 @@ def manual_check_reorder(request, design_id):
         else:
             # The pks in the request came from the page as it was rendered, before this fork -
             # translate them to their counterparts in the new draft (see _fork_draft).
-            suite, _step_pk_map, manual_check_pk_map, _asset_pk_map = _fork_draft(design, current)
+            suite, _step_pk_map, manual_check_pk_map, _asset_pk_map, _diagnostic_image_pk_map = _fork_draft(design, current)
             ordered_pks = [manual_check_pk_map[pk].pk for pk in requested_pks if pk in manual_check_pk_map]
 
         checks_by_id = {check.pk: check for check in suite.manual_checks.all()}
