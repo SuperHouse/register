@@ -17,8 +17,8 @@ class DesignChoiceField(forms.ModelChoiceField):
 
 
 class GroupedPartChoiceIterator(forms.models.ModelChoiceIterator):
-    """Yields Part options grouped into <optgroup>s by category name (uncategorised parts last),
-    matching the PartReparentForm dropdown. Within each group, options are ordered by
+    """Yields Part options grouped into <optgroup>s by category, with subcategories nested
+    under their parents (register#128). Within each group, options are ordered by
     value_sort_key (natural magnitude order, e.g. "120R" before "10K") rather than alphabetically
     by name, so scanning a dropdown falls into the same natural order as the Parts list (#87)."""
 
@@ -26,17 +26,31 @@ class GroupedPartChoiceIterator(forms.models.ModelChoiceIterator):
         if self.field.empty_label is not None:
             yield ('', self.field.empty_label)
 
-        groups = {}
+        # Build a mapping of category ID to (category, depth) for all categories that have parts
+        category_set = set()
+        parts_by_category_id = {}
         uncategorised = []
+
         for part in self.queryset:
             entry = (part.value_sort_key, self.choice(part))
             if part.category_id:
-                groups.setdefault(part.category.name, []).append(entry)
+                category_set.add(part.category_id)
+                parts_by_category_id.setdefault(part.category_id, []).append(entry)
             else:
                 uncategorised.append(entry)
 
-        for cat_name in sorted(groups):
-            yield (cat_name, _sorted_choices(groups[cat_name]))
+        # Build tree structure for categories that have parts
+        if category_set:
+            all_categories = list(
+                PartCategory.objects.filter(pk__in=category_set).select_related('parent')
+            )
+            for cat, depth in _category_tree_order(all_categories):
+                if cat.pk in parts_by_category_id:
+                    # Use the same indentation format as PartCategoryChoiceIterator
+                    prefix = (' ' * 4 * (depth - 1)) + '└ ' if depth > 0 else ''
+                    cat_display = prefix + cat.name
+                    yield (cat_display, _sorted_choices(parts_by_category_id[cat.pk]))
+
         if uncategorised:
             yield ('(uncategorised)', _sorted_choices(uncategorised))
 
@@ -345,13 +359,23 @@ class PartReparentForm(forms.Form):
         if exclude_pk:
             qs = qs.exclude(pk=exclude_pk)
 
-        groups = {}
+        # Build a mapping of category ID to parts for hierarchical grouping (register#128)
+        parts_by_category_id = {}
+        category_ids = set()
         for part in qs:
-            groups.setdefault(part.category.name, []).append((part.value_sort_key, (part.pk, str(part))))
+            parts_by_category_id.setdefault(part.category_id, []).append(
+                (part.value_sort_key, (part.pk, str(part)))
+            )
+            category_ids.add(part.category_id)
 
         choices = [('', '— select target part —')]
-        for cat_name in sorted(groups):
-            choices.append((cat_name, _sorted_choices(groups[cat_name])))
+        if category_ids:
+            all_categories = list(PartCategory.objects.filter(pk__in=category_ids))
+            for cat, depth in _category_tree_order(all_categories):
+                if cat.pk in parts_by_category_id:
+                    prefix = (' ' * 4 * (depth - 1)) + '└ ' if depth > 0 else ''
+                    cat_display = prefix + cat.name
+                    choices.append((cat_display, _sorted_choices(parts_by_category_id[cat.pk])))
         self.fields['target_part'].choices = choices
 
     def clean_target_part(self):
