@@ -247,6 +247,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Autoload display mode if ?display=1 is in the URL (register#125)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('display') === '1') {
+                enterDisplayMode();
+            }
+
             // Initialize chart with initial data
             const initialLabels = {{ chart_labels|safe }};
             const initialData = {{ chart_data|safe }};

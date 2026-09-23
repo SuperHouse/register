@@ -168,6 +168,12 @@
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Autoload display mode if ?display=1 is in the URL (register#125)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('display') === '1') {
+                enterDisplayMode();
+            }
+
             setInterval(updateBatchList, 30000);
         });
     </script>
