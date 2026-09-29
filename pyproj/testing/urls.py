@@ -10,6 +10,7 @@ urlpatterns = [
     path('testers/', views.tester_list, name='tester_list'),
     path('testers/add/', views.tester_add, name='tester_add'),
     path('testers/<int:tester_id>/', views.tester_edit, name='tester_edit'),
+    path('testers/<int:tester_id>/regenerate-key/', views.tester_regenerate_key, name='tester_regenerate_key'),
     path('testers/<int:tester_id>/delete/', views.tester_delete, name='tester_delete'),
     path('testers/modules/add/', views.test_module_add, name='test_module_add'),
     path('testers/modules/<int:module_id>/', views.test_module_edit, name='test_module_edit'),

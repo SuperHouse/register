@@ -1,4 +1,5 @@
 import pytest
+from django.db import IntegrityError
 from django.db.models import ProtectedError
 
 from crm.models import Org
@@ -36,6 +37,31 @@ def test_testers_ordered_by_name():
     Tester.objects.create(name='Zeta')
     Tester.objects.create(name='Alpha')
     assert [t.name for t in Tester.objects.all()] == ['Alpha', 'Zeta']
+
+
+@pytest.mark.django_db
+def test_tester_regenerate_api_key():
+    tester = Tester.objects.create(name='Testomatic')
+    assert tester.api_key is None
+
+    first_key = tester.regenerate_api_key()
+    assert first_key
+    tester.refresh_from_db()
+    assert tester.api_key == first_key
+
+    second_key = tester.regenerate_api_key()
+    assert second_key != first_key
+
+
+@pytest.mark.django_db
+def test_tester_api_key_uniqueness():
+    tester1 = Tester.objects.create(name='Testomatic One')
+    tester1.regenerate_api_key()
+    tester2 = Tester.objects.create(name='Testomatic Two')
+    tester2.api_key = tester1.api_key
+
+    with pytest.raises(IntegrityError):
+        tester2.save()
 
 
 @pytest.mark.django_db

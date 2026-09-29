@@ -84,6 +84,45 @@ class Design(models.Model):
         return Counter(self.bom_entries.values_list('part_id', flat=True))
 
 
+class CreatedByMixin(models.Model):
+    """Records which actor (User or Tester) created a record.
+
+    Exactly one of created_by_user / created_by_tester is normally set; both
+    may be null for legacy rows or system-generated records where the creator
+    is unknown. Static "who made this" attribution set once at creation -
+    not a versioned audit trail of edits.
+    """
+    created_by_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+    created_by_tester = models.ForeignKey(
+        'testing.Tester', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+
+    class Meta:
+        abstract = True
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(created_by_user__isnull=False, created_by_tester__isnull=False),
+                name='%(app_label)s_%(class)s_single_creator',
+            ),
+        ]
+
+    def set_creator(self, *, user=None, tester=None):
+        assert not (user and tester), "set_creator: pass user or tester, not both"
+        self.created_by_user = user
+        self.created_by_tester = tester
+
+    def get_creator_display(self):
+        if self.created_by_user:
+            return self.created_by_user.full_name or self.created_by_user.email
+        if self.created_by_tester:
+            return str(self.created_by_tester)
+        return '—'
+
+
 class Device(models.Model):
     design = models.ForeignKey(Design, on_delete=models.PROTECT)
     batch = models.ForeignKey('erp.Batch', on_delete=models.SET_NULL, null=True, blank=True, related_name='devices')
@@ -325,7 +364,7 @@ class DeviceAsset(models.Model):
         return classes.get(self.asset_type, 'bi-file-earmark')
 
 
-class DeviceEvent(models.Model):
+class DeviceEvent(CreatedByMixin, models.Model):
     NOTE = 'NOTE'
     SW_VERSION = 'SW_VERSION'
     SHIPPING = 'SHIPPING'
@@ -342,7 +381,8 @@ class DeviceEvent(models.Model):
     internal = models.BooleanField(default=False, help_text='Do not show this event to clients')
     description = models.TextField()
 
-    class Meta:
+    class Meta(CreatedByMixin.Meta):
+        abstract = False
         ordering = ["device__id", "event_dt"]
 
     def __str__(self):

@@ -95,6 +95,7 @@
                             <th>When</th>
                             <th>Type</th>
                             <th>Note</th>
+                            <th>Creator</th>
                             {% if user.is_staff %}<th>Operation</th>{% endif %}
                         </tr>
                     </thead>
@@ -110,6 +111,7 @@
                             {{ event.description|default_if_none:"" }}
                         {% endif %}
                     </td>
+                    <td>{{ event.get_creator_display }}</td>
                     {% if user.is_staff %}
                         <td>
                             <a role="button"

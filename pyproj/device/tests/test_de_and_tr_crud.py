@@ -53,10 +53,35 @@ def test_device_event_add_edit_delete(client, create_some_device_events, django_
     new_de = new_de_set.first()
     assert new_de.internal == False
     assert new_de.description == data['description']
+    assert new_de.created_by_user == staff
+    assert new_de.created_by_tester is None
 
     response = client.post(reverse('device:device_event_delete', args=[new_de.pk]))
     assert response.status_code == 302
     assert u1d.deviceevent_set.count() == 1
+
+
+def test_device_event_edit_does_not_change_creator(client, create_some_device_events, django_user_model):
+    data = create_some_device_events
+
+    original_staff = django_user_model.objects.create_user(email='original@example.com', password='staffy', is_staff=True)
+    other_staff = django_user_model.objects.create_user(email='other@example.com', password='staffy', is_staff=True)
+
+    u1de = data['user1_device_event1']
+    u1de.set_creator(user=original_staff)
+    u1de.save()
+
+    client.force_login(other_staff)
+    post_data = {
+        'internal': u1de.internal,
+        'description': u1de.description,
+        'event_dt': datetime.now().strftime(post_dt_fmt),
+    }
+    response = client.post(reverse('device:device_event_edit', args=[u1de.pk]), post_data)
+    assert response.status_code == 302
+
+    u1de.refresh_from_db()
+    assert u1de.created_by_user == original_staff
 
 
 def test_test_record_add_edit(client, create_some_test_records, django_user_model):

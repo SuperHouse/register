@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
 import os
+import secrets
 
 from django.db import models
 from django.utils import timezone
@@ -15,12 +16,18 @@ class Tester(models.Model):
     name = models.CharField(max_length=100)
     version = models.CharField(max_length=20, blank=True)
     notes = models.TextField(null=True, blank=True)
+    api_key = models.CharField(max_length=64, unique=True, null=True, blank=True)
 
     class Meta:
         ordering = ['name']
 
     def __str__(self):
         return f'{self.name} v{self.version}' if self.version else self.name
+
+    def regenerate_api_key(self):
+        self.api_key = secrets.token_urlsafe(32)
+        self.save(update_fields=['api_key'])
+        return self.api_key
 
 
 class TestModuleType(models.Model):

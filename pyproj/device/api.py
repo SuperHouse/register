@@ -11,11 +11,13 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from ninja import File, Form, UploadedFile
 
-from api.auth import session_or_api_key_auth
+from api.auth import AuthByUserOrTesterApiKey, session_or_api_key_auth
 from api.routes import router
+from authuser.models import User
 from crm.models import Org
 from device.models import Design, DesignAsset, Device, DeviceEvent, DeviceImage, TestImage, TestRecord
 from erp.models import Batch, Part
+from testing.models import Tester
 from .schemas import (
     DashboardStatsSchema,
     DesignAssetSchema,
@@ -137,13 +139,19 @@ def get_existing_device(request, device_pk: str):
     return ret
 
 
-@router.post('device/{device_pk}/program/', response={200: Message, 403: Message})
+@router.post('device/{device_pk}/program/', auth=AuthByUserOrTesterApiKey(), response={200: Message, 403: Message})
 def post_device_program(request, device_pk: str, data: DeviceProgramSchema):
     device = get_object_or_404(Device, pk=device_pk)
-    if not _user_can_access_device(request.auth, device):
+    # Tester-authenticated requests are unscoped for now - Tester has no Org/client
+    # relationship to check against, unlike a User key.
+    if isinstance(request.auth, User) and not _user_can_access_device(request.auth, device):
         return 403, {'message': 'API key does not have access to this device'}
 
     new_de = DeviceEvent(device=device, event_type='SW_VERSION', description=data.sw_version)
+    new_de.set_creator(
+        user=request.auth if isinstance(request.auth, User) else None,
+        tester=request.auth if isinstance(request.auth, Tester) else None,
+    )
     new_de.save()
 
     return {'message': 'Ok'}

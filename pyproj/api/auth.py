@@ -4,6 +4,7 @@ from django.conf import settings
 from ninja.security import APIKeyHeader
 
 from authuser.models import User
+from testing.models import Tester
 
 
 def _parse_allowed_networks(value):
@@ -88,3 +89,30 @@ class AuthByApiKey(APIKeyHeader):
             return None
 
         return User.objects.filter(api_key=key, is_active=True).first()
+
+
+class AuthByUserOrTesterApiKey(AuthByApiKey):
+    """Like AuthByApiKey, but also resolves a Tester (a physical Testomatic chassis) key.
+
+    Not used as the router's default auth - most endpoints assume request.auth is a
+    User with `.is_staff`, which a Tester doesn't have. Apply this explicitly, per-route,
+    only to endpoints meant to accept a tester chassis uploading its own results.
+    """
+    def authenticate(self, request, key):
+        user = super().authenticate(request, key)
+        if user:
+            return user
+
+        request_from = self.get_client_ip(request)
+        ip_addr = ipaddress.ip_address(request_from)
+
+        allow = False
+        if ip_addr in self.local_network:
+            allow = True
+        if any(ip_addr in network for network in self.allowed_ipv4_networks):
+            allow = True
+
+        if not allow or not key:
+            return None
+
+        return Tester.objects.filter(api_key=key).first()

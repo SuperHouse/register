@@ -13,6 +13,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.text import slugify
+from django.views.decorators.http import require_POST
 
 from device.models import Design
 from .forms import (
@@ -78,6 +79,17 @@ def tester_edit(request, tester_id):
 
     ctx = {'form': form, 'tester': tester}
     return render(request, 'testing/tester_edit.html', ctx)
+
+
+@staff_member_required
+@require_POST
+def tester_regenerate_key(request, tester_id):
+    """Regenerate a tester's API key."""
+    tester = get_object_or_404(Tester, pk=tester_id)
+    tester.regenerate_api_key()
+    messages.success(request, "Tester's API key has been regenerated.")
+
+    return redirect('testing:tester_edit', tester_id=tester.pk)
 
 
 @staff_member_required

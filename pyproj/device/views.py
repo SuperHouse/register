@@ -700,6 +700,7 @@ def device_event_add(request, device_number):
         form = DeviceEventForm(request.POST, initial={'device': device})
         if form.is_valid():
             form.instance.device = device
+            form.instance.set_creator(user=request.user)
             event = form.save()
 
             messages.success(request, 'Event added.')
