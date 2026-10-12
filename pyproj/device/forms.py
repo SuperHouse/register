@@ -55,6 +55,36 @@ class DesignDetailsForm(forms.ModelForm):
         }
 
 
+class DesignAddForm(forms.ModelForm):
+    """Creates a new Design (issue #133) - previously the only way to create one was the
+    import-xlsx management command or the admin. Unlike DesignDetailsForm (which edits an
+    existing design), this also exposes client/name/hw_version, since those three only
+    become fixed - editable only via the import command or the admin - once the design
+    exists."""
+    class Meta:
+        model = Design
+        fields = [
+            'client', 'name', 'hw_version', 'sku', 'description', 'price', 'pcb_stock',
+            'assembly_time_minutes', 'additional_materials', 'pcb_cost',
+            'conformal_coating', 'anti_shock_glue', 'packaging',
+        ]
+        widgets = {
+            'client': forms.Select(attrs={'class': 'form-select'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'hw_version': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 150px;'}),
+            'sku': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 250px;'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'pcb_stock': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
+            'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
+            'additional_materials': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'pcb_cost': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'conformal_coating': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'anti_shock_glue': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'packaging': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+        }
+
+
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Org

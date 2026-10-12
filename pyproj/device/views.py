@@ -21,7 +21,7 @@ from fusionextractor.f3z import FusionProject
 
 from login_required import login_not_required
 
-from .forms import DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .forms import DesignAddForm, DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
@@ -141,6 +141,28 @@ def design_list(request):
     }
 
     return render(request, 'device/design_list.html', context)
+
+
+@staff_member_required
+def design_add(request):
+    """Create a new Design (issue #133) - previously the only way to create one was the
+    import-xlsx management command or the admin."""
+    if request.method == 'POST':
+        form = DesignAddForm(request.POST)
+        if form.is_valid():
+            design = form.save()
+            messages.success(request, 'Design added.')
+            return redirect('design_detail', design_id=design.pk)
+        else:
+            messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
+    else:
+        form = DesignAddForm()
+
+    ctx = {
+        'form': form,
+    }
+
+    return render(request, 'device/design_add.html', ctx)
 
 
 def design_detail(request, design_id):

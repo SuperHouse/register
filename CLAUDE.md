@@ -27,8 +27,13 @@ register/
 │       └── docs.yml    # GitHub Actions: builds and deploys docs to GitHub Pages on push to main
 ├── mkdocs.yml          # MkDocs configuration (Material theme, nav structure)
 ├── API.md              # Full REST API documentation
+├── ASSET_STORAGE_PLAN.md # Planning doc: how DesignAsset/DeviceAsset-style file storage should work
 ├── BARCODES.md         # Planning notes for barcode scheme (future ERP/stock extension)
 ├── BARCODE-analysis.MD # Analysis of BARCODES.md ideas with industry best-practice recommendations
+├── PLANNING_STACK.md   # Index of in-progress planning docs chained off register#129 — start here to resume
+├── STOCK_CONSUMPTION_PLAN.md  # Planning doc: register#129 stock allocation/consumption — parked, see PLANNING_STACK.md
+├── BATCH_STATUS_PLAN.md       # Planning doc: a real Batch.status field (Draft/Ready/In Progress/Complete/On Hold/Cancelled) — parked
+├── DEVICE_GENERATION_PLAN.md  # Planning doc: in-app Device/serial-number generation, replacing spreadsheet import — parked
 ├── README.md
 └── SETUP.md            # Dev setup instructions
 ```
@@ -133,6 +138,10 @@ The Design detail page's **Bill of Materials** tab (see Design Detail Page Layou
 **Bill of Materials Cost column:** the Bill of Materials table has a Cost column showing, per row, the cheapest per-unit price payable across all of that part's supplier listings **at the part's total quantity across the whole design** — `Part.cheapest_price_break_for_quantity()` (see the `erp` app; MOQ-aware, see below) picks, for each `PartSourceVariant`, the highest price break genuinely reachable at that quantity, then returns the cheapest across all variants. `device.views.design_detail` computes this once per distinct `Part` (via `Design.bom_part_counts()`, see the `device` app, and the shared `erp.views.compute_bom_pricing()` helper — see the `erp` app) and applies the same per-unit price to every row for that part, so summing the column gives the correct total BoM cost — shown as a `Total:` row in the table's footer and reused as the Build Costing table's `BoM Cost` row above. A row shows `—` if the part has no price break data at all.
 
 **Batch Build Costing:** the Batch detail page (`erp.views.batch_edit`) shows this same Build Costing table below its **Parts Required** card (see `Batch` in the `erp` app), plus a **Total Batch Cost (`{{ batch.quantity }}` units)** row (`build_costing_total × batch.quantity`, computed from the unrounded per-board total rather than its rounded display value, then only rounded for display). Reuses `_batch_parts_required()`'s per-part rows for both the per-board counts (`row['per_board']`) and each part's total quantity across the whole batch (`row['required']`, already `per_board × batch.quantity`) so the counting logic exists only once. Unlike the Design detail page, which prices each part's BoM Cost contribution at its per-board quantity, the Batch page prices it at `row['required']` — the batch's actual order volume — via `erp.views.compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities)`, so a big enough batch can reach a cheaper price break than buying one board's worth would (see `Part.cheapest_price_break_for_quantity()` above); the returned `bom_total_cost` is still a per-board figure (weighted by each part's per-board count), which is what makes it comparable to, and sometimes identical to, the Design detail page's figure when the batch quantity isn't large enough to cross any part's next price break.
+
+### Adding a Design
+
+Before issue #133, the only ways to create a `Design` were the `import-xlsx` management command or the admin. The Designs list page now has a staff-only **Add Design** button (`design_list.html`) going to `design_add` (`device/views.py`), a standalone page (`device/design_add.html`) styled after the Design detail page's `#design-details` card above, submitting to its own `DesignAddForm` (`device/forms.py`). `DesignAddForm` is `DesignDetailsForm` (see above) plus `client`/`name`/`hw_version` — the three fields that, once a design exists, become fixed except via the import command or the admin — so this is the only form across the app where they're editable. On success it redirects to the new design's `design_detail` page, same as `design_update` does structurally. Unlike `batch_add`, which reuses `batch_edit.html` with `batch=None` for its add/edit split, `design_add` uses its own template rather than threading `design=None` through `design_detail.html`, since that page's BOM/Test Suite/Boards tabs all assume an existing design and would need their own add-mode gating for no benefit — the one card this feature needs was easy to lift out instead.
 
 ### Design Assets
 

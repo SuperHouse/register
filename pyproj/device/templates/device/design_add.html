@@ -1,0 +1,143 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Add Design - SuperHouse Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Add Design
+{% endblock h1 %}
+
+{% block content %}
+    <div class="col">
+        <div class="col-12 col-md-10">
+            <div class="mb-3">
+                <a href="{% url 'design_list' %}" class="btn btn-secondary">Back to Designs</a>
+            </div>
+
+            <div class="card border-0 mb-4" id="design-details">
+                <div class="card-body py-10">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                        {% endif %}
+                        <table class="table table-bordered">
+                            <tr>
+                                <th style="width: 220px;">{{ form.client.label }}:</th>
+                                <td>
+                                    {{ form.client }}
+                                    {% if form.client.errors %}<div class="text-danger small">{{ form.client.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.name.label }}:</th>
+                                <td>
+                                    {{ form.name }}
+                                    {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.hw_version.label }}:</th>
+                                <td>
+                                    {{ form.hw_version }}
+                                    {% if form.hw_version.errors %}<div class="text-danger small">{{ form.hw_version.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.sku.label }}:</th>
+                                <td>
+                                    {{ form.sku }}
+                                    {% if form.sku.errors %}<div class="text-danger small">{{ form.sku.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.description.label }}:</th>
+                                <td>
+                                    {{ form.description }}
+                                    {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.price.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 150px;">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.price }}
+                                    </div>
+                                    {% if form.price.errors %}<div class="text-danger small">{{ form.price.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.pcb_stock.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 150px;">
+                                        {{ form.pcb_stock }}
+                                    </div>
+                                    {% if form.pcb_stock.errors %}<div class="text-danger small">{{ form.pcb_stock.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.assembly_time_minutes.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 180px;">
+                                        {{ form.assembly_time_minutes }}
+                                        <span class="input-group-text">minutes</span>
+                                    </div>
+                                    {% if form.assembly_time_minutes.errors %}<div class="text-danger small">{{ form.assembly_time_minutes.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.additional_materials.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 150px;">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.additional_materials }}
+                                    </div>
+                                    {% if form.additional_materials.errors %}<div class="text-danger small">{{ form.additional_materials.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.pcb_cost.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 150px;">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.pcb_cost }}
+                                    </div>
+                                    {% if form.pcb_cost.errors %}<div class="text-danger small">{{ form.pcb_cost.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.packaging.label }}:</th>
+                                <td>
+                                    <div class="input-group" style="max-width: 150px;">
+                                        <span class="input-group-text">$</span>
+                                        {{ form.packaging }}
+                                    </div>
+                                    {% if form.packaging.errors %}<div class="text-danger small">{{ form.packaging.errors }}</div>{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.conformal_coating.label }}:</th>
+                                <td>
+                                    <div class="form-check">
+                                        {{ form.conformal_coating }}
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>{{ form.anti_shock_glue.label }}:</th>
+                                <td>
+                                    <div class="form-check">
+                                        {{ form.anti_shock_glue }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                        <button type="submit" class="btn btn-primary btn-sm">Add Design</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

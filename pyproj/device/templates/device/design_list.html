@@ -11,7 +11,7 @@
 {% endblock h1 %}
 
 {% block content %}
-    <div class="mb-3">
+    <div class="mb-3 d-flex justify-content-between align-items-start gap-2">
         <div class="input-group" style="max-width: 400px;">
             <span class="input-group-text"><i class="cil-magnifying-glass icon"></i></span>
             <input type="text" id="list-search" class="form-control" placeholder="Filter designs..."
@@ -21,6 +21,11 @@
                 <i class="cil-x icon"></i>
             </button>
         </div>
+        {% if user.is_staff %}
+            <a href="{% url 'design_add' %}" class="btn btn-primary text-nowrap">
+                <i class="cil-plus"></i> Add Design
+            </a>
+        {% endif %}
     </div>
 
     <div id="designs-results">
