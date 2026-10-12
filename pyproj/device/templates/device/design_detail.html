@@ -490,12 +490,17 @@
                                                     {% endif %}
                                                 </td>
                                                 <td class="text-nowrap" style="width:1px;background-color:white !important;box-shadow:none !important;border-bottom:none !important" onclick="event.stopPropagation()">
-                                                    <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                                            <i class="cil-trash"></i>
-                                                        </button>
-                                                    </form>
+                                                    <div class="d-flex gap-1">
+                                                        <a href="{% url 'erp:part_edit' entry.part.pk %}" class="btn btn-sm btn-secondary" title="View part">
+                                                            <i class="bi bi-cpu"></i>
+                                                        </a>
+                                                        <form method="post" action="{% url 'erp:design_bom_entry_delete' entry.pk %}">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                                                                <i class="cil-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         {% endfor %}
