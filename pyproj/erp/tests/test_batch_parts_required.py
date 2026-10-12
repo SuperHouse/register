@@ -1,3 +1,5 @@
+import re
+
 from django.urls import reverse
 import pytest
 
@@ -88,7 +90,8 @@ def test_parts_required_columns(client, staff_user, design):
     end = content.find('</tr>', idx)
     row = content[start:end]
     assert '<td>10</td>' in row
-    assert '<td>7</td>' in row
+    assert re.search(r'<td>\s*7\s', row)
+    assert 'title="Qty required exceeds stock"' in row
 
 
 @pytest.mark.django_db
@@ -100,3 +103,26 @@ def test_parts_required_empty_when_design_has_no_bom(client, staff_user, design)
     content = response.content.decode()
 
     assert 'This design has no BOM entries, so no parts are required.' in content
+
+
+@pytest.mark.django_db
+def test_parts_required_flags_rows_where_qty_exceeds_stock(client, staff_user, design):
+    enough = Part.objects.create(name='Enough Part', stock=10)
+    exact = Part.objects.create(name='Exact Part', stock=5)
+    short = Part.objects.create(name='Short Part', stock=4)
+    unset = Part.objects.create(name='Unset Part', stock=None)
+    exempt = Part.objects.create(name='Exempt Part', stock=None, no_stock_required=True)
+    for i, part in enumerate([enough, exact, short, unset, exempt]):
+        DesignBomEntry.objects.create(design=design, part=part, reference=f'U{i}')
+
+    batch = Batch.objects.create(design=design, quantity=5)
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:batch_edit', args=[batch.pk]))
+    flags = {row['part'].name: row['short'] for row in response.context['parts_required']}
+
+    assert flags == {
+        'Enough Part': False, 'Exact Part': False, 'Short Part': True,
+        'Unset Part': True, 'Exempt Part': False,
+    }
+    assert response.content.decode().count('title="Qty required exceeds stock"') == 2

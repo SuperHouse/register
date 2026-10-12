@@ -4037,6 +4037,11 @@ def _batch_parts_required(batch):
         {'part': parts_by_id[part_id], 'per_board': count, 'required': count * batch.quantity}
         for part_id, count in counts.items()
     ]
+    # `short` flags a row whose required quantity exceeds the part's manually-tracked stock
+    # (issue #137); a null stock counts as 0, same as _apply_part_stock_deltas.
+    for row in rows:
+        part = row['part']
+        row['short'] = not part.no_stock_required and row['required'] > (part.stock or 0)
     rows.sort(key=lambda row: row['part'].name.lower())
     return rows
 

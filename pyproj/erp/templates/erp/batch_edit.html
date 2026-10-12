@@ -271,7 +271,17 @@
                                                 {{ row.part.name }}
                                             </td>
                                             <td>{{ row.required }}</td>
-                                            <td>{% if row.part.no_stock_required %}<i class="bi bi-infinity"></i>{% else %}{{ row.part.stock|default_if_none:"-" }}{% endif %}</td>
+                                            <td>
+                                                {% if row.part.no_stock_required %}
+                                                    <i class="bi bi-infinity"></i>
+                                                {% else %}
+                                                    {{ row.part.stock|default_if_none:"-" }}
+                                                    {% if row.short %}
+                                                        <i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+                                                           title="Qty required exceeds stock"></i>
+                                                    {% endif %}
+                                                {% endif %}
+                                            </td>
                                             <td>
                                                 {% if row.part.no_stock_required %}
                                                     <i class="bi bi-infinity"></i>
