@@ -35,6 +35,7 @@ urlpatterns = [
     path('dashboard/', device_views.dashboard, name='dashboard'),
 
     path('design/', device_views.design_list, name='design_list'),
+    path('design/toggle-org/', device_views.design_org_toggle_collapse, name='design_org_toggle_collapse'),
     path('design/add/', device_views.design_add, name='design_add'),
     path('design/<int:design_id>/', device_views.design_detail, name='design_detail'),
     path('design/<int:design_id>/add-asset/', device_views.design_asset_add, name='design_asset_add'),

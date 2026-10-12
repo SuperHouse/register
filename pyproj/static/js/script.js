@@ -125,11 +125,12 @@ function initStatusButtons(tbodyId) {
 }
 
 // Wires up .category-header rows within the container identified by containerId so
-// clicking one toggles visibility of its .part-row siblings (matched via data-category)
-// and persists the expanded/collapsed state server-side via a POST to toggleUrl. Bound to
-// the container itself (not its rows) via event delegation, so it keeps working after
-// initServerFilter() replaces the container's innerHTML.
-function initCategoryCollapse(containerId, toggleUrl) {
+// clicking one toggles visibility of its rowSelector siblings (matched via data-category;
+// .part-row by default, as on the Parts list) and persists the expanded/collapsed state
+// server-side via a POST to toggleUrl. Bound to the container itself (not its rows) via
+// event delegation, so it keeps working after initServerFilter() replaces the container's
+// innerHTML. Also used by the Designs list's organisation groups (issue #138).
+function initCategoryCollapse(containerId, toggleUrl, rowSelector = '.part-row') {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -147,7 +148,7 @@ function initCategoryCollapse(containerId, toggleUrl) {
             caret.classList.toggle('bi-caret-right-fill', !expanded);
         }
 
-        container.querySelectorAll('.part-row[data-category="' + categoryKey + '"]').forEach(function (row) {
+        container.querySelectorAll(rowSelector + '[data-category="' + categoryKey + '"]').forEach(function (row) {
             row.style.display = expanded ? '' : 'none';
         });
 

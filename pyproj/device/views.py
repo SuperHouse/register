@@ -9,7 +9,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.core.files import File
 from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q, Sum
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -107,17 +107,17 @@ def top(request):
 
 
 def design_list(request):
-    """List all designs."""
+    """List all designs, grouped by organisation into collapsible sections (issue #138) -
+    same UI as the Parts list's category groups (see erp.views.part_list)."""
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
 
     if not request.user.is_staff:
         clients = Org.objects.filter(users=request.user)
         pcb_top_qs = pcb_top_qs.filter(internal=False)
 
-    designs = Design.objects.prefetch_related(
-        "client",
+    designs = Design.objects.select_related('client').prefetch_related(
         Prefetch('designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
-    ).order_by('obsolete', 'client', 'sku').all()
+    ).order_by('client__company_name', 'client', 'obsolete', 'sku')
 
     if not request.user.is_staff:
         designs = designs.filter(client__in=clients)
@@ -131,16 +131,42 @@ def design_list(request):
             Q(hw_version__icontains=q)
         )
 
-    paginator = Paginator(designs, 50)
-    page_obj = paginator.get_page(request.GET.get('page'))
+    org_groups = []
+    for design in designs:
+        if not org_groups or org_groups[-1]['org'].pk != design.client_id:
+            org_groups.append({'org': design.client, 'designs': []})
+        org_groups[-1]['designs'].append(design)
+
+    # A filter should reveal its matches even inside a collapsed group, without persisting
+    # that group as expanded; a lone group (e.g. a non-staff user in a single organisation)
+    # is always shown expanded, since collapsing the only group just hides the whole list.
+    expanded_orgs = set(request.session.get('designs_expanded_orgs', []))
+    for group in org_groups:
+        group['is_expanded'] = bool(q) or len(org_groups) == 1 or str(group['org'].pk) in expanded_orgs
 
     context = {
-        'designs': page_obj,
-        'page_obj': page_obj,
+        'org_groups': org_groups,
         'q': q,
     }
 
     return render(request, 'device/design_list.html', context)
+
+
+def design_org_toggle_collapse(request):
+    """Persist one Designs-list organisation group's expanded/collapsed state in the session
+    (issue #138) - the Designs equivalent of erp.views.part_category_toggle_collapse. Not
+    staff-only, since non-staff users can see the Designs list too."""
+    if request.method == 'POST':
+        org_key = request.POST.get('category', '')
+        expanded = request.POST.get('expanded') == 'true'
+        expanded_orgs = set(request.session.get('designs_expanded_orgs', []))
+        if expanded:
+            expanded_orgs.add(org_key)
+        else:
+            expanded_orgs.discard(org_key)
+        request.session['designs_expanded_orgs'] = list(expanded_orgs)
+
+    return JsonResponse({'status': 'ok'})
 
 
 @staff_member_required
