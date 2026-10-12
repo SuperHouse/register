@@ -959,6 +959,27 @@ def part_edit(request, part_id):
     for row in bom_refs:
         row['refs'].sort()
 
+    # Group this part's non-cancelled order lines by order for the Parts Orders card
+    # (issue #134). An order with more than one line for the same part is rare, so its
+    # lines are simply summed into one row.
+    _by_order = {}
+    order_lines = (
+        part.parts_order_lines.exclude(status=PartsOrderLine.CANCELLED)
+        .select_related('parts_order')
+        .order_by('-parts_order__order_dt', 'pk')
+    )
+    for line in order_lines:
+        row = _by_order.setdefault(line.parts_order_id, {
+            'parts_order': line.parts_order, 'quantity': 0, 'lines': [],
+        })
+        row['quantity'] += line.quantity
+        row['lines'].append(line)
+    parts_orders = list(_by_order.values())
+    for row in parts_orders:
+        prices = {(line.unit_price, line.currency) for line in row['lines']}
+        row['price_line'] = row['lines'][0] if len(prices) == 1 else None
+        row['received'] = all(line.received for line in row['lines'])
+
     ctx = {
         'form': form,
         'part': part,
@@ -968,6 +989,7 @@ def part_edit(request, part_id):
         'reparent_form': PartReparentForm(exclude_pk=part.pk),
         'cart_add_form': PartsCartAddFromPartForm(),
         'bom_refs': bom_refs,
+        'parts_orders': parts_orders,
         'stock_chart_data': _part_stock_chart_data(part),
     }
     return render(request, 'erp/part_edit.html', ctx)

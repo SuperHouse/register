@@ -552,3 +552,39 @@ def test_parts_order_detail_disables_controls_for_a_cancelled_line(client, staff
 
     assert 'table-secondary' in content
     assert 'design-picker-select' in content and 'disabled' in content
+
+
+@pytest.mark.django_db
+def test_part_edit_lists_parts_orders_grouped_and_excluding_cancelled(client, staff_user):
+    part = Part.objects.create(name='Order History Part')
+    now = timezone.now()
+    older = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-OLDER', order_dt=now - timedelta(days=30))
+    newer = PartsOrder.objects.create(supplier_name='Mouser', supplier_order_number='SO-NEWER', order_dt=now)
+    cancelled = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-CANCELLED', order_dt=now)
+    PartsOrderLine.objects.create(parts_order=older, part=part, quantity=10, received=True)
+    PartsOrderLine.objects.create(parts_order=newer, part=part, quantity=5, unit_price='0.1', received=True)
+    PartsOrderLine.objects.create(parts_order=newer, part=part, quantity=7, unit_price='0.1', received=False)
+    PartsOrderLine.objects.create(parts_order=cancelled, part=part, quantity=99, status=PartsOrderLine.CANCELLED)
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:part_edit', args=[part.pk]))
+    rows = response.context['parts_orders']
+
+    assert [row['parts_order'] for row in rows] == [newer, older]
+    assert rows[0]['quantity'] == 12
+    assert rows[0]['price_line'] is not None
+    assert rows[0]['received'] is False
+    assert rows[1]['received'] is True
+    content = response.content.decode()
+    assert reverse('erp:parts_order_detail', args=[newer.pk]) in content
+    assert 'SO-CANCELLED' not in content
+
+
+@pytest.mark.django_db
+def test_part_edit_hides_parts_orders_card_when_none(client, staff_user):
+    part = Part.objects.create(name='Never Ordered Part')
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:part_edit', args=[part.pk]))
+
+    assert '<strong>Parts Orders</strong>' not in response.content.decode()

@@ -548,6 +548,56 @@
                 </form>
             </div>
         </div>
+
+        {% if parts_orders %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <strong>Parts Orders</strong>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Order Number</th>
+                            <th>Supplier</th>
+                            <th>Order Date</th>
+                            <th>Quantity</th>
+                            <th>Unit Price</th>
+                            <th>Received</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in parts_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'erp:parts_order_detail' row.parts_order.pk %}">
+                                        {{ row.parts_order.supplier_order_number }}
+                                    </a>
+                                </td>
+                                <td class="text-body-secondary">{{ row.parts_order.supplier_name }}</td>
+                                <td class="text-body-secondary text-nowrap">{{ row.parts_order.order_dt|date:"j-M-Y"|default:"—" }}</td>
+                                <td class="text-body-secondary">{{ row.quantity }}</td>
+                                <td class="text-body-secondary text-nowrap">
+                                    {% if row.price_line and row.price_line.unit_price is not None %}
+                                        {{ row.price_line.symbol }}{{ row.price_line.unit_price|floatformat:-4 }} {{ row.price_line.currency }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.received %}
+                                        <i class="bi bi-check-circle-fill text-success" title="Received"></i>
+                                    {% else %}
+                                        <i class="bi bi-check-circle text-body-secondary" title="Not yet received"></i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
     {% endif %}
 {% endblock content %}
 
