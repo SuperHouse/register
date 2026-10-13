@@ -3151,13 +3151,25 @@ def parts_order_add_jlcpcb(request):
 @staff_member_required
 def parts_order_list(request):
     """List all supplier orders, newest first, filterable by ?q= against
-    supplier_order_number/supplier_name (same server-side initServerFilter AJAX pattern
-    as Parts/Designs)."""
+    supplier_order_number/supplier_name and the order's line items (same server-side
+    initServerFilter AJAX pattern as Parts/Designs).
+
+    Line items are matched via a pk__in subquery rather than filtering across the
+    `lines` join directly - a join would return an order once per matching line,
+    needing .distinct() to dedupe (which also makes the paginator's COUNT costlier)."""
     q = request.GET.get('q', '').strip()
     parts_orders_qs = PartsOrder.objects.prefetch_related('lines__part').order_by('-order_dt')
     if q:
+        matching_order_ids = PartsOrderLine.objects.filter(
+            Q(supplier_sku__icontains=q)
+            | Q(description__icontains=q)
+            | Q(part__name__icontains=q)
+            | Q(part_source_variant__source__manufacturer_sku__icontains=q)
+        ).values('parts_order_id')
         parts_orders_qs = parts_orders_qs.filter(
-            Q(supplier_order_number__icontains=q) | Q(supplier_name__icontains=q)
+            Q(supplier_order_number__icontains=q)
+            | Q(supplier_name__icontains=q)
+            | Q(pk__in=matching_order_ids)
         )
 
     paginator = Paginator(parts_orders_qs, 50)

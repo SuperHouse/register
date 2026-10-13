@@ -8,7 +8,7 @@ import pytest
 
 from crm.models import Org
 from device.models import Design
-from erp.models import Part, PartsOrder, PartsOrderLine
+from erp.models import Part, PartsOrder, PartsOrderLine, PartSource, PartSourceVariant
 
 
 @pytest.fixture
@@ -44,6 +44,71 @@ def test_parts_order_list_filters_by_q(client, staff_user):
 
     assert 'SO-MATCH' in content
     assert 'SO-OTHER' not in content
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('line_kwargs', [
+    {'supplier_sku': '296-TCAN1042-ND'},
+    {'description': 'IC TRANSCEIVER TCAN1042 8SOIC'},
+])
+def test_parts_order_list_filters_by_line_item_fields(client, staff_user, line_kwargs):
+    matching_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-MATCH')
+    PartsOrderLine.objects.create(parts_order=matching_order, quantity=1, **line_kwargs)
+    other_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-OTHER')
+    PartsOrderLine.objects.create(parts_order=other_order, supplier_sku='OTHER-ND', quantity=1)
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:parts_order_list'), {'q': 'tcan'})
+    content = response.content.decode()
+
+    assert 'SO-MATCH' in content
+    assert 'SO-OTHER' not in content
+
+
+@pytest.mark.django_db
+def test_parts_order_list_filters_by_matched_part_name(client, staff_user):
+    part = Part.objects.create(name='TCAN1042HGVDRQ1')
+    matching_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-MATCH')
+    PartsOrderLine.objects.create(parts_order=matching_order, part=part, supplier_sku='SKU1', quantity=1)
+    PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-OTHER')
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:parts_order_list'), {'q': 'tcan'})
+    content = response.content.decode()
+
+    assert 'SO-MATCH' in content
+    assert 'SO-OTHER' not in content
+
+
+@pytest.mark.django_db
+def test_parts_order_list_filters_by_manufacturer_sku(client, staff_user):
+    part = Part.objects.create(name='CAN transceiver')
+    source = PartSource.objects.create(part=part, supplier_name='DigiKey', manufacturer_sku='TCAN1042HGVDRQ1')
+    variant = PartSourceVariant.objects.create(source=source, supplier_sku='296-12345-1-ND')
+    matching_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-MATCH')
+    PartsOrderLine.objects.create(
+        parts_order=matching_order, part=part, part_source_variant=variant, supplier_sku='296-12345-1-ND', quantity=1,
+    )
+    PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-OTHER')
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:parts_order_list'), {'q': 'tcan'})
+    content = response.content.decode()
+
+    assert 'SO-MATCH' in content
+    assert 'SO-OTHER' not in content
+
+
+@pytest.mark.django_db
+def test_parts_order_list_line_item_filter_does_not_duplicate_orders(client, staff_user):
+    parts_order = PartsOrder.objects.create(supplier_name='DigiKey', supplier_order_number='SO-MATCH')
+    PartsOrderLine.objects.create(parts_order=parts_order, supplier_sku='TCAN1042-A', quantity=1)
+    PartsOrderLine.objects.create(parts_order=parts_order, supplier_sku='TCAN1042-B', quantity=1)
+
+    client.force_login(staff_user)
+    response = client.get(reverse('erp:parts_order_list'), {'q': 'tcan'})
+
+    assert response.context['page_obj'].paginator.count == 1
 
 
 @pytest.mark.django_db
