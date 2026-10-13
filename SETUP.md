@@ -75,13 +75,26 @@ across its Search/Cart/Order APIs) is tighter than DigiKey's — a busy Mouser a
 may need a coarser cron cadence than the example above, or a shorter
 `--lookback-days`.
 
+LCSC order syncing is not part of this cron job at all. It runs only from the Parts Orders
+page's "Refresh Orders" button, and only when `LCSC_SESSION_FILE` points to a saved LCSC
+login session. That session has to be captured on a desktop and copied to the server, and
+must be captured again whenever it expires (the refresh then fails with an error containing `/wmsc/order/page
+returned code=302`). See [Supplier API Setup → LCSC](docs/admin/supplier-apis.md#order-history-sync-optional)
+for the steps.
+
 JLCPCB order syncing is opt-in too: skipped entirely unless `JLCPCB_APP_ID`,
 `JLCPCB_ACCESS_KEY`, and `JLCPCB_SECRET_KEY` are all set in `.env` (see [JLCPCB API
 Integration](README.md#jlcpcb-api-integration)). It works differently from DigiKey/Mouser
 though — JLCPCB's API has no order-discovery endpoint at all, so this run doesn't search
-the lookback window for new orders; it just re-syncs the status of every JLCPCB order
-already on file. A new JLCPCB order still needs to be added once via the Parts Orders
-page's "Add PCB Order" field before this cron job will keep it updated.
+the lookback window for new orders; it just re-syncs the status of JLCPCB orders already
+on file. A new JLCPCB order still needs to be added once via the Parts Orders page's "Add
+PCB Order" field before this cron job will keep it updated.
+
+Mouser and JLCPCB (and LCSC, from the Parts Orders page) skip **finished** orders: ones
+where every line that isn't cancelled has been marked received. Each skipped order saves
+one supplier API call, and the output reports how many were skipped. Un-receiving a line
+makes its order eligible for refresh again. DigiKey has no per-order calls, so it isn't
+affected.
 
 ## Linux Local Setup (dev)
 

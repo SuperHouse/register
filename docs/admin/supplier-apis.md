@@ -8,6 +8,75 @@ The Parts library can look up component data from LCSC, DigiKey, Mouser, and Ele
 
 LCSC lookup uses LCSC's unofficial JSON API directly. **No API key or account is required.** The LCSC fetch button works out of the box.
 
+### Order history sync (optional)
+
+Parts Orders can also import your LCSC order history. This part does need your LCSC account. LCSC has no API key or OAuth flow for it, so Register uses the cookies from a real browser login instead, saved to a file. The file is called a *session file*.
+
+LCSC orders sync only when someone clicks **Refresh Orders** on the Parts Orders page. The scheduled `refresh_parts_orders` job does not sync LCSC.
+
+The session file can only be made on a computer with a screen, because you must log in to LCSC by hand in a browser window. Make it on your desktop, then copy it to the server.
+
+#### 1. Install the browser tools (desktop, once)
+
+On the desktop, in a Register checkout with its venv active:
+
+```bash
+pip install "lcsc-toolkit[auth]"
+playwright install chromium
+```
+
+#### 2. Make a session file (desktop)
+
+```bash
+cd pyproj
+LCSC_SESSION_FILE=$HOME/lcsc_session.json python manage.py lcsc_capture_session
+```
+
+Setting `LCSC_SESSION_FILE` on the command line is only needed if the desktop's own `.env` does not set it.
+
+A Chromium window opens. Log in to LCSC, including any CAPTCHA or two-factor step. The command then saves the file and checks it. Make sure that it prints `Confirmed - session is logged in and working.` If it does not, run it again.
+
+#### 3. Copy the session file to the server
+
+Find the path that the server expects:
+
+```bash
+grep LCSC_SESSION_FILE /path/to/register/pyproj/.env
+```
+
+Copy the file to that path:
+
+```bash
+scp ~/lcsc_session.json yourserver:/path/from/the/env/file.json
+```
+
+!!! warning
+    The session file gives access to your LCSC account, like a password. On the server, make it readable only by the user that runs Register (for example `chmod 600`, owned by the uWSGI user). Delete the copy on your desktop when you are done.
+
+If the server's `.env` does not set `LCSC_SESSION_FILE` yet, add it and restart Register:
+
+```env
+LCSC_SESSION_FILE=/path/to/lcsc_session.json
+```
+
+#### 4. Check that it works
+
+Click **Refresh Orders** on the Parts Orders page. You do not need to restart Register when you replace the file, because Register reads it each time it syncs.
+
+#### When the session expires
+
+LCSC sessions expire after some time. The exact lifetime is not known, and there is no way to renew a session automatically. When the session has expired, **Refresh Orders** shows an error like one of these. The wording depends on the installed version of `lcsc-toolkit`:
+
+```
+Refresh failed: LCSC order sync failed: LCSC session has expired (/wmsc/order/page returned code=302) - capture a new session and replace the saved session file
+```
+
+```
+Refresh failed: LCSC order sync failed: /wmsc/order/page returned code=302:
+```
+
+To fix it, do steps 2 to 4 again. You do not need to change `.env`.
+
 ---
 
 ## DigiKey

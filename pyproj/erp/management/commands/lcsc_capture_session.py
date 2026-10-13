@@ -13,13 +13,18 @@ class Command(BaseCommand):
         "Run it on a machine with a display - your desktop, not this server - then copy "
         "the saved session file to wherever LCSC_SESSION_FILE points on the server. "
         "Requires the lcsc-toolkit[auth] extra: pip install lcsc-toolkit[auth] && "
-        "playwright install chromium."
+        "playwright install chromium. Re-run whenever the session expires - the Parts "
+        "Orders refresh then fails with an error containing '/wmsc/order/page returned code=302'. Full steps: "
+        "docs/admin/supplier-apis.md."
     )
 
     def handle(self, *args, **options):
         session_file = os.environ.get('LCSC_SESSION_FILE', '').strip()
         if not session_file:
-            raise CommandError('LCSC_SESSION_FILE is not set in .env - set it before running this command.')
+            raise CommandError(
+                'LCSC_SESSION_FILE is not set. Set it in .env, or just for this run, e.g.: '
+                'LCSC_SESSION_FILE=$HOME/lcsc_session.json python manage.py lcsc_capture_session'
+            )
 
         self.stdout.write(self.style.WARNING(
             "This opens a real browser window on THIS machine. If you're running this over "

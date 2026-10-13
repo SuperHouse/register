@@ -2298,6 +2298,27 @@ def _match_or_create_part_for_digikey_line(supplier_sku, description):
     return part, variant
 
 
+def _finished_parts_order_numbers(supplier_name):
+    """supplier_order_numbers of this supplier's PartsOrders that are finished: every line
+    that isn't CANCELLED has been marked received (an order whose lines are all cancelled
+    counts too). An order with no lines at all is not finished - it may simply not have
+    synced properly yet.
+
+    Bulk refreshes skip finished orders: once the goods are physically in, nothing the
+    supplier reports later is useful, and each skipped order saves a per-order API call
+    (Mouser/LCSC order details, JLCPCB order lookups). Un-receiving any line makes the order
+    eligible again on the next refresh. DigiKey doesn't use this - its search returns line items for every order in
+    one paginated response either way, so skipping would save no requests."""
+    return set(
+        PartsOrder.objects.filter(supplier_name=supplier_name).annotate(
+            line_count=Count('lines'),
+            open_line_count=Count(
+                'lines', filter=Q(lines__received=False) & ~Q(lines__status=PartsOrderLine.CANCELLED),
+            ),
+        ).filter(line_count__gt=0, open_line_count=0).values_list('supplier_order_number', flat=True)
+    )
+
+
 def _upsert_parts_order(parsed_order, supplier_name='DigiKey', part_matcher=_match_or_create_part_for_digikey_line):
     """Create/update one PartsOrder and its PartsOrderLines from a _parse_digikey_order()/
     _parse_mouser_order() result. Generic across suppliers - supplier_name and part_matcher
@@ -2366,7 +2387,7 @@ def _sync_digikey_parts_orders(from_date, to_date):
     """Discover and upsert every DigiKey order placed in [from_date, to_date]. Never raises -
     mirrors _refresh_variant's {'ok': True/False, 'error': ...} contract. The single function
     called by both the refresh_parts_orders management command and the optional
-    parts_order_refresh "Refresh now" view. Part.incoming_stock is a computed property read
+    parts_order_refresh "Refresh Orders" view. Part.incoming_stock is a computed property read
     live from PartsOrderLine (see erp.models.Part.incoming_stock), so unlike before, there's
     nothing to recompute here once the lines themselves are synced.
     """
@@ -2580,7 +2601,7 @@ def _sync_mouser_parts_orders(from_date, to_date):
     """Discover and upsert every Mouser order placed in [from_date, to_date]. Never raises -
     mirrors _sync_digikey_parts_orders'/_refresh_variant's {'ok': True/False, 'error': ...}
     contract. Called by both the refresh_parts_orders management command and the optional
-    parts_order_refresh "Refresh now" view, but only when MOUSER_ORDER_API_KEY is actually
+    parts_order_refresh "Refresh Orders" view, but only when MOUSER_ORDER_API_KEY is actually
     configured - callers are expected to skip calling this at all otherwise, so a deployment
     that hasn't set up Mouser order tracking doesn't get a "not configured" error on every
     refresh; the check here is a defensive fallback for direct/test callers.
@@ -2595,20 +2616,25 @@ def _sync_mouser_parts_orders(from_date, to_date):
         if errors:
             return {'ok': False, 'error': f'Mouser API error: {errors[0]}'}
 
+        finished = _finished_parts_order_numbers('Mouser')
         synced = 0
+        skipped = 0
         items = history.get('OrderHistoryItems') or []
-        for index, item in enumerate(items):
+        for item in items:
             order_number = item.get('SalesOrderNumber')
             if not order_number:
                 continue
-            if index > 0:
+            if str(order_number) in finished:
+                skipped += 1
+                continue
+            if synced > 0:
                 time.sleep(MOUSER_ORDER_API_MIN_INTERVAL)
             detail = _mouser_order_detail(api_key, order_number)
             parsed = _parse_mouser_order(item, detail)
             _upsert_parts_order(parsed, supplier_name='Mouser', part_matcher=_match_or_create_part_for_mouser_line)
             synced += 1
 
-        return {'ok': True, 'orders_synced': synced}
+        return {'ok': True, 'orders_synced': synced, 'orders_skipped': skipped}
 
     except Exception as e:
         return {'ok': False, 'error': f'Mouser order sync failed: {e}'}
@@ -2743,7 +2769,7 @@ def _sync_lcsc_parts_orders(from_date, to_date):
     """Discover and upsert every LCSC order placed on or after from_date. Never raises -
     same {'ok': True/False, 'error'/'orders_synced': ...} contract as
     _sync_digikey_parts_orders/_sync_mouser_parts_orders. Called only by the
-    parts_order_refresh "Refresh now" view for now (see the module comment above) - not the
+    parts_order_refresh "Refresh Orders" view for now (see the module comment above) - not the
     scheduled refresh_parts_orders command - but only when LCSC_SESSION_FILE is actually
     configured and the file exists; callers are expected to gate on that before calling at
     all, the check here is a defensive fallback for direct/test callers (same convention as
@@ -2764,19 +2790,24 @@ def _sync_lcsc_parts_orders(from_date, to_date):
         session = LcscSession.load(session_file)
         client = OrdersClient(session)
 
+        finished = _finished_parts_order_numbers('LCSC')
         synced = 0
+        skipped = 0
         for summary in client.iter_orders(sort_type='timeDesc'):
             order_dt = _parse_lcsc_dt(summary.create_time)
             if order_dt is not None and order_dt.date() < from_date:
                 break
             if not summary.order_code:
                 continue
+            if summary.order_code in finished:
+                skipped += 1
+                continue
             detail = client.get_order_detail(summary.uuid)
             parsed = _parse_lcsc_order(summary, detail)
             _upsert_parts_order(parsed, supplier_name='LCSC', part_matcher=_match_or_create_part_for_lcsc_line)
             synced += 1
 
-        return {'ok': True, 'orders_synced': synced}
+        return {'ok': True, 'orders_synced': synced, 'orders_skipped': skipped}
 
     except Exception as e:
         return {'ok': False, 'error': f'LCSC order sync failed: {e}'}
@@ -3127,6 +3158,34 @@ def _sync_jlcpcb_parts_order(batch_num):
         return {'ok': False, 'error': f'JLCPCB order sync failed: {e}'}
 
 
+def _sync_known_jlcpcb_parts_orders():
+    """Re-sync every already-known JLCPCB PartsOrder that isn't finished (see
+    _finished_parts_order_numbers), one _sync_jlcpcb_parts_order() call each. JLCPCB has no
+    discovery endpoint and no date window, so without the finished-order filter this would
+    re-fetch every JLCPCB order ever placed, on every refresh. Shared by parts_order_refresh
+    and the refresh_parts_orders management command. Never raises; returns
+    {'ok', 'orders_synced', 'orders_skipped', 'errors', 'error'?} - 'errors' is the list of
+    per-order failures, each prefixed by its batch number, and 'error' (only when there were
+    any) joins them for display."""
+    finished = _finished_parts_order_numbers('JLCPCB')
+    errors = []
+    synced = 0
+    skipped = 0
+    for order in PartsOrder.objects.filter(supplier_name='JLCPCB'):
+        if order.supplier_order_number in finished:
+            skipped += 1
+            continue
+        result = _sync_jlcpcb_parts_order(order.supplier_order_number)
+        if result.get('ok'):
+            synced += 1
+        else:
+            errors.append(f"{order.supplier_order_number}: {result.get('error', 'unknown error')}")
+    result = {'ok': not errors, 'orders_synced': synced, 'orders_skipped': skipped, 'errors': errors}
+    if errors:
+        result['error'] = '; '.join(errors)
+    return result
+
+
 @staff_member_required
 def parts_order_add_jlcpcb(request):
     """POST-only: create/refresh a JLCPCB PartsOrder from a manually-entered batchNum. This
@@ -3242,9 +3301,11 @@ def parts_order_refresh(request):
     LCSC_SESSION_FILE - and LCSC is only ever synced from here, never from the scheduled
     refresh_parts_orders command (see the module comment above). JLCPCB is gated the same
     way, on the three JLCPCB_* env vars all being set - but unlike the other three, there's
-    no discovery step: it just re-syncs every already-known JLCPCB PartsOrder one at a time
-    (see _sync_jlcpcb_parts_order's module comment). Overall ok is True only if every sync
-    that was actually attempted succeeded."""
+    no discovery step: it re-syncs already-known JLCPCB PartsOrders one at a time (see
+    _sync_known_jlcpcb_parts_orders). Mouser/LCSC/JLCPCB all skip finished orders (every
+    line received - see _finished_parts_order_numbers). Overall ok is True only if every
+    sync that was actually attempted succeeded; on success a synced/skipped summary is
+    queued with the messages framework for the page reload that follows."""
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
 
@@ -3266,19 +3327,22 @@ def parts_order_refresh(request):
         response['ok'] = response['ok'] and lcsc_result.get('ok', False)
 
     if _jlcpcb_configured():
-        jlcpcb_errors = []
-        synced = 0
-        for order in PartsOrder.objects.filter(supplier_name='JLCPCB'):
-            result = _sync_jlcpcb_parts_order(order.supplier_order_number)
-            if result.get('ok'):
-                synced += 1
-            else:
-                jlcpcb_errors.append(result.get('error', 'unknown error'))
-        jlcpcb_result = {'ok': not jlcpcb_errors, 'orders_synced': synced}
-        if jlcpcb_errors:
-            jlcpcb_result['error'] = '; '.join(jlcpcb_errors)
+        jlcpcb_result = _sync_known_jlcpcb_parts_orders()
         response['jlcpcb'] = jlcpcb_result
         response['ok'] = response['ok'] and jlcpcb_result['ok']
+
+    if response['ok']:
+        # The page reloads on success, so this summary is shown via the messages framework
+        # on the reloaded page rather than in the JSON response.
+        synced = sum(r.get('orders_synced', 0) for r in response.values() if isinstance(r, dict))
+        skipped = sum(r.get('orders_skipped', 0) for r in response.values() if isinstance(r, dict))
+        summary = f'Refreshed {synced} order{"" if synced == 1 else "s"}.'
+        if skipped:
+            summary += (
+                f' Skipped {skipped} finished order{"" if skipped == 1 else "s"}'
+                ' (every line received).'
+            )
+        messages.success(request, summary)
 
     return JsonResponse(response)
 

@@ -631,16 +631,24 @@ class PartsOrder(models.Model):
         indicator on the Parts Orders list - same convention as
         BatchProductionStage.get_status_color_class(). Grey if no lines are received yet
         (including an order with no lines at all), blue if some but not all lines are
-        received, green once every line is received."""
+        received, green once every line is received.
+
+        CANCELLED lines are left out of the count: they can never be received (the Receive
+        toggle refuses them), so counting them kept an order with, say, a JLCPCB
+        replaced-file leftover line blue forever. An order whose lines are all cancelled is
+        green - nothing is outstanding. This matches what bulk refreshes treat as a finished
+        order (erp.views._finished_parts_order_numbers), so a green dot means "skipped by
+        Refresh Orders"."""
         lines = list(self.lines.all())
         if not lines:
             return 'bg-secondary'
 
-        received_count = sum(1 for line in lines if line.received)
+        receivable = [line for line in lines if line.status != PartsOrderLine.CANCELLED]
+        received_count = sum(1 for line in receivable if line.received)
+        if received_count == len(receivable):
+            return 'bg-success'
         if received_count == 0:
             return 'bg-secondary'
-        if received_count == len(lines):
-            return 'bg-success'
         return 'bg-info'
 
 

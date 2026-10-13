@@ -24,8 +24,10 @@
             real browser sizing quirk where flex-basis:auto/width:max-content compute narrower than
             the actual (non-shrinking) children, clipping content. If either button's label text
             changes, re-measure this group's natural width and update the pixel value to match.
+            Last measured 2026-10-13 with the JLCPCB form shown: 320 + 8 gap + 155.7 ("Refresh
+            Orders") = 483.7px natural, plus the ~14px margin the original value carried.
         {% endcomment %}
-        <div class="d-flex gap-2" style="flex: 0 0 520px;">
+        <div class="d-flex gap-2" style="flex: 0 0 498px;">
             {% if jlcpcb_configured %}
                 <form method="post" action="{% url 'erp:parts_order_add_jlcpcb' %}"
                       class="input-group input-group-sm flex-nowrap" style="max-width: 320px; flex: none;">
@@ -37,7 +39,7 @@
                 </form>
             {% endif %}
             <button type="button" id="refresh-orders-btn" class="btn btn-outline-secondary text-nowrap" style="flex: none;">
-                <i class="bi bi-arrow-clockwise"></i> Refresh All Orders
+                <i class="bi bi-arrow-clockwise"></i> Refresh Orders
             </button>
         </div>
     </div>
@@ -154,13 +156,13 @@
                             .map(result => result.error || 'unknown error');
                         alert('Refresh failed: ' + (failures.join('; ') || data.error || 'unknown error'));
                         btn.disabled = false;
-                        btn.innerHTML = '<i class="cil-reload"></i> Refresh All Orders';
+                        btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh Orders';
                     }
                 })
                 .catch(() => {
                     alert('Refresh failed.');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="cil-reload"></i> Refresh All Orders';
+                    btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh Orders';
                 });
         });
     </script>
