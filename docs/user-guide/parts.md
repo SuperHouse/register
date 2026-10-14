@@ -16,7 +16,7 @@ Click a part name to open its detail/edit page. Each part has:
 - **Value** — component value (e.g. `10k`, `100nF`)
 - **Category** — optional hierarchical category
 - **Description** — free-text description
-- **Fusion Library** — the Fusion Electronics library this part came from
+- **Library** — the CAD library this part came from: a Fusion Electronics library, or a KiCAD symbol library
 - **Image** — product photo (can be auto-populated from supplier lookups)
 
 ## Sources
@@ -59,7 +59,7 @@ Files such as datasheets, application notes, and specifications can be attached 
 
 ## BOM import
 
-The **Populate from BOM** button on the Parts list page accepts a CSV file exported from Autodesk Fusion Electronics. The columns expected are `reference`, `device`, `package`, `value`, and `library`.
+The **Populate from BOM** button on the Parts list page accepts a BOM CSV file, such as the one Register extracts from a Fusion or KiCAD project. The columns expected are `reference`, `device`, `package`, `value`, and `library`.
 
 For each row the importer:
 

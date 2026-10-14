@@ -174,7 +174,12 @@ class Part(models.Model):
     pth_joints = models.PositiveIntegerField(
         null=True, blank=True, help_text='Number of PTH (through-hole) solder joints for one placement of this part'
     )
-    fusion_library = models.CharField(max_length=200, blank=True, help_text='Fusion Electronics library name')
+    # Named for Fusion, where it started; KiCAD BOM imports (issue #143) store the symbol library
+    # here too. The column keeps its name so old data exports still load - only labels changed.
+    fusion_library = models.CharField(
+        max_length=200, blank=True, verbose_name='Library',
+        help_text='CAD library the part came from (a Fusion Electronics library or a KiCAD symbol library)',
+    )
     stock = models.IntegerField(
         null=True, blank=True, help_text='Manually-tracked on-hand stock count, independent of supplier listings'
     )
@@ -783,8 +788,11 @@ class PartCategory(models.Model):
 
 
 class BomLibrarySetting(models.Model):
-    """Per-Fusion-library behaviour applied when importing parts from a BOM CSV."""
-    library = models.CharField(max_length=200, unique=True, help_text='Fusion Electronics library name')
+    """Per-library behaviour applied when importing parts from a BOM CSV (Fusion or KiCAD)."""
+    library = models.CharField(
+        max_length=200, unique=True,
+        help_text='CAD library name (a Fusion Electronics library or a KiCAD symbol library)',
+    )
     ignore_device = models.BooleanField(
         default=False,
         help_text="When importing parts from this library, ignore the 'device' field: it is not used to "

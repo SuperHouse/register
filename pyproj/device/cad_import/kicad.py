@@ -1,8 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import csv
 import shutil
 import subprocess
+import tempfile
 import zipfile
+from decimal import Decimal, InvalidOperation
 from pathlib import Path, PurePosixPath
 
 from django.conf import settings
@@ -10,7 +13,7 @@ from PIL import Image
 
 from device.models import Design
 
-from .base import CadExtractor, CadImportError, ExtractedAssets
+from .base import SIDE_BOTTOM, SIDE_TOP, CadExtractor, CadImportError, ExtractedAssets, Placement, normalise_rotation
 
 # Fallback when KICAD_CLI is unset and kicad-cli isn't on PATH - a standard macOS install.
 MACOS_KICAD_CLI = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli'
@@ -34,6 +37,10 @@ RENDER_MARGIN = 20
 # kicad-cli fits the board outline to the canvas, so parts that overhang the edge or stand
 # tall would be clipped at zoom 1. Zooming out leaves room for them; the extra margin is
 # trimmed afterwards anyway. --perspective was tried for the 3D view and clipped badly.
+# kicad-cli writes six decimal places; DesignBomEntry stores four (positions) and two (rotation).
+POSITION_STEP = Decimal('0.0001')
+ROTATION_STEP = Decimal('0.01')
+
 RENDER_VIEWS = {
     'pcb_top': ['--side', 'top', '--zoom', '0.9'],
     'pcb_bottom': ['--side', 'bottom', '--zoom', '0.9'],
@@ -153,6 +160,7 @@ class KicadCadExtractor(CadExtractor):
     project_label = 'KiCAD Project'
     project_icon = 'img/filetypes/kicad.svg'
     file_extensions = ('.zip',)
+    placement_extensions = ('.kicad_pcb',)
 
     def accepts(self, uploaded_file):
         try:
@@ -198,3 +206,40 @@ class KicadCadExtractor(CadExtractor):
             setattr(extracted, field, png)
 
         return extracted
+
+    def read_placements(self, pcb_path):
+        """Positions via `kicad-cli pcb export pos`, i.e. exactly what KiCad itself writes to a
+        position (CPL) file: millimetres, Y up, measured from the board's drill/place file
+        origin - which is the page origin when none is set, giving negative Y values. Parts
+        marked "exclude from position files" in KiCad (mounting holes, logos, ...) are absent.
+
+        The board is copied into a temp dir under CAD_IMPORT_WORK_DIR first, so a Flatpak
+        kicad-cli (private /tmp, limited filesystem access) can read it.
+        """
+        with tempfile.TemporaryDirectory(dir=settings.CAD_IMPORT_WORK_DIR) as tmpdir:
+            work = Path(tmpdir)
+            board = work / Path(pcb_path).name
+            shutil.copyfile(pcb_path, board)
+            positions = work / 'positions.csv'
+            _run_cli([
+                'pcb', 'export', 'pos',
+                '--format', 'csv', '--units', 'mm', '--side', 'both', '--use-drill-file-origin',
+                '--output', positions, board,
+            ], positions, work)
+            rows = list(csv.DictReader(positions.open(newline='', encoding='utf-8')))
+
+        placements = {}
+        for row in rows:
+            reference = (row.get('Ref') or '').strip()
+            if not reference:
+                continue
+            try:
+                placements[reference] = Placement(
+                    pos_x=Decimal(row['PosX']).quantize(POSITION_STEP),
+                    pos_y=Decimal(row['PosY']).quantize(POSITION_STEP),
+                    rotation=normalise_rotation(row['Rot']).quantize(ROTATION_STEP),
+                    side=SIDE_BOTTOM if row.get('Side', '').strip().lower() == 'bottom' else SIDE_TOP,
+                )
+            except (InvalidOperation, KeyError):
+                continue
+        return placements

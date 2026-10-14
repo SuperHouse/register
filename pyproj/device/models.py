@@ -29,9 +29,10 @@ class Design(models.Model):
     # The CAD tool of the design's current CAD_PROJECT asset (issue #140), blank if it has none
     # or it isn't a recognised project file. Not user-editable: design_asset_add sets it from
     # the uploaded file itself and design_asset_delete clears it, so it always describes the
-    # file. Used for the Design Files row's label/icon, and later to pick how other files are
-    # read (e.g. placements, register#143). Add one choice per supported tool - see
-    # CAD_IMPORT_PLAN.md.
+    # file. Used for the Design Files row's label/icon, and kept as a field for per-tool
+    # reporting. Other files are read according to their own type (e.g. placements by the PCB
+    # Design File's extension, register#143), not this. Add one choice per supported tool,
+    # alongside its extractor in device/cad_import.
     CAD_FUSION = 'FUSION'
     CAD_KICAD = 'KICAD'
 

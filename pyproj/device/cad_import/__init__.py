@@ -6,7 +6,7 @@ Each supported CAD tool has one CadExtractor subclass, registered in EXTRACTORS 
 Design.cad_tool value. design_asset_add picks one with extractor_for_upload() when a
 CAD_PROJECT asset is uploaded and runs it through extract_and_save(), which is shared by
 every tool. Adding a tool means one module here, one entry in EXTRACTORS, and one
-Design.CAD_TOOL_CHOICES value. See CAD_IMPORT_PLAN.md.
+Design.CAD_TOOL_CHOICES value.
 """
 import tempfile
 from pathlib import Path
@@ -16,7 +16,7 @@ from django.core.files import File
 
 from device.models import DesignAsset
 
-from .base import CadExtractor, CadImportError, ExtractedAssets
+from .base import SIDE_BOTTOM, SIDE_TOP, CadExtractor, CadImportError, ExtractedAssets, Placement
 from .fusion import FusionCadExtractor
 from .kicad import KicadCadExtractor
 
@@ -40,6 +40,19 @@ def extractor_for_upload(uploaded_file):
     for extractor in EXTRACTORS.values():
         if suffix in extractor.file_extensions and extractor.accepts(uploaded_file):
             return extractor
+    return None
+
+
+def read_placements(pcb_path):
+    """Part positions from a PCB Design File, read by whichever extractor handles its
+    extension (an EAGLE .brd or a .kicad_pcb), as {reference designator: Placement}.
+
+    Returns None if no extractor reads this kind of file. Raises CadImportError on failure.
+    """
+    suffix = Path(pcb_path).suffix.lower()
+    for extractor in EXTRACTORS.values():
+        if suffix in extractor.placement_extensions:
+            return extractor.read_placements(Path(pcb_path))
     return None
 
 
@@ -77,6 +90,6 @@ def save_extracted_assets(design, extracted, stem):
 
 __all__ = [
     'CadExtractor', 'CadImportError', 'DEFAULT_PROJECT_LABEL', 'EXTRACTORS', 'ExtractedAssets',
-    'FusionCadExtractor', 'KicadCadExtractor', 'extract_and_save', 'extractor_for_upload', 'get_extractor',
-    'save_extracted_assets',
+    'FusionCadExtractor', 'KicadCadExtractor', 'Placement', 'SIDE_BOTTOM', 'SIDE_TOP', 'extract_and_save',
+    'extractor_for_upload', 'get_extractor', 'read_placements', 'save_extracted_assets',
 ]

@@ -68,6 +68,15 @@ Parts whose footprints have no 3D model appear in the renders as bare pads.
 
 The project must be from KiCad 6 or later. To use a KiCad 5 project, open it in a newer KiCad and save it first. A `.zip` must hold exactly one KiCAD project. If it holds none, Register stores the file without extracting anything.
 
+### Positions from the board
+
+The **Populate from BOM** button on the Bill of Materials tab adds a row for each part in the design's BOM CSV. It also reads each part's position, rotation, and side from the PCB Design File:
+
+- For a Fusion design, Register reads them from the `.brd` file.
+- For a KiCAD design, Register gets them from KiCad, as in a KiCad position file. They are in millimetres, measured from the drill/place file origin. If the board has no drill/place origin, KiCad measures from the page corner, so most Y values are negative. To get positive values, set the drill/place file origin to the board's lower-left corner in KiCad.
+
+Parts that KiCad excludes from position files, such as mounting holes, get a BOM row without a position.
+
 ### Attachments
 
 Arbitrary files (extra firmware images, inspection photos, notes PDFs, etc.) can be added in the Attachments section. These don't replace each other — any number can be attached.

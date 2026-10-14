@@ -1,11 +1,18 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+import re
+import xml.etree.ElementTree as ET
+from decimal import Decimal, InvalidOperation
+
 from fusionextractor.exceptions import FusionExtractorError
 from fusionextractor.f3z import FusionProject
 
 from device.models import Design
 
-from .base import CadExtractor, CadImportError, ExtractedAssets
+from .base import SIDE_BOTTOM, SIDE_TOP, CadExtractor, CadImportError, ExtractedAssets, Placement, normalise_rotation
+
+# An EAGLE element's rot attribute: "R90", or "MR90" for a part mirrored onto the bottom.
+_BRD_ROT_RE = re.compile(r'^(M)?R(-?\d+(?:\.\d+)?)$')
 
 
 class FusionCadExtractor(CadExtractor):
@@ -18,6 +25,7 @@ class FusionCadExtractor(CadExtractor):
     project_label = 'Fusion Electronics Project'
     project_icon = 'img/filetypes/fusion.svg'
     file_extensions = ('.f3z',)
+    placement_extensions = ('.brd',)
 
     def extract(self, project_path, out_dir):
         try:
@@ -37,3 +45,37 @@ class FusionCadExtractor(CadExtractor):
         except FusionExtractorError as e:
             raise CadImportError(str(e)) from e
         return extracted
+
+    def read_placements(self, pcb_path):
+        """Positions from an EAGLE .brd (the PCB Design File a .f3z produces). Coordinates are
+        EAGLE's own millimetres, so they match Fusion's CAM output.
+
+        Reference designators (the <element name="..."> attribute) match the BOM CSV's
+        `reference` column exactly, since both come from the same board - so they're the join
+        key rather than library/device/package/value, which don't line up consistently between
+        the two exports. A file that isn't valid XML yields no placements (moved unchanged
+        from erp.views._parse_brd_placements, issue #143).
+        """
+        placements = {}
+        try:
+            elements = ET.parse(pcb_path).find('drawing/board/elements')
+        except ET.ParseError:
+            return placements
+        if elements is None:
+            return placements
+
+        for element in elements.findall('element'):
+            reference = element.get('name')
+            if not reference:
+                continue
+            match = _BRD_ROT_RE.match(element.get('rot', 'R0'))
+            try:
+                placements[reference] = Placement(
+                    pos_x=Decimal(element.get('x', '0')),
+                    pos_y=Decimal(element.get('y', '0')),
+                    rotation=normalise_rotation(match.group(2)) if match else Decimal('0'),
+                    side=SIDE_BOTTOM if match and match.group(1) else SIDE_TOP,
+                )
+            except InvalidOperation:
+                continue
+        return placements

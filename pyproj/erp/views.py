@@ -55,6 +55,7 @@ from .forms import (
     ProductionStageTemplateStepForm,
 )
 from crm.models import Org
+from device.cad_import import CadImportError, read_placements
 from device.models import Design, DesignAsset
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
@@ -582,68 +583,43 @@ def _resolve_bom_csv_row(row, exclusion_rules, equivalence_rules, library_settin
     ).order_by('pk').first()
     created = False
     if not part:
-        name = ' '.join(p for p in [value, package, device.capitalize()] if p) or 'Unnamed Part'
+        # A KiCAD package is a full footprint id ("LED_THT:LED_D3.0mm"); the library prefix is
+        # noise in a display name, so only the name drops it - `package` keeps the full id, which
+        # is what matching uses (issue #143). Fusion packages have no prefix and are unaffected.
+        name_package = package.rsplit(':', 1)[-1]
+        name = ' '.join(p for p in [value, name_package, device.capitalize()] if p) or 'Unnamed Part'
         part = Part.objects.create(name=name, device=device, package=package, value=value, fusion_library=library)
         created = True
 
     return reference, part, created
 
 
-_BRD_ROT_RE = re.compile(r'^(M)?R(-?\d+(?:\.\d+)?)$')
-
-
-def _parse_brd_placements(brd_path):
-    """Parse an EAGLE .brd file into {reference designator: {pos_x, pos_y, rotation, side}}.
-
-    Reference designators (the <element name="..."> attribute) match the BOM CSV's `reference`
-    column exactly, since both are generated from the same Fusion Electronics board for a given
-    design — so it's used as the join key rather than library/device/package/value, which don't
-    line up consistently between the two exports.
-    """
-    placements = {}
-    try:
-        elements = ET.parse(brd_path).find('drawing/board/elements')
-    except ET.ParseError:
-        return placements
-    if elements is None:
-        return placements
-
-    for element in elements.findall('element'):
-        reference = element.get('name')
-        if not reference:
-            continue
-        match = _BRD_ROT_RE.match(element.get('rot', 'R0'))
-        try:
-            placements[reference] = {
-                'pos_x': Decimal(element.get('x', '0')),
-                'pos_y': Decimal(element.get('y', '0')),
-                'rotation': Decimal(match.group(2)) if match else Decimal('0'),
-                'side': DesignBomEntry.BOTTOM if match and match.group(1) else DesignBomEntry.TOP,
-            }
-        except InvalidOperation:
-            continue
-    return placements
-
-
-def _apply_brd_placements(design):
+def _apply_placements(design):
     """Backfill pos_x/pos_y/rotation/side on a design's BOM entries from its PCB Design File asset.
 
-    Returns the number of entries updated, or None if the design has no PCB Design File asset.
+    The file is read according to what it is - an EAGLE .brd from a Fusion project, or a
+    .kicad_pcb (issue #143) - by device.cad_import.read_placements(). Reference designators
+    are the join key with the BOM rows.
+
+    Returns the number of entries updated, or None if the design has no PCB Design File asset
+    or it's a kind of file nothing reads positions from. Raises CadImportError if reading fails.
     """
-    brd_asset = design.designasset_set.filter(asset_type=DesignAsset.PCB_DESIGN).first()
-    if not brd_asset:
+    pcb_asset = design.designasset_set.filter(asset_type=DesignAsset.PCB_DESIGN).first()
+    if not pcb_asset:
         return None
 
-    placements = _parse_brd_placements(brd_asset.file.path)
+    placements = read_placements(pcb_asset.file.path)
+    if placements is None:
+        return None
     entries_to_update = []
     for entry in design.bom_entries.all():
         placement = placements.get(entry.reference)
         if not placement:
             continue
-        entry.pos_x = placement['pos_x']
-        entry.pos_y = placement['pos_y']
-        entry.rotation = placement['rotation']
-        entry.side = placement['side']
+        entry.pos_x = placement.pos_x
+        entry.pos_y = placement.pos_y
+        entry.rotation = placement.rotation
+        entry.side = placement.side
         entries_to_update.append(entry)
 
     if entries_to_update:
@@ -712,7 +688,7 @@ def design_bom_populate(request, design_id):
     Safe to run more than once: rows whose reference designator is already present on the
     design are skipped, so re-running after manual edits never overwrites or duplicates them.
     Also backfills pos_x/pos_y/rotation/side on every entry (new and pre-existing) from the
-    design's PCB Design File asset, if one is attached — see _apply_brd_placements().
+    design's PCB Design File asset, if one is attached — see _apply_placements().
     """
     design = get_object_or_404(Design, pk=design_id)
 
@@ -758,11 +734,17 @@ def design_bom_populate(request, design_id):
                         existing_references.add(reference)
                         added += 1
 
-                positions_updated = _apply_brd_placements(design)
-                position_msg = (
-                    f' {positions_updated} position{"s" if positions_updated != 1 else ""} updated'
-                    f' from PCB design file.' if positions_updated is not None else ''
-                )
+                # BOM rows are already saved at this point, so a placement failure (e.g.
+                # kicad-cli missing) is reported on its own rather than as a CSV error.
+                try:
+                    positions_updated = _apply_placements(design)
+                    position_msg = (
+                        f' {positions_updated} position{"s" if positions_updated != 1 else ""} updated'
+                        f' from PCB design file.' if positions_updated is not None else ''
+                    )
+                except CadImportError as e:
+                    position_msg = f' Positions were not updated: {e}'
+
                 new_parts_msg = (
                     f' {new_parts} new part{"s" if new_parts != 1 else ""} created in the Parts library.'
                     if new_parts else ''
