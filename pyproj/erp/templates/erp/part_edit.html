@@ -746,31 +746,7 @@
             }
         }
 
-        // Lightbox
-        const lightboxLink = document.getElementById('part-image-link');
-        if (lightboxLink) {
-            const overlay = document.createElement('div');
-            overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;';
-            const fullImg = document.createElement('img');
-            fullImg.src = lightboxLink.href;
-            fullImg.style.cssText = 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px;box-shadow:0 4px 32px rgba(0,0,0,0.6);';
-            overlay.appendChild(fullImg);
-            document.body.appendChild(overlay);
-
-            function openLightbox(e) {
-                e.preventDefault();
-                overlay.style.display = 'flex';
-                document.addEventListener('keydown', onKey);
-            }
-            function closeLightbox() {
-                overlay.style.display = 'none';
-                document.removeEventListener('keydown', onKey);
-            }
-            function onKey(e) { if (e.key === 'Escape') closeLightbox(); }
-
-            lightboxLink.addEventListener('click', openLightbox);
-            overlay.addEventListener('click', closeLightbox);
-        }
+        initImageLightbox('#part-image-link');
 
         document.getElementById('lcsc-fetch-btn')?.addEventListener('click', function () {
             fetchSupplierData('{% url "erp:part_source_fetch_lcsc" %}', this, document.getElementById('lcsc-fetch-icon'));

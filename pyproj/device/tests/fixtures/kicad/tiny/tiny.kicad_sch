@@ -1,0 +1,17 @@
+(kicad_sch (version 20231120) (generator "eeschema") (uuid "00000000-0000-0000-0000-000000000001")
+  (paper "A4")
+  (lib_symbols
+    (symbol "Device:R" (in_bom yes) (on_board yes)
+      (property "Reference" "R" (at 0 0 0))
+      (property "Value" "R" (at 0 0 0))
+      (property "Footprint" "" (at 0 0 0))
+      (symbol "R_0_1" (rectangle (start -1 -2.5) (end 1 2.5) (stroke (width 0.25) (type default)) (fill (type none))))
+      (symbol "R_1_1"
+        (pin passive line (at 0 3.81 270) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+        (pin passive line (at 0 -3.81 90) (length 1.27) (name "~" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27))))))))
+  (symbol (lib_id "Device:R") (at 100 100 0) (unit 1) (in_bom yes) (on_board yes)
+    (uuid "00000000-0000-0000-0000-000000000002")
+    (property "Reference" "R1" (at 102 100 0))
+    (property "Value" "10k" (at 104 100 0))
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric" (at 100 100 0))
+    (instances (project "tiny" (path "/00000000-0000-0000-0000-000000000001" (reference "R1") (unit 1))))))

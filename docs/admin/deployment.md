@@ -26,6 +26,40 @@ When the app works again, delete `env-old`. Then check that the cron jobs (for e
 
 The upgrade from Ubuntu 24.04 (Python 3.12) to 26.04 (Python 3.14) on 2026-10-14 needed this procedure.
 
+## KiCAD import
+
+Register uses `kicad-cli` (KiCad 9 or later) to extract files from uploaded KiCAD projects. Without it, Fusion import still works, but a KiCAD upload shows a "kicad-cli not found" warning and nothing is extracted from it.
+
+On Ubuntu 26.04, install KiCad from Flathub for all users, so the `uwsgi` user can run it:
+
+```bash
+sudo flatpak install --system flathub org.kicad.KiCad
+```
+
+A Flatpak app has its own private `/tmp`, so `kicad-cli` cannot see files that Register unpacks there. Give it a working directory that both can use:
+
+```bash
+sudo mkdir -p /srv/register-cad-work
+sudo chown uwsgi:uwsgi /srv/register-cad-work
+sudo flatpak override --system --filesystem=/srv/register-cad-work org.kicad.KiCad
+```
+
+Then add these lines to each app's `.env` file and restart the app:
+
+```
+KICAD_CLI = "flatpak run --command=kicad-cli org.kicad.KiCad"
+CAD_IMPORT_WORK_DIR = "/srv/register-cad-work"
+```
+
+To check the setup, run a render as the `uwsgi` user. The `.kicad_pcb` file must be inside the working directory:
+
+```bash
+sudo -u uwsgi flatpak run --command=kicad-cli org.kicad.KiCad pcb render \
+    --output /srv/register-cad-work/test.png /srv/register-cad-work/board.kicad_pcb
+```
+
+If the render fails because no display is available, install `xvfb` and set `KICAD_CLI = "xvfb-run -a flatpak run --command=kicad-cli org.kicad.KiCad"`.
+
 ## Deploying an update
 
 Run these steps for the test deployment first, verify it, then repeat for production.

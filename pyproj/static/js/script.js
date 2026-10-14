@@ -230,6 +230,40 @@ function activateTabFromHash() {
     }
 }
 
+// Opens each link matching selector (an <a href> pointing at an image) in a full-screen
+// overlay instead of following it; Escape or a click anywhere closes it. One overlay is
+// shared by all matching links. Started as the Part edit page's own lightbox, moved here when
+// the Design detail page's PCB preview banner needed the same thing. A no-op if nothing
+// matches.
+function initImageLightbox(selector) {
+    const links = document.querySelectorAll(selector);
+    if (!links.length) return;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;cursor:zoom-out;align-items:center;justify-content:center;';
+    const fullImg = document.createElement('img');
+    fullImg.style.cssText = 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:4px;box-shadow:0 4px 32px rgba(0,0,0,0.6);';
+    overlay.appendChild(fullImg);
+    document.body.appendChild(overlay);
+
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    function close() {
+        overlay.style.display = 'none';
+        document.removeEventListener('keydown', onKey);
+    }
+
+    links.forEach(function (link) {
+        link.addEventListener('click', function (e) {
+            e.preventDefault();
+            fullImg.src = link.href;
+            fullImg.alt = link.querySelector('img')?.alt || '';
+            overlay.style.display = 'flex';
+            document.addEventListener('keydown', onKey);
+        });
+    });
+    overlay.addEventListener('click', close);
+}
+
 // Sidebar drawer toggle for mobile: slides in/out with a tap-to-dismiss backdrop.
 // CoreUI's data-coreui-toggle is removed to avoid conflicts with our handler.
 document.addEventListener('DOMContentLoaded', function() {

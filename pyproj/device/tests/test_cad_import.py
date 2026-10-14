@@ -8,7 +8,7 @@ import pytest
 from crm.models import Org
 from device import cad_import
 from device.cad_import import (
-    CadExtractor, CadImportError, ExtractedAssets, FusionCadExtractor, extractor_for_filename,
+    CadExtractor, CadImportError, ExtractedAssets, FusionCadExtractor, extractor_for_upload,
 )
 from device.models import Design, DesignAsset
 
@@ -54,11 +54,14 @@ def _fake_extract(project_path, out_dir):
     return ExtractedAssets(bom=bom, pcb_design=board, pcb_top=top)
 
 
-def test_extractor_for_filename():
-    assert isinstance(extractor_for_filename('board.f3z'), FusionCadExtractor)
-    assert isinstance(extractor_for_filename('BOARD.F3Z'), FusionCadExtractor)
-    assert extractor_for_filename('board.zip') is None
-    assert extractor_for_filename('board') is None
+def test_extractor_for_upload():
+    def upload(name):
+        return SimpleUploadedFile(name, b'not a zip')
+
+    assert isinstance(extractor_for_upload(upload('board.f3z')), FusionCadExtractor)
+    assert isinstance(extractor_for_upload(upload('BOARD.F3Z')), FusionCadExtractor)
+    assert extractor_for_upload(upload('board.zip')) is None  # a .zip must hold a .kicad_pro
+    assert extractor_for_upload(upload('board')) is None
 
 
 def test_fusion_extractor_wraps_fusionextractor_errors(tmp_path):
@@ -107,12 +110,13 @@ def test_failed_extraction_keeps_project_file_and_existing_assets(staff_client, 
 @pytest.mark.django_db
 def test_unrecognised_project_file_is_stored_without_extraction(staff_client, design):
     with patch.object(FusionCadExtractor, 'extract') as extract:
-        _upload(staff_client, design, 'notes.pdf')
+        response = _upload(staff_client, design, 'notes.pdf')
 
     extract.assert_not_called()
     design.refresh_from_db()
     assert design.cad_tool == ''
     assert list(design.designasset_set.values_list('asset_type', flat=True)) == [DesignAsset.CAD_PROJECT]
+    assert 'Not a recognised CAD project' in response.content.decode()
 
 
 @pytest.mark.django_db
@@ -130,21 +134,70 @@ class _OtherToolExtractor(CadExtractor):
     project_label = 'Other Tool Project'
     file_extensions = ('.other',)
 
+    def extract(self, project_path, out_dir):
+        return ExtractedAssets()
+
 
 @pytest.mark.django_db
-def test_project_file_for_a_different_cad_tool_is_refused(staff_client, design, monkeypatch):
+def test_cad_tool_follows_the_uploaded_project_file(staff_client, design, monkeypatch):
+    """A design that moves to another tool just gets the new project uploaded - the flag is
+    set from the file, never chosen by hand."""
     monkeypatch.setitem(cad_import.EXTRACTORS, 'OTHER', _OtherToolExtractor())
     design.cad_tool = Design.CAD_FUSION
     design.save()
     existing = DesignAsset(design=design, name='old', asset_type=DesignAsset.CAD_PROJECT)
     existing.file.save('old.f3z', ContentFile(b'old'), save=True)
 
-    response = _upload(staff_client, design, 'MyBoard.other')
+    _upload(staff_client, design, 'MyBoard.other')
 
-    assert list(design.designasset_set.values_list('pk', flat=True)) == [existing.pk]
     design.refresh_from_db()
-    assert design.cad_tool == Design.CAD_FUSION
-    assert 'but that file is a Other Tool Project' in response.content.decode()
+    assert design.cad_tool == 'OTHER'
+    project_files = list(design.designasset_set.filter(asset_type=DesignAsset.CAD_PROJECT))
+    assert [a.filename for a in project_files] == ['MyBoard.other']
+
+
+@pytest.mark.django_db
+def test_unrecognised_project_file_clears_cad_tool(staff_client, design):
+    design.cad_tool = Design.CAD_FUSION
+    design.save()
+
+    _upload(staff_client, design, 'notes.pdf')
+
+    design.refresh_from_db()
+    assert design.cad_tool == ''
+
+
+@pytest.mark.django_db
+def test_deleting_the_project_file_clears_cad_tool(staff_client, design):
+    design.cad_tool = Design.CAD_FUSION
+    design.save()
+    project = DesignAsset(design=design, name='proj', asset_type=DesignAsset.CAD_PROJECT)
+    project.file.save('proj.f3z', ContentFile(b'proj'), save=True)
+    bom = DesignAsset(design=design, name='bom', asset_type=DesignAsset.BOM)
+    bom.file.save('bom.csv', ContentFile(b'bom'), save=True)
+
+    staff_client.post(reverse('design_asset_delete', args=[bom.pk]))
+    design.refresh_from_db()
+    assert design.cad_tool == Design.CAD_FUSION  # only the project file decides
+
+    staff_client.post(reverse('design_asset_delete', args=[project.pk]))
+    design.refresh_from_db()
+    assert design.cad_tool == ''
+
+
+@pytest.mark.django_db
+def test_cad_tool_is_not_on_the_design_forms(staff_client, design):
+    from device.forms import DesignAddForm, DesignDetailsForm
+    assert 'cad_tool' not in DesignDetailsForm().fields
+    assert 'cad_tool' not in DesignAddForm().fields
+
+    response = staff_client.post(reverse('design_update', args=[design.pk]), {
+        'sku': design.sku, 'cad_tool': Design.CAD_FUSION,
+        'assembly_time_minutes': 0, 'additional_materials': 0, 'pcb_cost': 0, 'packaging': 0,
+    })
+    assert response.status_code == 302
+    design.refresh_from_db()
+    assert design.cad_tool == ''  # a posted value is ignored
 
 
 @pytest.mark.django_db
@@ -171,3 +224,15 @@ def test_fusion_project_row_shows_fusion_icon(staff_client, design):
     response = staff_client.get(reverse('design_detail', args=[design.pk]))
 
     assert 'img/filetypes/fusion.svg' in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_kicad_project_row_shows_kicad_icon(staff_client, design):
+    design.cad_tool = Design.CAD_KICAD
+    design.save()
+    asset = DesignAsset(design=design, name='proj', asset_type=DesignAsset.CAD_PROJECT)
+    asset.file.save('proj.zip', ContentFile(b'proj'), save=True)
+
+    response = staff_client.get(reverse('design_detail', args=[design.pk]))
+
+    assert 'img/filetypes/kicad.svg' in response.content.decode()

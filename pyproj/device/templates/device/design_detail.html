@@ -64,18 +64,28 @@
                 <div class="tab-content">
                 <div class="tab-pane active" id="pane-details" role="tabpanel" aria-labelledby="tab-details">
                     {% if pcb_top_asset or pcb_bottom_asset %}
+                        {% comment %}
+                            Bounded on both axes so an unusually tall or wide board (e.g. a long thin
+                            KiCAD render) can't fill the screen; the aspect ratio is kept, and a click
+                            shows the full-size image in a lightbox (initImageLightbox, script.js).
+                        {% endcomment %}
+                        <style>
+                            .pcb-preview { max-width: min(400px, 100%); max-height: 300px; width: auto; height: auto; cursor: zoom-in; }
+                        </style>
                         <div class="mb-4 d-flex gap-3 flex-wrap align-items-start">
                             {% if pcb_top_asset %}
-                                <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
-                                     alt="PCB Top View"
-                                     class="rounded"
-                                     style="max-width: 400px; width: 100%;">
+                                <a href="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}" class="pcb-preview-link" title="View full size">
+                                    <img src="{{ pcb_top_asset.file.url }}?v={{ pcb_top_asset.file_version }}"
+                                         alt="PCB Top View"
+                                         class="rounded pcb-preview">
+                                </a>
                             {% endif %}
                             {% if pcb_bottom_asset %}
-                                <img src="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}"
-                                     alt="PCB Bottom View"
-                                     class="rounded"
-                                     style="max-width: 400px; width: 100%;">
+                                <a href="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}" class="pcb-preview-link" title="View full size">
+                                    <img src="{{ pcb_bottom_asset.file.url }}?v={{ pcb_bottom_asset.file_version }}"
+                                         alt="PCB Bottom View"
+                                         class="rounded pcb-preview">
+                                </a>
                             {% endif %}
                             {% if user.is_staff and pcb_top_asset and pcb_bottom_asset %}
                                 <form method="post"
@@ -109,13 +119,6 @@
                                             <td>
                                                 {{ design_form.description }}
                                                 {% if design_form.description.errors %}<div class="text-danger small">{{ design_form.description.errors }}</div>{% endif %}
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <th>{{ design_form.cad_tool.label }}:</th>
-                                            <td>
-                                                {{ design_form.cad_tool }}
-                                                {% if design_form.cad_tool.errors %}<div class="text-danger small">{{ design_form.cad_tool.errors }}</div>{% endif %}
                                             </td>
                                         </tr>
                                         <tr>
@@ -858,6 +861,7 @@
     <script src="https://unpkg.com/sortablejs@1.7.0/Sortable.min.js"></script>
     <script>
         activateTabFromHash();
+        initImageLightbox('.pcb-preview-link');
 
         initSortableReorder('test-steps-body');
         initSortableReorder('manual-checks-body');

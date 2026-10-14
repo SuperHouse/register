@@ -6,6 +6,7 @@ This guide walks through running the Testomatic Register locally for development
 
 - Python 3.13 or later (check with `python3 --version`). Production runs Python 3.14 (see [Production Deployment](deployment.md)), so code must not need anything newer than 3.13 or anything removed in 3.14.
 - Git
+- Optional: KiCad 9 or later, to test KiCAD project import. On macOS, Register finds `kicad-cli` inside the KiCad app automatically. On other systems, put `kicad-cli` on your `PATH` or set `KICAD_CLI` in `.env`. Without it, the tests that need `kicad-cli` are skipped.
 
 ## Step 1: Clone the repository
 

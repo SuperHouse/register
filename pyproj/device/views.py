@@ -16,7 +16,7 @@ import json
 
 from login_required import login_not_required
 
-from .cad_import import DEFAULT_PROJECT_LABEL, CadImportError, extract_and_save, extractor_for_filename, get_extractor
+from .cad_import import DEFAULT_PROJECT_LABEL, CadImportError, extract_and_save, extractor_for_upload, get_extractor
 from .forms import DesignAddForm, DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
@@ -323,20 +323,11 @@ def design_asset_add(request, design_id):
             form.instance.design = design
             asset_type = form.cleaned_data['asset_type']
 
-            # A CAD project file picks its extractor by extension (issue #140). A design only
-            # ever uses one CAD tool, so a project file for a different tool than the one
-            # already recorded is refused rather than silently switching tools - staff change
-            # the design's CAD Tool first if it really has moved.
+            # A CAD project file picks its extractor from what the file is (issue #140), and
+            # design.cad_tool is then set to match - see Design.cad_tool.
             extractor = None
             if asset_type == DesignAsset.CAD_PROJECT:
-                extractor = extractor_for_filename(form.cleaned_data['file'].name)
-                if extractor and design.cad_tool and extractor.cad_tool != design.cad_tool:
-                    messages.warning(
-                        request,
-                        f'This design\'s CAD tool is {design.get_cad_tool_display()}, but that file is a '
-                        f'{extractor.project_label}. Change the design\'s CAD Tool first if it has moved tools.',
-                    )
-                    return redirect('design_detail', design_id=design.pk)
+                extractor = extractor_for_upload(form.cleaned_data['file'])
 
             replaced = False
             if asset_type in DesignAsset.CORE_ASSET_TYPES:
@@ -348,10 +339,17 @@ def design_asset_add(request, design_id):
             saved_asset = form.save()
             messages.success(request, 'File replaced successfully.' if replaced else 'File uploaded successfully.')
 
+            if asset_type == DesignAsset.CAD_PROJECT:
+                design.cad_tool = extractor.cad_tool if extractor else ''
+                design.save(update_fields=['cad_tool'])
+
+            if asset_type == DesignAsset.CAD_PROJECT and not extractor:
+                messages.info(
+                    request,
+                    'Not a recognised CAD project (a Fusion .f3z, or a .zip holding a KiCAD .kicad_pro), '
+                    'so nothing was extracted from it.',
+                )
             if extractor:
-                if not design.cad_tool:
-                    design.cad_tool = extractor.cad_tool
-                    design.save(update_fields=['cad_tool'])
                 stem = Path(saved_asset.filename).stem
                 try:
                     saved_types = extract_and_save(extractor, design, saved_asset.file.path, stem)
@@ -402,6 +400,9 @@ def design_asset_delete(request, asset_id):
     if request.method == 'POST':
         asset.file.delete(save=False)
         asset.delete()
+        if asset.asset_type == DesignAsset.CAD_PROJECT:
+            design.cad_tool = ''
+            design.save(update_fields=['cad_tool'])
         messages.success(request, 'Asset deleted.')
         return redirect('design_detail', design_id=design.pk)
 

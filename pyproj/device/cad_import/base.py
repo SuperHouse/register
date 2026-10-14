@@ -46,6 +46,12 @@ class CadExtractor:
     project_icon = None       # Optional static path of an icon image for that row
     file_extensions = ()      # Lower-case extensions (with dot) of this tool's project files
 
+    def accepts(self, uploaded_file):
+        """Whether an upload whose extension matches file_extensions really is this tool's
+        project. Override when the extension alone is ambiguous (a .zip could hold anything).
+        Must leave uploaded_file positioned at the start."""
+        return True
+
     def extract(self, project_path, out_dir):
         """Write whatever Design Files this tool can produce from project_path into out_dir.
 

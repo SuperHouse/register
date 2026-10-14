@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import shlex
 import sys
 
 from pathlib import Path
@@ -250,6 +251,15 @@ BACKGROUND_SETTINGS = {
         # 'CSS_MAINWRAPPER_BACKGROUND_COLOUR': 'transparent',
     },
 }
+
+# KiCAD project import (issue #142, see device/cad_import/kicad.py). KICAD_CLI is the command
+# that runs kicad-cli, split like a shell command so a Flatpak install works:
+#   KICAD_CLI="flatpak run --command=kicad-cli org.kicad.KiCad"
+# Unset means kicad-cli on PATH, else the macOS app bundle. CAD_IMPORT_WORK_DIR is where uploads
+# are unpacked for extraction (unset = the system temp dir); a Flatpak kicad-cli has a private
+# /tmp, so on such hosts point this at a directory granted with `flatpak override --filesystem`.
+KICAD_CLI = shlex.split(os.environ.get('KICAD_CLI', ''))
+CAD_IMPORT_WORK_DIR = os.environ.get('CAD_IMPORT_WORK_DIR') or None
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST')

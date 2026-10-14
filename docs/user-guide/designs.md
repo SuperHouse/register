@@ -23,7 +23,7 @@ Each design can have one file of each core type. Uploading a new file of the sam
 | PCB 3D View | 3D render of the assembled board |
 | PCB Top View | Top-side image |
 | PCB Bottom View | Bottom-side image |
-| CAD Project | The CAD tool's own project file, e.g. a `.f3z` from Autodesk Fusion. Shown as "Fusion Electronics Project" when the design's CAD Tool is Autodesk Fusion |
+| CAD Project | The CAD tool's own project file: a `.f3z` from Autodesk Fusion, or a `.zip` of a KiCAD project folder. Shown as "Fusion Electronics Project" or "KiCAD Project" to match the design's CAD Tool |
 | Schematic Design File | Schematic source file |
 | PCB Design File | PCB layout source file |
 | Bill of Materials | BOM in any format |
@@ -31,11 +31,9 @@ Each design can have one file of each core type. Uploading a new file of the sam
 
 Staff can upload, replace, and delete design files from the detail page. Non-staff users see only rows where a file exists, and only non-internal files.
 
-### CAD Tool
+### Changing CAD tool
 
-Each design records the **CAD Tool** it is drawn in, in the design details card. Only Autodesk Fusion is supported at the moment; KiCAD support is planned. Leave it blank if you don't know.
-
-You don't normally need to set it by hand. Uploading a project file for a design with no CAD Tool sets it automatically. A design uses one CAD tool, so Register refuses a project file from a different tool than the one recorded. If a design really has moved to another tool, change its CAD Tool first, then upload.
+Register knows which CAD tool a design uses from its CAD Project file, so there is nothing to set. If a design moves to another tool, upload the new project file in the CAD Project row. It replaces the old project file, and its extracted files replace the old extracted files.
 
 ### Autodesk Fusion auto-extraction
 
@@ -49,6 +47,26 @@ When a `.f3z` file is uploaded as the CAD Project, the system automatically extr
 - PCB 3D View thumbnail
 
 This means uploading a single `.f3z` file can populate most of the Design Files table automatically.
+
+### KiCAD auto-extraction
+
+KiCAD keeps a project in several files, so upload the project as one `.zip`:
+
+1. In Finder (or your file manager), find the folder that holds the `.kicad_pro` file.
+2. Compress that folder into a `.zip`. Include any project-specific symbol and footprint libraries in it. KiCad's `-backups` folder can stay in, because Register ignores it.
+3. In the CAD Project row of the Design Files table, upload the `.zip`.
+
+The system then extracts and stores:
+
+- PCB Design File (`.kicad_pcb`)
+- Schematic (the root `.kicad_sch`; any sub-sheets stay in the uploaded `.zip`)
+- Bill of Materials (`.csv`, one row per part, in the same columns as a Fusion BOM)
+- PCB Top View and PCB Bottom View renders
+- PCB 3D View (an angled render)
+
+Parts whose footprints have no 3D model appear in the renders as bare pads.
+
+The project must be from KiCad 6 or later. To use a KiCad 5 project, open it in a newer KiCad and save it first. A `.zip` must hold exactly one KiCAD project. If it holds none, Register stores the file without extracting anything.
 
 ### Attachments
 

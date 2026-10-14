@@ -26,13 +26,18 @@ def get_dt_as_string(dt):
 
 
 class Design(models.Model):
-    # The CAD tool a design is authored in (issue #140). Picks which device.cad_import
-    # extractor handles an uploaded CAD_PROJECT asset; blank means not yet known. Add one
-    # choice per supported tool - see CAD_IMPORT_PLAN.md.
+    # The CAD tool of the design's current CAD_PROJECT asset (issue #140), blank if it has none
+    # or it isn't a recognised project file. Not user-editable: design_asset_add sets it from
+    # the uploaded file itself and design_asset_delete clears it, so it always describes the
+    # file. Used for the Design Files row's label/icon, and later to pick how other files are
+    # read (e.g. placements, register#143). Add one choice per supported tool - see
+    # CAD_IMPORT_PLAN.md.
     CAD_FUSION = 'FUSION'
+    CAD_KICAD = 'KICAD'
 
     CAD_TOOL_CHOICES = [
         (CAD_FUSION, 'Autodesk Fusion'),
+        (CAD_KICAD, 'KiCAD'),
     ]
 
     client = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="legacy_client")
@@ -44,7 +49,7 @@ class Design(models.Model):
     price2 = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     obsolete = models.BooleanField(default=False)
     cad_tool = models.CharField(
-        max_length=20, choices=CAD_TOOL_CHOICES, blank=True, default='', verbose_name='CAD Tool',
+        max_length=20, choices=CAD_TOOL_CHOICES, blank=True, default='', editable=False, verbose_name='CAD Tool',
     )
     assembly_time_minutes = models.PositiveIntegerField(
         default=0, verbose_name='Assembly Time', help_text='Minutes'
