@@ -37,13 +37,14 @@ class DesignDetailsForm(forms.ModelForm):
     class Meta:
         model = Design
         fields = [
-            'sku', 'description', 'price', 'pcb_stock',
+            'sku', 'description', 'cad_tool', 'price', 'pcb_stock',
             'assembly_time_minutes', 'additional_materials', 'pcb_cost',
             'conformal_coating', 'anti_shock_glue', 'packaging',
         ]
         widgets = {
             'sku': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 250px;'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'cad_tool': forms.Select(attrs={'class': 'form-select', 'style': 'max-width: 250px;'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'pcb_stock': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
@@ -64,7 +65,7 @@ class DesignAddForm(forms.ModelForm):
     class Meta:
         model = Design
         fields = [
-            'client', 'name', 'hw_version', 'sku', 'description', 'price', 'pcb_stock',
+            'client', 'name', 'hw_version', 'sku', 'description', 'cad_tool', 'price', 'pcb_stock',
             'assembly_time_minutes', 'additional_materials', 'pcb_cost',
             'conformal_coating', 'anti_shock_glue', 'packaging',
         ]
@@ -74,6 +75,7 @@ class DesignAddForm(forms.ModelForm):
             'hw_version': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 150px;'}),
             'sku': forms.TextInput(attrs={'class': 'form-control', 'style': 'max-width: 250px;'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'cad_tool': forms.Select(attrs={'class': 'form-select', 'style': 'max-width: 250px;'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'pcb_stock': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
             'assembly_time_minutes': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),

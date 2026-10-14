@@ -39,6 +39,8 @@ python manage.py import_data export.zip --yes
 !!! warning
     **The import permanently deletes all existing application data before loading the archive.** This is a clean-slate replace, not a merge. Ensure you have a backup of the target installation's data before proceeding.
 
+Archives exported by an older version of the Register are upgraded as they load. For example, a design's Fusion project file was stored with the asset type `FUSION` before October 2026 and is now loaded as `CAD_PROJECT`, with the design's CAD Tool set to Autodesk Fusion.
+
 The database load runs inside a single transaction: if it fails for any reason, the database rolls back to its state before the import. Media file restoration happens after the database is committed and is not transactional; if interrupted, re-running the import from the same archive will restore a consistent state.
 
 ## Permissions

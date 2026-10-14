@@ -209,7 +209,7 @@ GET /api/v1/design-assets/?design_id={design_id}&asset_type={asset_type}
 
 **Query Parameters:**
 - `design_id` (optional): Only return assets belonging to this design
-- `asset_type` (optional): Only return assets of this type, e.g. `PCB_TOP`. One of `FUSION`, `PCB_DESIGN`, `SCHEMATIC`, `BOM`, `PCB_TOP`, `PCB_BOTTOM`, `PCB_3D`, `FIRMWARE`, `ATTACHMENT`.
+- `asset_type` (optional): Only return assets of this type, e.g. `PCB_TOP`. One of `CAD_PROJECT` (the CAD tool's own project file, e.g. a Fusion `.f3z`; called `FUSION` before 2026-10-14), `PCB_DESIGN`, `SCHEMATIC`, `BOM`, `PCB_TOP`, `PCB_BOTTOM`, `PCB_3D`, `FIRMWARE`, `ATTACHMENT`.
 
 **Response:**
 ```json

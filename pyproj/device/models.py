@@ -26,6 +26,15 @@ def get_dt_as_string(dt):
 
 
 class Design(models.Model):
+    # The CAD tool a design is authored in (issue #140). Picks which device.cad_import
+    # extractor handles an uploaded CAD_PROJECT asset; blank means not yet known. Add one
+    # choice per supported tool - see CAD_IMPORT_PLAN.md.
+    CAD_FUSION = 'FUSION'
+
+    CAD_TOOL_CHOICES = [
+        (CAD_FUSION, 'Autodesk Fusion'),
+    ]
+
     client = models.ForeignKey(Org, on_delete=models.PROTECT, related_name="legacy_client")
     sku = models.CharField(verbose_name='SKU', max_length=50)
     name = models.CharField(max_length=255)
@@ -34,6 +43,9 @@ class Design(models.Model):
     price = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     price2 = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     obsolete = models.BooleanField(default=False)
+    cad_tool = models.CharField(
+        max_length=20, choices=CAD_TOOL_CHOICES, blank=True, default='', verbose_name='CAD Tool',
+    )
     assembly_time_minutes = models.PositiveIntegerField(
         default=0, verbose_name='Assembly Time', help_text='Minutes'
     )
@@ -240,7 +252,9 @@ def device_asset_upload_path(instance, filename):
 
 
 class DesignAsset(models.Model):
-    FUSION = 'FUSION'
+    # The CAD tool's own project file (a .f3z for Fusion). Tool-neutral since issue #140 -
+    # was FUSION - with its display label taken from Design.cad_tool.
+    CAD_PROJECT = 'CAD_PROJECT'
     PCB_DESIGN = 'PCB_DESIGN'
     SCHEMATIC = 'SCHEMATIC'
     BOM = 'BOM'
@@ -250,11 +264,11 @@ class DesignAsset(models.Model):
     FIRMWARE = 'FIRMWARE'
     ATTACHMENT = 'ATTACHMENT'
 
-    CORE_ASSET_TYPES = frozenset({FUSION, PCB_DESIGN, SCHEMATIC, BOM, PCB_TOP, PCB_BOTTOM, PCB_3D, FIRMWARE})
+    CORE_ASSET_TYPES = frozenset({CAD_PROJECT, PCB_DESIGN, SCHEMATIC, BOM, PCB_TOP, PCB_BOTTOM, PCB_3D, FIRMWARE})
 
     ASSET_TYPE_CHOICES = [
         ('Design Files', [
-            (FUSION, 'Fusion Electronics Project'),
+            (CAD_PROJECT, 'CAD Project'),
             (PCB_3D, 'PCB 3D View'),
             (PCB_TOP, 'PCB Top View'),
             (PCB_BOTTOM, 'PCB Bottom View'),
@@ -314,6 +328,7 @@ class DesignAsset(models.Model):
     def get_icon_class(self):
         """Returns a Bootstrap Icons class for this asset type."""
         classes = {
+            self.CAD_PROJECT: 'bi-file-earmark-zip',
             self.PCB_DESIGN: 'bi-cpu',
             self.SCHEMATIC: 'bi-diagram-3',
             self.BOM: 'bi-file-earmark-spreadsheet',

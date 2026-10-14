@@ -4,7 +4,7 @@ This guide walks through running the Testomatic Register locally for development
 
 ## Prerequisites
 
-- Python 3.12 (required to match the production uWSGI build; check with `python3 --version`)
+- Python 3.13 or later (check with `python3 --version`). Production runs Python 3.14 (see [Production Deployment](deployment.md)), so code must not need anything newer than 3.13 or anything removed in 3.14.
 - Git
 
 ## Step 1: Clone the repository

@@ -23,7 +23,7 @@ Each design can have one file of each core type. Uploading a new file of the sam
 | PCB 3D View | 3D render of the assembled board |
 | PCB Top View | Top-side image |
 | PCB Bottom View | Bottom-side image |
-| Fusion Electronics Project | `.f3z` file from Autodesk Fusion |
+| CAD Project | The CAD tool's own project file, e.g. a `.f3z` from Autodesk Fusion. Shown as "Fusion Electronics Project" when the design's CAD Tool is Autodesk Fusion |
 | Schematic Design File | Schematic source file |
 | PCB Design File | PCB layout source file |
 | Bill of Materials | BOM in any format |
@@ -31,9 +31,15 @@ Each design can have one file of each core type. Uploading a new file of the sam
 
 Staff can upload, replace, and delete design files from the detail page. Non-staff users see only rows where a file exists, and only non-internal files.
 
+### CAD Tool
+
+Each design records the **CAD Tool** it is drawn in, in the design details card. Only Autodesk Fusion is supported at the moment; KiCAD support is planned. Leave it blank if you don't know.
+
+You don't normally need to set it by hand. Uploading a project file for a design with no CAD Tool sets it automatically. A design uses one CAD tool, so Register refuses a project file from a different tool than the one recorded. If a design really has moved to another tool, change its CAD Tool first, then upload.
+
 ### Autodesk Fusion auto-extraction
 
-When a `.f3z` Fusion Electronics Project file is uploaded, the system automatically extracts and stores:
+When a `.f3z` file is uploaded as the CAD Project, the system automatically extracts and stores:
 
 - Bill of Materials (`.csv`)
 - PCB Design File (`.brd`)
@@ -48,7 +54,7 @@ This means uploading a single `.f3z` file can populate most of the Design Files 
 
 Arbitrary files (extra firmware images, inspection photos, notes PDFs, etc.) can be added in the Attachments section. These don't replace each other — any number can be attached.
 
-When selecting a file to attach, the Name field is auto-populated from the filename, and the asset type and description are set automatically based on the file extension (`.f3z`, `.brd`, `.sch`).
+When selecting a file to attach, the Name field is auto-populated from the filename. A `.f3z` uploaded as an attachment is stored as-is and is not extracted; upload it in the CAD Project row of the Design Files table instead.
 
 ### Boards for this design
 

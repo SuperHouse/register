@@ -6,7 +6,25 @@ The Register runs on Linux under uWSGI Emperor. Two deployments are typically ma
 
 uWSGI Emperor watches ini files in `/etc/uwsgi-emperor/vassals/`. Both `register.ini` and `register-test.ini` are symlinks to a shared template `/etc/uwsgi-emperor/django-app-template.ini`, which uses the `%n` magic variable (vassal name without extension) to derive paths — so the same template serves both apps.
 
-uWSGI embeds its own Python interpreter via the `python3` plugin (built for Python 3.12). Each app's virtualenv **must** be created with the same Python minor version, or uWSGI will fail at startup with "no python application found". The real error (`ModuleNotFoundError`) only appears in the per-app log at `/var/log/uwsgi/app/%n.log` immediately after a restart.
+uWSGI embeds its own Python interpreter via the `python3` plugin, which uses the operating system's Python (Python 3.14 on Ubuntu 26.04). Each app's virtualenv **must** be created with the same Python minor version, or uWSGI will fail at startup with "no python application found". The real error (`ModuleNotFoundError`) only appears in the per-app log at `/var/log/uwsgi/app/%n.log` immediately after a restart.
+
+### After an operating system upgrade
+
+An Ubuntu release upgrade usually changes the system Python version. The existing virtualenvs then stop working and both apps fail as described above. Rebuild the virtualenv of each app with the new Python:
+
+```bash
+cd ~/register/pyproj          # then repeat for ~/register-test/pyproj
+mv env env-old
+python3 -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+deactivate
+sudo touch /etc/uwsgi-emperor/vassals/register.ini
+```
+
+When the app works again, delete `env-old`. Then check that the cron jobs (for example `refresh_part_sources`) still run, because they call the virtualenv's Python by its path.
+
+The upgrade from Ubuntu 24.04 (Python 3.12) to 26.04 (Python 3.14) on 2026-10-14 needed this procedure.
 
 ## Deploying an update
 

@@ -62,6 +62,27 @@ def _flush_app_data(include_users=False):
     Thumbnail.objects.all().delete()
 
 
+def _upgrade_legacy_records(data):
+    """Bring records from an export made before a data migration up to date, in place.
+
+    loaddata writes field values as-is, bypassing both choices validation and any
+    RunPython step a migration applied to rows already in the database, so an old export
+    loaded into a migrated database would otherwise reintroduce the old values.
+
+    Covers device migration 0039 (issue #140): DesignAsset.asset_type FUSION became
+    CAD_PROJECT, and each design that had one got Design.cad_tool = FUSION.
+    """
+    fusion_design_pks = set()
+    for obj in data:
+        if obj['model'] == 'device.designasset' and obj['fields'].get('asset_type') == 'FUSION':
+            obj['fields']['asset_type'] = 'CAD_PROJECT'
+            fusion_design_pks.add(obj['fields'].get('design'))
+
+    for obj in data:
+        if obj['model'] == 'device.design' and obj['pk'] in fusion_design_pks and not obj['fields'].get('cad_tool'):
+            obj['fields']['cad_tool'] = 'FUSION'
+
+
 class Command(BaseCommand):
     help = 'Import application data and media files from a ZIP archive (replaces ALL existing data)'
 
@@ -125,6 +146,8 @@ class Command(BaseCommand):
                 for obj in data:
                     if obj['model'] == 'crm.org':
                         obj['fields'].pop('users', None)
+
+            _upgrade_legacy_records(data)
 
             # Write fixture to a temp file so loaddata can infer format from extension.
             tmp_fd, tmp_path = tempfile.mkstemp(suffix='.json')

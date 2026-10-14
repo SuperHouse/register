@@ -22,7 +22,7 @@ class DesignAssetSchema(Schema):
     id: int
     design_id: int
     asset_type: Literal[
-        'FUSION', 'PCB_DESIGN', 'SCHEMATIC', 'BOM', 'PCB_TOP', 'PCB_BOTTOM', 'PCB_3D', 'FIRMWARE', 'ATTACHMENT',
+        'CAD_PROJECT', 'PCB_DESIGN', 'SCHEMATIC', 'BOM', 'PCB_TOP', 'PCB_BOTTOM', 'PCB_3D', 'FIRMWARE', 'ATTACHMENT',
     ]
     name: str
     uploaded_dt: datetime

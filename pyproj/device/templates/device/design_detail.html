@@ -112,6 +112,13 @@
                                             </td>
                                         </tr>
                                         <tr>
+                                            <th>{{ design_form.cad_tool.label }}:</th>
+                                            <td>
+                                                {{ design_form.cad_tool }}
+                                                {% if design_form.cad_tool.errors %}<div class="text-danger small">{{ design_form.cad_tool.errors }}</div>{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
                                             <th>{{ design_form.price.label }}:</th>
                                             <td>
                                                 <div class="input-group" style="max-width: 150px;">
@@ -226,8 +233,8 @@
                                                 {% if asset %}
                                                     <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
                                                         <td class="text-nowrap" style="width:1px">
-                                                            {% if type_key == 'FUSION' %}
-                                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
+                                                            {% if type_key == 'CAD_PROJECT' and cad_project_icon %}
+                                                                <img src="{% static cad_project_icon %}" height="16" width="16" alt="{{ label }}">
                                                             {% else %}
                                                                 <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
                                                             {% endif %}
@@ -741,11 +748,7 @@
                                                 {% if asset %}
                                                     <tr class="clickable-row" onclick="window.location='{{ asset.file.url }}'" style="cursor:pointer">
                                                         <td class="text-nowrap" style="width:1px">
-                                                            {% if type_key == 'FUSION' %}
-                                                                <img src="{% static 'img/filetypes/fusion.svg' %}" height="16" width="16" alt="Fusion">
-                                                            {% else %}
-                                                                <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
-                                                            {% endif %}
+                                                            <i class="bi {{ asset.get_icon_class }}"{% if asset.get_icon_color %} style="color:{{ asset.get_icon_color }}"{% endif %}></i>
                                                         </td>
                                                         <td class="text-nowrap">{{ label }}</td>
                                                         <td>
