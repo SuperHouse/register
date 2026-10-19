@@ -112,10 +112,12 @@ Do these steps in this order. Caddy requests a certificate as soon as the hostna
 
     Then open `https://serials.example.com/` in a browser and log in.
 
+5. **Add the client's branding (optional).** In Register, edit the client's organisation and add the hostname in the **Branding** card. See [Branding](../user-guide/organisations.md#branding). Without branding, the hostname shows the normal SuperHouse site.
+
 Notes:
 
 - Login sessions are separate for each hostname. A user who is logged in on `portal.superhouse.tv` must log in again on a vanity hostname.
-- Password reset emails always contain links to `portal.superhouse.tv` (the Sites framework domain, `SITE_ID = 1`), even when the reset was requested on a vanity hostname. The links work, but they show the SuperHouse hostname.
+- Password reset emails link to the hostname the reset was requested on, and use that hostname's brand name.
 - To remove a vanity hostname, do the steps in reverse: remove it from `ALLOWED_HOSTS`, then from the Caddyfile.
 
 ## KiCAD import

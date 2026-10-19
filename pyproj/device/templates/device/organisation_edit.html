@@ -1,7 +1,7 @@
 {% extends "device/base-with-sidebar.html" %}
 
 {% block title %}
-    Edit Organisation - SuperHouse Device Register
+    Edit Organisation - {{ brand_name }} Device Register
 {% endblock title %}
 
 {% block h1 %}
@@ -72,6 +72,76 @@
                             <a href="{% url 'organisation_detail' client.pk %}" class="btn btn-secondary">Cancel</a>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card" id="branding">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Branding</strong>
+                    <a href="{% url 'branded_host_add' client.pk %}" class="btn btn-sm btn-primary">
+                        <i class="cil-plus"></i> Add Hostname
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted">
+                        When the site is opened through one of these hostnames, it shows this logo, name and colours
+                        instead of SuperHouse's. Branding never changes what data anyone can see.
+                        Each hostname also has to be set up on the server; see the deployment docs ("Adding a vanity hostname").
+                    </p>
+                    {% if branded_hosts %}
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Hostname</th>
+                                    <th>Logo</th>
+                                    <th>Colours</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for branded_host, allowed in branded_hosts %}
+                                    <tr>
+                                        <td>
+                                            <a href="{% url 'branded_host_edit' branded_host.pk %}">{{ branded_host.hostname }}</a>
+                                            <div class="small text-muted">{{ branded_host.brand_name }}</div>
+                                            {% if not allowed %}
+                                                <div class="small text-danger" title="Add it to ALLOWED_HOSTS in the server's local_settings.py">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i> Not in ALLOWED_HOSTS
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                        <td><img src="{{ branded_host.logo.url }}" alt="" style="max-height: 40px; max-width: 100px;"></td>
+                                        <td>
+                                            {% if branded_host.sidebar_colour %}
+                                                <span class="d-inline-block border rounded" title="Sidebar {{ branded_host.sidebar_colour }}"
+                                                      style="width: 1.25rem; height: 1.25rem; background: {{ branded_host.sidebar_colour }};"></span>
+                                            {% endif %}
+                                            {% if branded_host.accent_colour %}
+                                                <span class="d-inline-block border rounded" title="Accent {{ branded_host.accent_colour }}"
+                                                      style="width: 1.25rem; height: 1.25rem; background: {{ branded_host.accent_colour }};"></span>
+                                            {% endif %}
+                                            {% if not branded_host.sidebar_colour and not branded_host.accent_colour %}
+                                                <span class="small text-muted">Default</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end">
+                                            <form method="post" action="{% url 'branded_host_delete' branded_host.pk %}" class="d-inline"
+                                                  onsubmit="return confirm('Remove branding for {{ branded_host.hostname }}?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Remove">
+                                                    <i class="cil-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p class="mb-0"><i>No branded hostnames.</i></p>
+                    {% endif %}
                 </div>
             </div>
         </div>

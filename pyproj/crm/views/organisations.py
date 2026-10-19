@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.http.request import validate_host
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 
@@ -81,9 +83,17 @@ def organisation_edit(request, client_id):
     else:
         form = ClientForm(instance=client)
 
+    # A branded hostname only works once it's also in the server's ALLOWED_HOSTS (and the
+    # Caddyfile) - flag the ones that aren't, so that step isn't forgotten.
+    branded_hosts = [
+        (branded_host, validate_host(branded_host.hostname, settings.ALLOWED_HOSTS))
+        for branded_host in client.branded_hosts.all()
+    ]
+
     context = {
         'form': form,
         'client': client,
+        'branded_hosts': branded_hosts,
     }
 
     return render(request, 'device/organisation_edit.html', context)

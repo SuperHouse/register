@@ -1,9 +1,33 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from crm.models import Org
+from crm.models import BrandedHost, Org
 
 User = get_user_model()
+
+
+class BrandedHostForm(forms.ModelForm):
+    class Meta:
+        model = BrandedHost
+        fields = ['hostname', 'display_name', 'logo', 'logo_link_url', 'sidebar_colour', 'accent_colour']
+        widgets = {
+            'hostname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'serials.example.com'}),
+            'display_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'logo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'logo_link_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://www.example.com/'}),
+            'sidebar_colour': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '#3c4b64'}),
+            'accent_colour': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '#321fdb'}),
+        }
+        labels = {'logo_link_url': 'Logo link'}
+
+    def clean_hostname(self):
+        return self.cleaned_data['hostname'].strip().lower()
+
+    def clean_sidebar_colour(self):
+        return self.cleaned_data['sidebar_colour'].lower()
+
+    def clean_accent_colour(self):
+        return self.cleaned_data['accent_colour'].lower()
 
 
 class UserForm(forms.ModelForm):

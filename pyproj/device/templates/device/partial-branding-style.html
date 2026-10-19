@@ -1,0 +1,71 @@
+{% comment %}
+    Per-hostname colours (issue #150), from crm.branding.branding_processor. Values are
+    validated #rrggbb colours or computed from them, so they are safe inside <style>.
+    Variable names are CoreUI 4.3.2's own.
+{% endcomment %}
+{% if brand_sidebar or brand_accent %}
+<style>
+{% if brand_sidebar %}
+    .sidebar {
+        --cui-sidebar-bg: {{ brand_sidebar.colour }};
+    {% if brand_sidebar.dark_text %}
+        --cui-sidebar-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-brand-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-nav-title-color: rgba(0, 0, 21, 0.6);
+        --cui-sidebar-nav-link-color: rgba(0, 0, 21, 0.6);
+        --cui-sidebar-nav-link-active-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-nav-link-active-bg: rgba(0, 0, 21, 0.05);
+        --cui-sidebar-nav-link-active-icon-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-nav-link-disabled-color: rgba(0, 0, 21, 0.38);
+        --cui-sidebar-nav-link-disabled-icon-color: rgba(0, 0, 21, 0.6);
+        --cui-sidebar-nav-link-hover-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-nav-link-hover-bg: rgba(0, 0, 21, 0.05);
+        --cui-sidebar-nav-link-hover-icon-color: rgba(0, 0, 21, 0.87);
+        --cui-sidebar-nav-link-icon-color: rgba(0, 0, 21, 0.6);
+        --cui-sidebar-nav-group-toggle-show-color: rgba(0, 0, 21, 0.6);
+    {% endif %}
+    }
+{% endif %}
+{% if brand_accent %}
+    :root {
+        --cui-primary: {{ brand_accent.colour }};
+        --cui-primary-rgb: {{ brand_accent.rgb }};
+        --cui-link-color: {{ brand_accent.link }};
+        --cui-link-color-rgb: {{ brand_accent.link_rgb }};
+        --cui-link-hover-color: {{ brand_accent.link_hover }};
+    }
+    .btn-primary {
+        --cui-btn-color: {{ brand_accent.text }};
+        --cui-btn-bg: {{ brand_accent.colour }};
+        --cui-btn-border-color: {{ brand_accent.colour }};
+        --cui-btn-hover-color: {{ brand_accent.text }};
+        --cui-btn-hover-bg: {{ brand_accent.hover }};
+        --cui-btn-hover-border-color: {{ brand_accent.hover }};
+        --cui-btn-focus-shadow-rgb: {{ brand_accent.rgb }};
+        --cui-btn-active-color: {{ brand_accent.text }};
+        --cui-btn-active-bg: {{ brand_accent.active }};
+        --cui-btn-active-border-color: {{ brand_accent.active }};
+        --cui-btn-disabled-color: {{ brand_accent.text }};
+        --cui-btn-disabled-bg: {{ brand_accent.colour }};
+        --cui-btn-disabled-border-color: {{ brand_accent.colour }};
+    }
+    .btn-outline-primary {
+        --cui-btn-color: {{ brand_accent.link }};
+        --cui-btn-border-color: {{ brand_accent.colour }};
+        --cui-btn-hover-color: {{ brand_accent.text }};
+        --cui-btn-hover-bg: {{ brand_accent.colour }};
+        --cui-btn-hover-border-color: {{ brand_accent.colour }};
+        --cui-btn-focus-shadow-rgb: {{ brand_accent.rgb }};
+        --cui-btn-active-color: {{ brand_accent.text }};
+        --cui-btn-active-bg: {{ brand_accent.active }};
+        --cui-btn-active-border-color: {{ brand_accent.active }};
+        --cui-btn-disabled-color: {{ brand_accent.link }};
+    }
+    /* style.css colours table headers with the primary colour and white text. */
+    .table > thead tr,
+    tr.highlight th {
+        color: {{ brand_accent.text }};
+    }
+{% endif %}
+</style>
+{% endif %}

@@ -93,6 +93,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'device.context_processor.background_processor',  # Variables for customising the background
                 'device.context_processor.demo_processor',  # Variables for the demo level
+                'crm.branding.branding_processor',  # Per-hostname logo, name and colours (issue #150)
                 'device.context_processor.version_processor',  # App version number
             ],
         },
@@ -136,6 +137,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/admin/',
     '/api/',
     '/static/',
+    '/media/branding/',  # Branding logos are shown on the login page; conf/media.py serves them publicly
     '__debug__/',
 ]
 

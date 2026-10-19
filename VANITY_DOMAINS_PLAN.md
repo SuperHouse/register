@@ -302,7 +302,40 @@ to when clients push for more.
 7. **Docs** — admin guide covering how to add a branded host, start to finish (server steps from
    #149, then the Register entry), plus the scope statement.
 
-### Open decisions before starting #150
+### Status: implemented 2026-10-19 on `main` (uncommitted when written)
+
+- **Model:** `crm.BrandedHost` (migration `crm/0007_brandedhost`).
+- **Lookup and colours:** `crm/branding.py` (`branding_processor` in `TEMPLATES`) and
+  `device/partial-branding-style.html`.
+- **Staff UI:** Branding card on `organisation_edit`, plus `crm/views/branding.py` and
+  `device/branded_host_edit.html`.
+- **Logos:** the `branding/` public rule in `conf/media.py`, and `/media/branding/` in
+  `LOGIN_REQUIRED_IGNORE_PATHS`.
+- **Password reset:** `InvitePasswordResetForm.save()` uses the request host and brand name.
+- **Templates:** 84 page titles use `{{ brand_name }}`. The sidebar and the Batch print logo use
+  `brand_logo_url`.
+- **Tests:** `crm/tests/test_branding.py` (29 tests). The full suite passes (669 tests).
+- **Checked in a browser:** through `brand.example.test` (yellow sidebar, dark text, navy accent)
+  and through `localhost` (unchanged SuperHouse look).
+- **Docs:** `docs/user-guide/organisations.md` (Branding), and step 5 in
+  `docs/admin/deployment.md`.
+- **Change from the plan:** the logo is **required**, with no fallback to `Org.logo`. Org logos
+  live in `clients/`, which is members-only, so the login page couldn't show one to anonymous
+  visitors.
+
+### Decisions made 2026-10-19
+
+- **Per hostname:** a `BrandedHost` record (hostname → org, logo, link, name, colours). Logo falls
+  back to the org's logo.
+- **Colours:** sidebar colour, plus an accent colour for buttons and links (CoreUI primary).
+- **Configured on the org edit page** (a "Branding" card).
+- **Also follows the host:** page titles, the password reset pages and email (including the reset
+  link's host), and the Batch print page logo.
+- **Branding logos are public** (the login page shows them to anonymous users): stored under
+  their own `branding/` media prefix with a public rule in `conf/media.py`, plus a
+  `LOGIN_REQUIRED_IGNORE_PATHS` entry.
+
+### Open decisions before starting #150 (resolved above)
 
 - **Host-level or org-level branding?** Recommendation: host-level, with logo fallback to
   `org.logo`.

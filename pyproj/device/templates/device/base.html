@@ -6,8 +6,8 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description"
-              content="A management system for information about devices made by SuperHouse">
-        <meta name="keywords" content="device,test,SuperHouse,dashboard">
+              content="A management system for information about devices made by {{ brand_name }}">
+        <meta name="keywords" content="device,test,{{ brand_name }},dashboard">
         <title>
             {% block title %}
                 Page Title
@@ -21,6 +21,7 @@
         <!-- SimpleBar CSS for sidebar scrolling -->
         <link href="https://cdn.jsdelivr.net/npm/simplebar@latest/dist/simplebar.min.css" rel="stylesheet">
         <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+        {% include "device/partial-branding-style.html" %}
         {% block extra_head %}
         {% endblock extra_head %}
     </head>

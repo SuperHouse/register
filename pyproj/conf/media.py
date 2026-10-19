@@ -5,11 +5,12 @@ Every file under MEDIA_ROOT belongs to a record (a DesignAsset, a DeviceImage, a
 Org's logo, ...). This view finds the record by the file name stored in the
 database and checks that the user may see it. Staff may see everything. Any other
 user may only see files that belong to their own Org(s), and never an asset marked
-internal. Files with no matching rule are staff only.
+internal. Files with no matching rule are staff only. The one public exception is
+branding logos (branding/), which the login page shows to anonymous visitors.
 
 Forbidden and missing files both give a 404, so the response doesn't tell anyone
-that a file exists. Anonymous users never get here: LoginRequiredMiddleware sends
-them to the login page first.
+that a file exists. Anonymous users only get here for /media/branding/:
+LoginRequiredMiddleware sends them to the login page for everything else.
 """
 
 import mimetypes
@@ -24,7 +25,7 @@ from django.utils.http import http_date
 from django.views.static import was_modified_since
 from easy_thumbnails.models import Thumbnail
 
-from crm.models import Org
+from crm.models import BrandedHost, Org
 from device.models import DesignAsset, DeviceAsset, DeviceImage, TestImage
 
 # Types that are safe to show inline in the browser. Anything else (HTML, SVG, ...)
@@ -83,6 +84,11 @@ NON_STAFF_RULES = {
 
 def user_can_access_media(user, name):
     """Can `user` see the media file stored as `name` (a path relative to MEDIA_ROOT)?"""
+    if name.startswith('branding/'):
+        # Per-hostname branding logos (issue #150) are public: the login page shows them to
+        # people who are not logged in yet. Only files that really are a BrandedHost logo.
+        # LOGIN_REQUIRED_IGNORE_PATHS lets anonymous requests for /media/branding/ reach here.
+        return BrandedHost.objects.filter(logo=name).exists()
     if not user.is_authenticated or not user.is_active:
         return False
     if user.is_staff:

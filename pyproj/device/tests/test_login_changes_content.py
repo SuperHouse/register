@@ -22,6 +22,7 @@ def logged_in_user_client(client, django_user_model):
 # on whether the user is logged in, and whether the user is a staff member.
 
 
+@pytest.mark.django_db  # every page looks up the request hostname's branding (crm.branding)
 def test_content_for_strangers(stranger_client):
     response = stranger_client.get(reverse('device:perm_report'))
     assert response.status_code == 200

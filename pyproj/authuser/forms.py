@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm, _unicode_ci_compare
 
+from crm.branding import get_brand_name
+
 User = get_user_model()
 
 
@@ -14,6 +16,21 @@ class InvitePasswordResetForm(PasswordResetForm):
     the state a newly invited user is in (see crm.views.users.user_add),
     so the stock form would silently email nobody for every invite.
     """
+
+    def save(self, *args, request=None, domain_override=None, extra_email_context=None, **kwargs):
+        """Link to the hostname the request came in on, and name its brand (issue #150).
+
+        Without this, Django takes both from the Sites framework (SITE_ID = 1), so a user on
+        a client's vanity hostname would get a SuperHouse-named email linking to
+        portal.superhouse.tv. request.get_host() has already been checked against
+        ALLOWED_HOSTS, so it can't be used to point the link somewhere else.
+        """
+        if request is not None:
+            domain_override = domain_override or request.get_host()
+            extra_email_context = {'site_name': get_brand_name(request), **(extra_email_context or {})}
+        return super().save(
+            *args, request=request, domain_override=domain_override, extra_email_context=extra_email_context, **kwargs,
+        )
 
     def get_users(self, email):
         email_field_name = User.get_email_field_name()

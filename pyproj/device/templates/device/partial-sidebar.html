@@ -1,8 +1,8 @@
 {% load static %}
 <aside class="sidebar sidebar-fixed sidebar-lg-show" id="sidebar">
     <div class="sidebar-brand d-none d-md-flex">
-        <a class="sidebar-brand-full" href="https://www.superhouse.tv/" target="_blank" rel="noopener noreferrer">
-            <img src="{% static 'img/superhouse.png' %}" alt="SuperHouse" style="max-height: 120px; max-width: 200px; padding: 10px 0;">
+        <a class="sidebar-brand-full" href="{{ brand_logo_link }}"{% if brand_logo_external %} target="_blank" rel="noopener noreferrer"{% endif %}>
+            <img src="{{ brand_logo_url }}" alt="{{ brand_name }}" style="max-height: 120px; max-width: 200px; padding: 10px 0;">
         </a>
     </div>
     {% if user.is_authenticated %}
