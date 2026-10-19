@@ -741,6 +741,10 @@ class PartsOrderLine(models.Model):
     def symbol(self):
         return PartPriceBreak.CURRENCY_SYMBOLS.get(self.currency, '')
 
+    # Archive formats a Gerber upload to JLCPCB may arrive in, stripped from description
+    # by display_sku. Longest first, so ".tar.gz" wins over a shorter suffix.
+    JLCPCB_ARCHIVE_EXTENSIONS = ('.tar.gz', '.zip', '.rar', '.7z', '.tgz')
+
     @property
     def display_sku(self):
         """The value to show wherever a line's "Supplier SKU" is displayed. For every
@@ -753,8 +757,7 @@ class PartsOrderLine(models.Model):
         labels each entry with a compound value built from the Gerber filename (stored as
         description - see erp.views._parse_jlcpcb_order_item) and produceCode, e.g.
         "BeetleBot-v1_0_Y466" - description is "BeetleBot-v1_0.zip", supplier_sku is
-        "Y466". This reconstructs that two-part compound (extension stripped from
-        description, whatever it is - not hardcoded to ".zip") so staff can recognise an
+        "Y466". This reconstructs that two-part compound so staff can recognise an
         entry the same way JLCPCB's own site presents it, without needing to store the
         compound string itself (description and supplier_sku alone are still what's
         matched against on resync - see _upsert_parts_order). Deliberately doesn't
@@ -763,10 +766,26 @@ class PartsOrderLine(models.Model):
         is unconfirmed - see the "# --- JLCPCB PCB order sync" module comment in
         erp/views.py for this integration's other unconfirmed-field caveats), not from
         fileName or produceCode alone.
+
+        description isn't always a bare filename. Real orders have also returned it with
+        no extension and the produceCode already in it (e.g. "BeetleBot-v1_0_Y466", or
+        "BeetleBot-v1_0_Y467(replacefile)" with JLCPCB's annotation after it), so the
+        produceCode is only appended when it isn't there already. Only a known
+        archive extension (JLCPCB_ARCHIVE_EXTENSIONS) is stripped, not anything after the
+        last dot: a board name like "Board-v1.0_Y466" would otherwise lose ".0_Y466".
         """
         if self.parts_order.supplier_name == 'JLCPCB' and self.description:
-            stem = os.path.splitext(self.description)[0]
-            return f'{stem}_{self.supplier_sku}' if self.supplier_sku else stem
+            stem = self.description
+            lowered = stem.lower()
+            for ext in self.JLCPCB_ARCHIVE_EXTENSIONS:
+                if lowered.endswith(ext):
+                    stem = stem[:-len(ext)]
+                    break
+            # The produceCode can sit before an annotation ("..._Y467(replacefile)"), so look
+            # for it anywhere as a whole token - "_Y46" mustn't match inside "_Y466".
+            if not self.supplier_sku or re.search(rf'_{re.escape(self.supplier_sku)}(?![A-Za-z0-9])', stem):
+                return stem
+            return f'{stem}_{self.supplier_sku}'
         return self.supplier_sku
 
 

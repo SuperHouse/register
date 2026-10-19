@@ -470,6 +470,78 @@ def test_display_sku_strips_whatever_extension_is_present_not_just_zip():
 
 
 @pytest.mark.django_db
+def test_display_sku_does_not_repeat_produce_code_already_in_filename():
+    # Real order W2026080710498327 returned fileName with no extension and the produceCode
+    # already on the end - it was shown as "BeetleBot-v1_0_Y466_Y466".
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y466', description='BeetleBot-v1_0_Y466', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y466'
+
+
+@pytest.mark.django_db
+def test_display_sku_does_not_repeat_produce_code_after_annotation():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y412', description='MCM-v9_5(Reorder)_Y412', quantity=1,
+    )
+
+    assert line.display_sku == 'MCM-v9_5(Reorder)_Y412'
+
+
+@pytest.mark.django_db
+def test_display_sku_does_not_repeat_produce_code_before_replacefile_annotation():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y467', description='BeetleBot-v1_0_Y467(replacefile)', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y467(replacefile)'
+
+
+@pytest.mark.django_db
+def test_display_sku_does_not_treat_a_longer_code_as_containing_the_produce_code():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y46', description='BeetleBot-v1_0_Y466', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y466_Y46'
+
+
+@pytest.mark.django_db
+def test_display_sku_still_appends_produce_code_when_filename_ends_with_a_different_code():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y467', description='BeetleBot-v1_0_Y466', quantity=1,
+    )
+
+    assert line.display_sku == 'BeetleBot-v1_0_Y466_Y467'
+
+
+@pytest.mark.django_db
+def test_display_sku_keeps_dots_that_are_not_an_archive_extension():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y466', description='Board-v1.0_Y466', quantity=1,
+    )
+
+    assert line.display_sku == 'Board-v1.0_Y466'
+
+
+@pytest.mark.django_db
+def test_display_sku_strips_archive_extension_case_insensitively_and_keeps_version_dots():
+    parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
+    line = PartsOrderLine.objects.create(
+        parts_order=parts_order, supplier_sku='Y466', description='Board-v1.0.ZIP', quantity=1,
+    )
+
+    assert line.display_sku == 'Board-v1.0_Y466'
+
+
+@pytest.mark.django_db
 def test_display_sku_falls_back_to_filename_alone_when_produce_code_blank():
     parts_order = PartsOrder.objects.create(supplier_name='JLCPCB', supplier_order_number='BATCH1')
     line = PartsOrderLine.objects.create(
