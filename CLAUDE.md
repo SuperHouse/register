@@ -34,6 +34,7 @@ register/
 ├── STOCK_CONSUMPTION_PLAN.md  # Planning doc: register#129 stock allocation/consumption — parked, see PLANNING_STACK.md
 ├── BATCH_STATUS_PLAN.md       # Planning doc: a real Batch.status field (Draft/Ready/In Progress/Complete/On Hold/Cancelled) — parked
 ├── DEVICE_GENERATION_PLAN.md  # Planning doc: in-app Device/serial-number generation, replacing spreadsheet import — parked
+├── VANITY_DOMAINS_PLAN.md     # Planning doc: register#149 vanity-hostname server check, then register#150 per-host branding
 ├── README.md
 └── SETUP.md            # Dev setup instructions
 ```
@@ -48,6 +49,8 @@ python manage.py runserver
 ```
 
 **Production (Linux):** uWSGI Emperor manages apps via ini files in `/etc/uwsgi-emperor/vassals/`. Touch an ini file to restart the app (`sudo touch /etc/uwsgi-emperor/vassals/register.ini`). `register.ini` and `register-test.ini` are both symlinks to the shared `/etc/uwsgi-emperor/django-app-template.ini`, which uses uWSGI's `%n` (vassal name) magic variable for `chdir`/`virtualenv`/socket/log paths — so changes to the template affect both apps. uWSGI embeds its own Python interpreter via the `python3` plugin (the OS Python — **3.14** since prod moved to Ubuntu 26.04 on 2026-10-14; was 3.12 on 24.04) rather than exec'ing the venv's own binary; each app's `env` venv **must** be created with the matching Python minor version (so an OS upgrade means rebuilding both venvs — see `docs/admin/deployment.md`), or uWSGI fails at startup with a generic "no python application found" (the real `ModuleNotFoundError` only shows in the per-app log under `/var/log/uwsgi/app/%n.log` right after a restart). See [SETUP.md](SETUP.md) for full setup instructions.
+
+Prod/test code lives at `/var/www/register/pyproj` and `/var/www/register-test/pyproj` (not `~/register`). **Caddy** (not nginx) sits in front: `/etc/caddy/Caddyfile` maps each deployment's hostnames (one site block per deployment, address line = all its hostnames) to `reverse_proxy unix//run/uwsgi/%n.sock`, serves `/static/*` itself, and manages TLS certificates automatically. **`/media/*` is deliberately not served by Caddy**, so media requests go through Django's `serve` route and `LoginRequiredMiddleware`. Until 2026-10-19 a Caddy `file_server` block made every upload downloadable without login. That interim fix only requires *a* login; a logged-in user can still fetch another org's or `internal=True` files by URL (see `VANITY_DOMAINS_PLAN.md`). Adding a client vanity hostname (register#149) = client DNS first, then the Caddyfile, then `ALLOWED_HOSTS` in the server's `local_settings.py`; steps are in `docs/admin/deployment.md`.
 
 - Dashboard: http://127.0.0.1:8000/
 - Boards: http://127.0.0.1:8000/device/
