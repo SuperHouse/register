@@ -17,7 +17,16 @@ check (see `VANITY_DOMAINS_PLAN.md`).
 - **Already public:** CLAUDE.md, committed and pushed in `ae5c55f`, mentions the remaining gap.
   Jon accepted this given there are no client users. Reword that line once the fix is in.
 
-## Plan
+## Status
+
+**Implemented 2026-10-19 on `main` (uncommitted when written):** `pyproj/conf/media.py`
+(`serve_media`, `user_can_access_media`), wired in `conf/urls.py` as URL name `media`, with
+`device/tests/test_media_access.py` (16 tests; the full suite passes, 640 tests). Documented in
+CLAUDE.md (`conf` section, Access Control) and `docs/admin/deployment.md`. The CLAUDE.md line
+describing the gap has been reworded. **Takes effect on the server only after deploy;** check on
+test first, then prod.
+
+## Plan (as implemented)
 
 Replace the `serve` route with a Django view that finds the record that owns the requested file
 and applies the same access rules the pages use. URLs stay `/media/...`, so no template or Caddy

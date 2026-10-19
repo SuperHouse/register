@@ -20,7 +20,6 @@ from django.contrib import admin
 from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic.base import RedirectView
-from django.views.static import serve
 
 from api.app import api
 from authuser import api as authuser_api  # noqa: F401 — registers authuser endpoints on the shared router
@@ -28,6 +27,7 @@ from device import api as device_api  # noqa: F401 — registers device endpoint
 from crm.views import api as crm_api  # noqa: F401 — registers crm endpoints on the shared router
 from testing import api as testing_api  # noqa: F401 — registers testing endpoints on the shared router
 from crm import views as crm_views
+from conf.media import serve_media
 from device import views as device_views
 
 urlpatterns = [
@@ -62,14 +62,9 @@ urlpatterns = [
     # Short-link form used on board stickers, e.g. https://d.superlab.au/5678
     path('<int:device_number>/', RedirectView.as_view(pattern_name='device:device_detail', permanent=False), name='device_detail_short'),
 
-    # If we're running behind a web server, we won't see media requests, so this will do nothing.
-    re_path(
-        r'^media/(?P<path>.*)$',
-        serve,
-        {
-            "document_root": settings.MEDIA_ROOT,
-        },
-    ),
+    # Uploaded files are always served by Django, never directly by the web server,
+    # so that each request is checked against the file's owner. See conf/media.py.
+    re_path(r'^media/(?P<path>.*)$', serve_media, name='media'),
 ]
 
 if settings.DEBUG:
