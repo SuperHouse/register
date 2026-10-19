@@ -35,6 +35,7 @@ register/
 ├── BATCH_STATUS_PLAN.md       # Planning doc: a real Batch.status field (Draft/Ready/In Progress/Complete/On Hold/Cancelled) — parked
 ├── DEVICE_GENERATION_PLAN.md  # Planning doc: in-app Device/serial-number generation, replacing spreadsheet import — parked
 ├── VANITY_DOMAINS_PLAN.md     # Planning doc: register#149 vanity-hostname server check, then register#150 per-host branding
+├── MEDIA_ACCESS_PLAN.md       # Planning doc: per-org/internal access checks on /media/ files — do before any client gets a login
 ├── README.md
 └── SETUP.md            # Dev setup instructions
 ```
