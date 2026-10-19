@@ -3052,8 +3052,17 @@ def _parse_jlcpcb_order_item(item, order_status, currency, line_index):
     confirmed plausible against the docs' own worked example (price=5 for count=10,
     consistent with JLCPCB's well-known low-cost prototype pricing) for the unpanelised
     case, though the docs don't say in so many words that price is a line total rather than
-    already per-unit."""
+    already per-unit.
+
+    status comes from this item's own orderStatus, falling back to order_status (the
+    order-level status) only when the item has none. JLCPCB reports status per item, and
+    one order can mix them: after a cart "replace files" upload the superseded entry stays
+    in the order, and order W2026080710498327 showed it as cancelled while its replacement
+    shipped. Copying one item's status onto every line made that phantom line look shipped,
+    so it could never be told apart from a real line or leave the order unfinished."""
     pcb_item = item.get('pcbItem') or {}
+    if pcb_item.get('orderStatus') is not None:
+        order_status = _map_jlcpcb_order_status(pcb_item.get('orderStatus'))
     count = pcb_item.get('count') or 1
     panel_x = pcb_item.get('panelByJLCPCB_X')
     panel_y = pcb_item.get('panelByJLCPCB_Y')
@@ -3088,20 +3097,29 @@ def _parse_jlcpcb_order(data, batch_num):
     (PCB) entries are kept - orderType == 3 (Stencil) entries carry their data under a
     separate smtItem key instead of pcbItem (confirmed by the docs' own worked example,
     which shows one PCB orderItem with an all-null smtItem alongside it), and stencil
-    orders aren't tracked by this app. order_dt/status are read from the first PCB
-    orderItem, since GetOrderDetailByBatchNumData has no order-level date/status field of
-    its own - only per-item orderDate/orderStatus."""
+    orders aren't tracked by this app. order_dt/expected_arrival_date are read from the first
+    PCB orderItem, since GetOrderDetailByBatchNumData has no order-level date/status field of
+    its own - only per-item orderDate/orderStatus. The order-level status is read from the
+    first PCB orderItem that isn't cancelled (orderStatus 0), so a phantom entry left behind
+    by a "replace files" upload doesn't label the whole order Cancelled just because it's
+    listed first; it falls back to the first PCB orderItem if every one is cancelled. Each
+    line's own status comes from its own item - see _parse_jlcpcb_order_item."""
     order_items = data.get('orderItem') or []
     pcb_items = [item for item in order_items if item.get('orderType') == 1]
-    first_item = (pcb_items[0].get('pcbItem') or {}) if pcb_items else {}
-    order_status = _map_jlcpcb_order_status(first_item.get('orderStatus'))
+    pcb_details = [item.get('pcbItem') or {} for item in pcb_items]
+    first_item = pcb_details[0] if pcb_details else {}
+    status_item = next(
+        (d for d in pcb_details if _map_jlcpcb_order_status(d.get('orderStatus')) != PartsOrderLine.CANCELLED),
+        first_item,
+    )
+    order_status = _map_jlcpcb_order_status(status_item.get('orderStatus'))
     currency = 'USD'  # docs annotate money fields with a "$" comment, not an ISO code - same assumption as LCSC
     return {
         'supplier_order_number': batch_num,
         'supplier_order_url': '',
         'order_dt': _parse_jlcpcb_dt(first_item.get('orderDate')),
         'expected_arrival_date': _parse_jlcpcb_date(first_item.get('deliveryTime')),
-        'status': _jlcpcb_order_status_label(first_item.get('orderStatus')),
+        'status': _jlcpcb_order_status_label(status_item.get('orderStatus')),
         'lines': [
             _parse_jlcpcb_order_item(item, order_status, currency, i) for i, item in enumerate(pcb_items)
         ],

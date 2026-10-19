@@ -18,6 +18,7 @@ from erp.views import (
     _parse_jlcpcb_date,
     _parse_jlcpcb_dt,
     _parse_jlcpcb_order,
+    _finished_parts_order_numbers,
     _parse_jlcpcb_order_item,
     _upsert_parts_order,
 )
@@ -211,6 +212,25 @@ def test_parse_jlcpcb_order_item_handles_missing_price():
     assert parsed['unit_price'] is None
 
 
+def test_parse_jlcpcb_order_item_uses_its_own_order_status():
+    # A cancelled item in an otherwise-shipped order keeps its own status rather than
+    # inheriting the order-level one passed in.
+    item = _order_item(order_status=0)
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.SHIPPED, currency='USD', line_index=0)
+
+    assert parsed['status'] == PartsOrderLine.CANCELLED
+
+
+def test_parse_jlcpcb_order_item_falls_back_to_order_status_when_item_has_none():
+    item = _order_item()
+    item['pcbItem']['orderStatus'] = None
+
+    parsed = _parse_jlcpcb_order_item(item, order_status=PartsOrderLine.SHIPPED, currency='USD', line_index=0)
+
+    assert parsed['status'] == PartsOrderLine.SHIPPED
+
+
 # --- _parse_jlcpcb_order_item panelisation (issue #100) ---
 #
 # Confirmed live against real order W2026080710498327: a panelised line reports `count` as
@@ -291,6 +311,48 @@ def test_parse_jlcpcb_order_multiple_items_use_produce_code_as_line_number():
 
     assert [line['supplier_line_number'] for line in parsed['lines']] == ['PC1', 'PC2']
     assert [line['supplier_sku'] for line in parsed['lines']] == ['PC1', 'PC2']
+
+
+def test_parse_jlcpcb_order_replaced_file_line_is_cancelled_while_replacement_ships():
+    # The shape of real order W2026080710498327: a "replace files" upload leaves the
+    # superseded entry (Y466) in the order alongside its replacement (Y467) and an
+    # unrelated line (Y412). Each line must keep its own status.
+    data = {'orderItem': [
+        _order_item(produce_code='Y467', order_status=5),
+        _order_item(produce_code='Y466', order_status=0),
+        _order_item(produce_code='Y412', order_status=5),
+    ]}
+
+    parsed = _parse_jlcpcb_order(data, batch_num='BATCH123')
+
+    assert {line['supplier_sku']: line['status'] for line in parsed['lines']} == {
+        'Y467': PartsOrderLine.SHIPPED,
+        'Y466': PartsOrderLine.CANCELLED,
+        'Y412': PartsOrderLine.SHIPPED,
+    }
+    assert parsed['status'] == 'Shipped'
+
+
+def test_parse_jlcpcb_order_status_label_skips_a_leading_cancelled_item():
+    # If the phantom entry happens to be listed first, it mustn't label the whole order.
+    data = {'orderItem': [
+        _order_item(produce_code='Y466', order_status=0),
+        _order_item(produce_code='Y467', order_status=5),
+    ]}
+
+    parsed = _parse_jlcpcb_order(data, batch_num='BATCH123')
+
+    assert parsed['status'] == 'Shipped'
+    assert [line['status'] for line in parsed['lines']] == [PartsOrderLine.CANCELLED, PartsOrderLine.SHIPPED]
+
+
+def test_parse_jlcpcb_order_all_items_cancelled_labels_order_cancelled():
+    data = {'orderItem': [_order_item(produce_code='PC1', order_status=0)]}
+
+    parsed = _parse_jlcpcb_order(data, batch_num='BATCH123')
+
+    assert parsed['status'] == 'Cancelled'
+    assert parsed['lines'][0]['status'] == PartsOrderLine.CANCELLED
 
 
 def test_parse_jlcpcb_order_excludes_stencil_order_items():
@@ -433,3 +495,25 @@ def test_display_sku_is_plain_supplier_sku_for_non_jlcpcb_suppliers():
     )
 
     assert line.display_sku == 'DK123'
+
+
+@pytest.mark.django_db
+def test_upsert_resync_cancels_replaced_file_line_so_order_can_finish():
+    # Before per-item status, the phantom line was stored as SHIPPED and could never be
+    # received, so the order never counted as finished. A resync that reports it cancelled
+    # must update the stored line, after which receiving the real lines finishes the order.
+    parts_order = _upsert_parts_order(_parse_jlcpcb_order({'orderItem': [
+        _order_item(produce_code='Y467', order_status=5),
+        _order_item(produce_code='Y466', order_status=5),
+    ]}, batch_num='BATCH1'), supplier_name='JLCPCB', part_matcher=None)
+    parts_order.lines.filter(supplier_sku='Y467').update(received=True)
+    assert 'BATCH1' not in _finished_parts_order_numbers('JLCPCB')
+
+    _upsert_parts_order(_parse_jlcpcb_order({'orderItem': [
+        _order_item(produce_code='Y467', order_status=5),
+        _order_item(produce_code='Y466', order_status=0),
+    ]}, batch_num='BATCH1'), supplier_name='JLCPCB', part_matcher=None)
+
+    assert parts_order.lines.get(supplier_sku='Y466').status == PartsOrderLine.CANCELLED
+    assert parts_order.lines.get(supplier_sku='Y467').received  # resync leaves received alone
+    assert 'BATCH1' in _finished_parts_order_numbers('JLCPCB')
