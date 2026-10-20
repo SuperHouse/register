@@ -1,19 +1,45 @@
+import io
+import secrets
+
 from django import forms
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import UploadedFile
+from PIL import Image, ImageOps
 
 from crm.models import BrandedHost, Org
 
 User = get_user_model()
 
+FAVICON_SIZE = 192
+
+
+def make_favicon(uploaded):
+    """The uploaded image as a FAVICON_SIZE square PNG: padded with transparency, never cropped or stretched."""
+    image = ImageOps.exif_transpose(Image.open(uploaded)).convert('RGBA')
+    side = max(image.size)
+    square = Image.new('RGBA', (side, side), (0, 0, 0, 0))
+    square.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
+    square = square.resize((FAVICON_SIZE, FAVICON_SIZE), Image.LANCZOS)
+    buffer = io.BytesIO()
+    square.save(buffer, format='PNG', optimize=True)
+    return ContentFile(buffer.getvalue(), name=f'favicon-{secrets.token_hex(8)}.png')
+
 
 class BrandedHostForm(forms.ModelForm):
+    remove_favicon = forms.BooleanField(
+        required=False, label='Remove favicon (use the Testomatic icon)',
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
     class Meta:
         model = BrandedHost
-        fields = ['hostname', 'display_name', 'logo', 'logo_link_url', 'sidebar_colour', 'accent_colour']
+        fields = ['hostname', 'display_name', 'logo', 'favicon', 'logo_link_url', 'sidebar_colour', 'accent_colour']
         widgets = {
             'hostname': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'serials.example.com'}),
             'display_name': forms.TextInput(attrs={'class': 'form-control'}),
             'logo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'favicon': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'logo_link_url': forms.URLInput(attrs={'class': 'form-control', 'placeholder': 'https://www.example.com/'}),
             'sidebar_colour': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '#3c4b64'}),
             'accent_colour': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '#321fdb'}),
@@ -28,6 +54,19 @@ class BrandedHostForm(forms.ModelForm):
 
     def clean_accent_colour(self):
         return self.cleaned_data['accent_colour'].lower()
+
+    def clean_favicon(self):
+        favicon = self.cleaned_data.get('favicon')
+        if isinstance(favicon, UploadedFile):
+            return make_favicon(favicon)
+        return favicon
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # False clears the field. A newly uploaded favicon wins over the checkbox.
+        if cleaned_data.get('remove_favicon') and not isinstance(cleaned_data.get('favicon'), ContentFile):
+            cleaned_data['favicon'] = False
+        return cleaned_data
 
 
 class UserForm(forms.ModelForm):

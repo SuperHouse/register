@@ -93,14 +93,16 @@ def test_login_page_on_vanity_host_shows_brand_to_anonymous_visitor(client, bran
     assert 'Example Serials Device Register' in content
     assert '--cui-sidebar-bg: #ffee00' in content
     assert '--cui-primary: #123456' in content
-    assert 'superhouse.png' not in content
+    assert 'testomatic-logo-transparent.png' not in content
 
 
 @pytest.mark.django_db
-def test_other_hostnames_get_superhouse_defaults(client, branded_host):
+def test_other_hostnames_get_testomatic_defaults(client, branded_host):
     content = client.get(reverse('login'), HTTP_HOST='portal.superhouse.tv').content.decode()
-    assert 'superhouse.png' in content
-    assert 'SuperHouse Device Register' in content
+    assert 'testomatic-logo-transparent.png' in content
+    assert 'href="https://www.testomatic.io/"' in content
+    assert 'Testomatic Device Register' in content
+    assert 'superhouse' not in content.lower()
     assert '--cui-sidebar-bg' not in content
     assert branded_host.logo.url not in content
 
@@ -137,7 +139,7 @@ def test_batch_print_page_uses_brand_logo(client, branded_host, staff):
     client.force_login(staff)
     content = client.get(reverse('erp:batch_print', args=[batch.pk]), HTTP_HOST=VANITY).content.decode()
     assert branded_host.logo.url in content
-    assert 'superhouse.png' not in content
+    assert 'testomatic-logo-transparent.png' not in content
 
 
 # --- Branding logos are public; nothing else in branding/ is ---
@@ -168,11 +170,11 @@ def test_password_reset_email_uses_vanity_host_and_brand(client, branded_host, d
 
 
 @pytest.mark.django_db
-def test_password_reset_email_elsewhere_keeps_superhouse(client, org, django_user_model, mailoutbox):
+def test_password_reset_email_elsewhere_uses_testomatic(client, org, django_user_model, mailoutbox):
     django_user_model.objects.create_user(email='person@example.com', password='x')
     client.post(reverse('password_reset'), {'email': 'person@example.com'}, HTTP_HOST='portal.superhouse.tv')
     message = mailoutbox[0]
-    assert message.subject == 'Password reset for SuperHouse'
+    assert message.subject == 'Password reset for Testomatic'
     assert '://portal.superhouse.tv/accounts/reset/' in message.body
 
 
@@ -291,3 +293,116 @@ def test_branding_views_are_staff_only(client, branded_host, django_user_model):
         assert client.get(url).status_code == 302
     assert client.post(reverse('branded_host_delete', args=[branded_host.pk])).status_code == 302
     assert BrandedHost.objects.exists()
+
+
+# --- Favicons (issue #151) ---
+
+def upload(name='icon.png', size=(40, 20), colour='red'):
+    buffer = io.BytesIO()
+    Image.new('RGB', size, colour).save(buffer, format='PNG')
+    return ContentFile(buffer.getvalue(), name=name)
+
+
+def edit_post(client, branded_host, **extra):
+    data = {'hostname': branded_host.hostname, 'display_name': branded_host.display_name}
+    data.update(extra)
+    return client.post(reverse('branded_host_edit', args=[branded_host.pk]), data)
+
+
+@pytest.mark.django_db
+def test_uploaded_favicon_becomes_padded_192px_png_with_fresh_name(client, branded_host, staff):
+    client.force_login(staff)
+    assert edit_post(client, branded_host, favicon=upload('acme.png', size=(40, 20))).status_code == 302
+    branded_host.refresh_from_db()
+    name = branded_host.favicon.name
+    assert name.startswith('branding/favicon-') and name.endswith('.png')
+    with default_storage.open(name) as f:
+        image = Image.open(f)
+        assert image.size == (192, 192)
+        assert image.getpixel((96, 2))[3] == 0      # padding above a wide image is transparent
+        assert image.getpixel((96, 96))[:3] == (255, 0, 0)
+
+
+@pytest.mark.django_db
+def test_unbranded_hostname_links_testomatic_icons(client, branded_host):
+    content = client.get(reverse('login'), HTTP_HOST='portal.superhouse.tv').content.decode()
+    assert 'img/favicon-192.png?v=' in content
+    assert 'img/apple-touch-icon.png?v=' in content
+
+
+@pytest.mark.django_db
+def test_branded_host_without_favicon_links_testomatic_icons(client, branded_host):
+    content = client.get(reverse('login'), HTTP_HOST=VANITY).content.decode()
+    assert 'img/favicon-192.png?v=' in content
+
+
+@pytest.mark.django_db
+def test_branded_host_favicon_is_linked_and_public(client, branded_host):
+    branded_host.favicon.save('favicon-x.png', ContentFile(png_bytes()), save=True)
+    content = client.get(reverse('login'), HTTP_HOST=VANITY).content.decode()
+    assert f'<link rel="icon" type="image/png" sizes="192x192" href="{branded_host.favicon.url}">' in content
+    assert f'<link rel="apple-touch-icon" href="{branded_host.favicon.url}">' in content
+    assert 'img/favicon-192.png' not in content
+    assert client.get(branded_host.favicon.url).status_code == 200  # anonymous
+
+
+@pytest.mark.django_db
+def test_favicon_ico_follows_hostname(client, branded_host):
+    assert client.get('/favicon.ico', HTTP_HOST=VANITY)['Location'] == '/static/favicon.ico'
+    branded_host.favicon.save('favicon-x.png', ContentFile(png_bytes()), save=True)
+    response = client.get('/favicon.ico', HTTP_HOST=VANITY)
+    assert response.status_code == 302
+    assert response['Location'] == branded_host.favicon.url
+    assert client.get('/favicon.ico', HTTP_HOST='portal.superhouse.tv')['Location'] == '/static/favicon.ico'
+
+
+@pytest.mark.django_db
+def test_replacing_favicon_deletes_old_file(client, branded_host, staff):
+    client.force_login(staff)
+    edit_post(client, branded_host, favicon=upload())
+    branded_host.refresh_from_db()
+    old_name = branded_host.favicon.name
+    edit_post(client, branded_host, favicon=upload(colour='green'))
+    branded_host.refresh_from_db()
+    assert branded_host.favicon.name != old_name
+    assert not default_storage.exists(old_name)
+
+
+@pytest.mark.django_db
+def test_edit_without_new_favicon_keeps_it(client, branded_host, staff):
+    client.force_login(staff)
+    edit_post(client, branded_host, favicon=upload())
+    branded_host.refresh_from_db()
+    name = branded_host.favicon.name
+    edit_post(client, branded_host, display_name='Renamed')
+    branded_host.refresh_from_db()
+    assert branded_host.favicon.name == name
+    assert default_storage.exists(name)
+
+
+@pytest.mark.django_db
+def test_remove_favicon(client, branded_host, staff):
+    client.force_login(staff)
+    edit_post(client, branded_host, favicon=upload())
+    branded_host.refresh_from_db()
+    name = branded_host.favicon.name
+    assert edit_post(client, branded_host, remove_favicon='on').status_code == 302
+    branded_host.refresh_from_db()
+    assert not branded_host.favicon
+    assert not default_storage.exists(name)
+
+
+@pytest.mark.django_db
+def test_delete_branded_host_removes_favicon(client, branded_host, staff):
+    branded_host.favicon.save('favicon-x.png', ContentFile(png_bytes()), save=True)
+    name = branded_host.favicon.name
+    client.force_login(staff)
+    client.post(reverse('branded_host_delete', args=[branded_host.pk]))
+    assert not default_storage.exists(name)
+
+
+@pytest.mark.django_db
+def test_unbranded_sidebar_has_no_duplicate_powered_by_mark(client, branded_host, staff):
+    client.force_login(staff)
+    assert 'testomatic-logo-wide-transparent.png' not in client.get('/', HTTP_HOST='portal.superhouse.tv').content.decode()
+    assert 'testomatic-logo-wide-transparent.png' in client.get('/', HTTP_HOST=VANITY).content.decode()

@@ -86,8 +86,8 @@
                 </div>
                 <div class="card-body">
                     <p class="small text-muted">
-                        When the site is opened through one of these hostnames, it shows this logo, name and colours
-                        instead of SuperHouse's. Branding never changes what data anyone can see.
+                        When the site is opened through one of these hostnames, it shows this logo, name, colours and
+                        favicon instead of the Testomatic defaults. Branding never changes what data anyone can see.
                         Each hostname also has to be set up on the server; see the deployment docs ("Adding a vanity hostname").
                     </p>
                     {% if branded_hosts %}
@@ -95,7 +95,7 @@
                             <thead>
                                 <tr>
                                     <th>Hostname</th>
-                                    <th>Logo</th>
+                                    <th>Logo / Favicon</th>
                                     <th>Colours</th>
                                     <th></th>
                                 </tr>
@@ -112,7 +112,12 @@
                                                 </div>
                                             {% endif %}
                                         </td>
-                                        <td><img src="{{ branded_host.logo.url }}" alt="" style="max-height: 40px; max-width: 100px;"></td>
+                                        <td>
+                                            <img src="{{ branded_host.logo.url }}" alt="" style="max-height: 40px; max-width: 100px;">
+                                            {% if branded_host.favicon %}
+                                                <img src="{{ branded_host.favicon.url }}" alt="" title="Favicon" class="ms-2" style="width: 24px; height: 24px;">
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             {% if branded_host.sidebar_colour %}
                                                 <span class="d-inline-block border rounded" title="Sidebar {{ branded_host.sidebar_colour }}"

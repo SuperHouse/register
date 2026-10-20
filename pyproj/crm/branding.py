@@ -2,8 +2,10 @@
 Per-hostname branding (issue #150).
 
 When the site is reached through a client's vanity hostname (a BrandedHost), pages show
-that client's logo, name and colours instead of SuperHouse's. Any other hostname gets the
-defaults below. Branding is cosmetic only and never changes what data a user can see.
+that client's logo, name, colours and favicon instead of the Testomatic defaults below. Any
+other hostname gets the defaults. No organisation is special here: SuperHouse's own hostnames
+are branded with BrandedHost records like any client's. Branding is cosmetic only and never
+changes what data a user can see.
 """
 
 from django.templatetags.static import static
@@ -11,9 +13,9 @@ from django.http.request import split_domain_port
 
 from crm.models import BrandedHost
 
-DEFAULT_BRAND_NAME = 'SuperHouse'
-DEFAULT_LOGO_STATIC = 'img/superhouse.png'
-DEFAULT_LOGO_LINK = 'https://www.superhouse.tv/'
+DEFAULT_BRAND_NAME = 'Testomatic'
+DEFAULT_LOGO_STATIC = 'img/testomatic-logo-transparent.png'
+DEFAULT_LOGO_LINK = 'https://www.testomatic.io/'
 
 # Text colours used on a branded background: CoreUI's own light and dark text colours.
 LIGHT_TEXT_RGB = (255, 255, 255)
@@ -102,7 +104,12 @@ def accent_style(colour):
 
 
 def branding_processor(request):
-    """Template context: brand_name, brand_logo_url, brand_logo_link, brand_logo_external, brand_sidebar, brand_accent."""
+    """Template context for the brand of the hostname this request came in on.
+
+    brand_favicon_url is None unless the BrandedHost has its own favicon (the page then links the
+    Testomatic icons). brand_is_custom is False on unbranded hostnames, where the sidebar's
+    "powered by Testomatic" mark would just repeat the logo above it.
+    """
     host = get_branded_host(request)
     if host is None:
         return {
@@ -110,6 +117,8 @@ def branding_processor(request):
             'brand_logo_url': static(DEFAULT_LOGO_STATIC),
             'brand_logo_link': DEFAULT_LOGO_LINK,
             'brand_logo_external': True,
+            'brand_favicon_url': None,
+            'brand_is_custom': False,
             'brand_sidebar': None,
             'brand_accent': None,
         }
@@ -118,6 +127,8 @@ def branding_processor(request):
         'brand_logo_url': host.logo.url,
         'brand_logo_link': host.logo_link_url or '/',
         'brand_logo_external': bool(host.logo_link_url),
+        'brand_favicon_url': host.favicon.url if host.favicon else None,
+        'brand_is_custom': True,
         'brand_sidebar': sidebar_style(host.sidebar_colour) if host.sidebar_colour else None,
         'brand_accent': accent_style(host.accent_colour) if host.accent_colour else None,
     }

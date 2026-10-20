@@ -19,6 +19,7 @@ import posixpath
 
 from django.conf import settings
 from django.core.exceptions import SuspiciousFileOperation
+from django.db.models import Q
 from django.http import FileResponse, Http404, HttpResponseNotModified
 from django.utils._os import safe_join
 from django.utils.http import http_date
@@ -85,10 +86,11 @@ NON_STAFF_RULES = {
 def user_can_access_media(user, name):
     """Can `user` see the media file stored as `name` (a path relative to MEDIA_ROOT)?"""
     if name.startswith('branding/'):
-        # Per-hostname branding logos (issue #150) are public: the login page shows them to
-        # people who are not logged in yet. Only files that really are a BrandedHost logo.
+        # Per-hostname branding logos (issue #150) and favicons (issue #151) are public: the
+        # login page shows them to people who are not logged in yet. Only files that really are
+        # a BrandedHost logo or favicon.
         # LOGIN_REQUIRED_IGNORE_PATHS lets anonymous requests for /media/branding/ reach here.
-        return BrandedHost.objects.filter(logo=name).exists()
+        return BrandedHost.objects.filter(Q(logo=name) | Q(favicon=name)).exists()
     if not user.is_authenticated or not user.is_active:
         return False
     if user.is_staff:

@@ -71,5 +71,5 @@ admin.site.register(TestImage, TestImageAdmin)
 admin.site.register(TestRecord, TestRecordAdmin)
 
 admin.site.site_header = 'Device register'
-admin.site.site_title = 'SuperHouse device register'
+admin.site.site_title = 'Testomatic device register'
 admin.site.site_url = '/'  # reverse() doesn't work here

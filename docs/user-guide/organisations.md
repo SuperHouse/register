@@ -34,14 +34,17 @@ Staff can create, edit, and view organisations from the Organisations list. The 
 
 ## Branding
 
-A client can have their own hostname, for example `serials.example.com`, and use it in the QR codes on their boards. When the site is opened through that hostname, it shows the client's branding instead of SuperHouse's:
+A client can have their own hostname, for example `serials.example.com`, and use it in the QR codes on their boards. When the site is opened through that hostname, it shows the client's branding instead of the Testomatic defaults:
 
 - their logo at the top of the sidebar, including on the login page, linked to a page of their choice
 - their name in browser tab titles, in password reset pages, and in password reset emails
+- optionally, their own favicon (the icon in the browser tab)
 - optionally, their colours for the sidebar background and for buttons, links and table headers
 - their logo on printed batch sheets
 
 Branding changes only how the site looks. It never changes what data a user can see.
+
+No organisation is special. A hostname without branding shows the Testomatic name, logo and favicon. This includes SuperHouse's own hostnames: to show the SuperHouse logo on them, add branding for each one to the SuperHouse organisation, the same as for any client.
 
 ### Add branding for a hostname
 
@@ -51,6 +54,7 @@ Branding changes only how the site looks. It never changes what data a user can 
     - **Hostname**: the hostname only, for example `serials.example.com`. Do not include `https://`, a path, or a port number.
     - **Display name**: shown in titles and emails. The organisation's name is filled in for you.
     - **Logo**: required. The logo can be seen by anyone, including people who are not logged in, because the login page shows it.
+    - **Favicon**: optional. The icon in the browser tab, and on a phone's home screen. Use a square image if you can: other shapes are padded with transparency, not cropped. It is resized to 192 × 192 pixels. Like the logo, anyone can see it. If you leave it empty, the Testomatic icon is used. To go back to the Testomatic icon later, edit the branding and select **Remove favicon**.
     - **Logo link**: where clicking the logo goes, for example the client's website. If you leave it empty, the logo goes to the dashboard.
     - **Sidebar colour** and **Accent colour**: type a colour such as `#3c4b64`, or use the colour picker. Leave a colour empty to use the default. The text colour on the sidebar and on buttons is chosen automatically, so that it can be read. Links use a darker version of a light accent colour, so that they can be read on a white page.
 4. Click **Save**.

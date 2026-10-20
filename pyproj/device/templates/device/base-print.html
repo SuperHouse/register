@@ -10,6 +10,7 @@
                 Print
             {% endblock title %}
         </title>
+        {% include "device/partial-favicon.html" %}
         <link rel="stylesheet" href="{% static 'css/print.css' %}" />
         {% block extra_head %}
         {% endblock extra_head %}

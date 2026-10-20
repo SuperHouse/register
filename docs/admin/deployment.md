@@ -52,7 +52,7 @@ d.superlab.au, portal.superhouse.tv {
 ```
 
 - **uWSGI socket.** The vassal template sets `http-socket = /run/uwsgi/%n.sock`, so Caddy sends plain HTTP over a Unix socket. Django receives the original `Host` header. It also detects HTTPS correctly from Caddy's `X-Forwarded-Proto` header, so CSRF checks and absolute URLs (QR codes, password reset links) use `https://`.
-- **Static files.** Caddy serves `/static/*` and `/favicon.ico` from the app's `STATIC_ROOT` directly.
+- **Static files.** Caddy serves `/static/*` from the app's `STATIC_ROOT` directly. `/favicon.ico` must go to Django, which sends each hostname to its own favicon (see [Branding](../user-guide/organisations.md#branding)). If the Caddyfile serves `/favicon.ico` itself, every hostname gets the Testomatic icon from that URL. Pages still show the right icon, because they link to it directly.
 - **Media files are not served by Caddy.** Requests for `/media/*` must go through Django, which checks each file against the record that owns it. Staff can download every file. A client user can only download files that belong to their own organisation, and never files marked internal. Do not add a `handle_path /media/*` block with `file_server`. If you do, Caddy skips these checks, and uploaded files (design files, client attachments, firmware) can be downloaded by anyone who knows the URL. This was the case until 2026-10-19.
 - **TLS certificates.** Caddy gets and renews a Let's Encrypt certificate for each hostname in the Caddyfile automatically. There is no certbot. A hostname that is not in the Caddyfile is refused during the TLS handshake and never reaches Django.
 - **Logs.** Per-site access logs are in `/var/log/caddy/` (`register.log`, `register-test.log`). Certificate events are in the service journal: `sudo journalctl -u caddy`.
@@ -112,7 +112,7 @@ Do these steps in this order. Caddy requests a certificate as soon as the hostna
 
     Then open `https://serials.example.com/` in a browser and log in.
 
-5. **Add the client's branding (optional).** In Register, edit the client's organisation and add the hostname in the **Branding** card. See [Branding](../user-guide/organisations.md#branding). Without branding, the hostname shows the normal SuperHouse site.
+5. **Add the client's branding (optional).** In Register, edit the client's organisation and add the hostname in the **Branding** card. See [Branding](../user-guide/organisations.md#branding). Without branding, the hostname shows the Testomatic name, logo and favicon.
 
 Notes:
 

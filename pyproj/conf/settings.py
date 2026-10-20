@@ -137,6 +137,7 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     '/admin/',
     '/api/',
     '/static/',
+    r'/favicon\.ico$',  # Browsers request it on the login page too; it only redirects into /static/
     '/media/branding/',  # Branding logos are shown on the login page; conf/media.py serves them publicly
     '__debug__/',
 ]

@@ -52,6 +52,12 @@ class BrandedHost(models.Model):
     # Stored under branding/, which conf/media.py serves to everyone: the login page shows
     # this logo to people who are not logged in yet.
     logo = models.ImageField(upload_to='branding/')
+    # Also under branding/ and public, for the same reason. BrandedHostForm turns every upload
+    # into a square FAVICON_SIZE PNG with a fresh name, so browsers never keep showing an old one.
+    favicon = models.ImageField(
+        upload_to='branding/', blank=True,
+        help_text='Browser tab icon. A square image works best; it is resized to 192 × 192. Blank for the Testomatic icon.',
+    )
     logo_link_url = models.URLField(
         blank=True, help_text='Where clicking the logo goes, e.g. the client\'s website. Defaults to the dashboard.',
     )

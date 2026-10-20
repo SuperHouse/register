@@ -17,7 +17,6 @@ Including another URLconf
 
 from django.conf import settings
 from django.contrib import admin
-from django.templatetags.static import static
 from django.urls import include, path, re_path
 from django.views.generic.base import RedirectView
 
@@ -58,7 +57,7 @@ urlpatterns = [
     path('', include('testing.urls')),
     path('office/', admin.site.urls),
     path('accounts/', include('authuser.urls')),
-    path('favicon.ico', RedirectView.as_view(url=static('favicon.ico'), permanent=True)),
+    path('favicon.ico', crm_views.favicon, name='favicon'),
     path('hijack/', include('hijack.urls')),
     path('device/', include('device.urls')),
     path('api/v1/', api.urls),
