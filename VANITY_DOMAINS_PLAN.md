@@ -341,3 +341,40 @@ to when clients push for more.
   `org.logo`.
 - **Should branding change data visibility?** Recommendation: no — purely cosmetic; access stays
   governed by org permissions. A user from Org B visiting Org A's domain just sees Org A's logo.
+
+## #151 — Favicons, and Testomatic as the default brand (done, deployed 2026-10-20)
+
+register#151: the favicon was always the SuperHouse logo, which looked wrong on client vanity
+hostnames. Before starting, the code was checked for anything that treats the SuperHouse org
+specially: nothing does. Access depends only on `is_staff` and `Org.users` membership
+(`is_superuser` only matters in the Django admin), and SuperHouse is an ordinary client `Org`.
+Decision (Jon): **no org is special.** Any hostname without a `BrandedHost` gets the Testomatic
+name, logo, link and favicon. SuperHouse's own hostnames get their SuperHouse look from
+`BrandedHost` records on the SuperHouse org, the same as a client's. This replaces #150's
+"fall back to the SuperHouse defaults".
+
+What was built:
+
+- Static Testomatic favicons (`static/favicon.ico` with 16/32/48 px, `img/favicon-32.png`,
+  `img/favicon-192.png`, `img/apple-touch-icon.png` on white for iOS), generated with Pillow from
+  Jon's square crop `Resources/testomatic-logo-favicon.bmp`. The source was moved out of
+  `static/` so `collectstatic` doesn't publish it.
+- `device/partial-favicon.html`, included in `base.html` and `base-print.html`, which had no icon
+  links before. Browsers relied on `/favicon.ico` alone.
+- Optional `BrandedHost.favicon` (migration `crm/0008`): each upload is padded to a square,
+  resized to a 192 px PNG and given a random name, so a replaced icon always has a new URL.
+  Public under `branding/`, like logos.
+- `/favicon.ico` → `crm.views.branding.favicon`, a 302 to the hostname's favicon or the static
+  default. It was a **permanent** 301 before, which browsers cache forever.
+- Fixed while doing this: `/favicon.ico` was behind the login check, so anonymous visitors (on the
+  login page) never got an icon from it. It's now in `LOGIN_REQUIRED_IGNORE_PATHS`.
+- The sidebar footer's "powered by Testomatic" mark now shows only on branded hostnames, since an
+  unbranded page already has the Testomatic logo at the top.
+
+Still SuperHouse-specific, deliberately left alone: the `noreply@superhouse.tv` from-address
+(changing it needs mail set up for another domain), the Sites record (`SITE_ID = 1` →
+`portal.superhouse.tv`; reset links already use the request host), and internal names such as
+`SuperHousePasswordResetView` and the `superhouse_*` templates.
+
+The original SuperHouse favicon (a 64×61 PNG named `.ico`) is in git at
+`06de90d^:pyproj/static/favicon.ico`.

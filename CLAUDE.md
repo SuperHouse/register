@@ -21,6 +21,7 @@ register/
 │   ├── user-guide/     # Dashboard, Boards, Designs, Organisations, Parts, Batches
 │   ├── admin/          # Setup, deployment, configuration, supplier APIs, data export/import
 │   └── api/            # REST API reference, Test Suite Package format
+├── Resources/          # Reference material and source artwork, not served (e.g. testomatic-logo-favicon.bmp, the source of the static favicons)
 ├── scripts/            # Standalone utility scripts, own deps, own READMEs — see Scripts below
 ├── .github/
 │   └── workflows/
@@ -34,7 +35,7 @@ register/
 ├── STOCK_CONSUMPTION_PLAN.md  # Planning doc: register#129 stock allocation/consumption — parked, see PLANNING_STACK.md
 ├── BATCH_STATUS_PLAN.md       # Planning doc: a real Batch.status field (Draft/Ready/In Progress/Complete/On Hold/Cancelled) — parked
 ├── DEVICE_GENERATION_PLAN.md  # Planning doc: in-app Device/serial-number generation, replacing spreadsheet import — parked
-├── VANITY_DOMAINS_PLAN.md     # Planning doc: register#149 vanity-hostname server check, then register#150 per-host branding
+├── VANITY_DOMAINS_PLAN.md     # Planning doc: register#149 vanity-hostname server check, register#150 per-host branding, register#151 favicons/Testomatic default (all done)
 ├── README.md
 └── SETUP.md            # Dev setup instructions
 ```
