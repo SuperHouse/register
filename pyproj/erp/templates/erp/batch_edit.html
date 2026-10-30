@@ -152,8 +152,8 @@
                                 {% for batch_production_stage, update_form in production_stages_with_forms %}
                                     <tr class="{{ batch_production_stage.get_bootstrap_table_class }}" data-stage-id="{{ batch_production_stage.pk }}">
                                         <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
-                                        <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ batch_production_stage.color }};"></span></td>
-                                        <td>{{ batch_production_stage.name }}</td>
+                                        <td>{% include "erp/partial-stage-swatch.html" with stage=batch_production_stage.production_stage %}</td>
+                                        <td>{{ batch_production_stage.production_stage.name }}{% include "erp/partial-stage-info-button.html" with stage=batch_production_stage.production_stage %}</td>
                                         <td class="text-nowrap">
                                             <div class="d-flex gap-1 status-buttons">
                                                 <button type="button" class="btn btn-sm status-btn {% if batch_production_stage.status == 'NOT_STARTED' %}btn-secondary{% else %}btn-outline-secondary{% endif %}" data-status="NOT_STARTED" data-color="secondary" data-url="{% url 'erp:batch_production_stage_set_status' batch_production_stage.pk 'NOT_STARTED' %}" title="Not Started">
@@ -224,8 +224,8 @@
                             <tbody>
                                 {% for batch_production_stage, update_form in production_stages_with_forms %}
                                     <tr class="{{ batch_production_stage.get_bootstrap_table_class }}">
-                                        <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ batch_production_stage.color }};"></span></td>
-                                        <td>{{ batch_production_stage.name }}</td>
+                                        <td>{% include "erp/partial-stage-swatch.html" with stage=batch_production_stage.production_stage %}</td>
+                                        <td>{{ batch_production_stage.production_stage.name }}{% include "erp/partial-stage-info-button.html" with stage=batch_production_stage.production_stage %}</td>
                                         <td>{{ batch_production_stage.get_status_display }}</td>
                                         <td>{{ batch_production_stage.due_date|default:"—" }}</td>
                                         <td>{{ batch_production_stage.completion_date|default:"—" }}</td>
@@ -381,9 +381,18 @@
             </div>
         </div>
     {% endif %}
+
+    {% if explained_stages %}
+        {% include "erp/partial-stage-explainer-modal.html" %}
+    {% endif %}
 {% endblock content %}
 
 {% block extra_js %}
+    {% if explained_stages %}
+        <script>
+            initStageExplainers('stage-explainer-modal');
+        </script>
+    {% endif %}
     {% if user.is_staff %}
         <script>
             flatpickr('#batch-due-date', {dateFormat: 'd-M-Y', allowInput: true});

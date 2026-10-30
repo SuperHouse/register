@@ -21,7 +21,7 @@
                         </tr>
                         <tr>
                             <th>Colour:</th>
-                            <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ production_stage.color }};"></span></td>
+                            <td>{% include "erp/partial-stage-swatch.html" with stage=production_stage %}</td>
                         </tr>
                     </table>
                     <form method="post">

@@ -28,6 +28,7 @@ from easy_thumbnails.models import Thumbnail
 
 from crm.models import BrandedHost, Org
 from device.models import DesignAsset, DeviceAsset, DeviceImage, TestImage
+from erp.models import ProductionStage
 
 # Types that are safe to show inline in the browser. Anything else (HTML, SVG, ...)
 # is sent as a download, so an uploaded file can't run script on this site's origin.
@@ -61,6 +62,12 @@ def _org_logo_allowed(user, name):
     return Org.objects.filter(logo=name, users=user).exists()
 
 
+def _production_stage_media_allowed(user, name):
+    # Production stage explainers (register#152) describe a generic process step, not
+    # any client's data, so every logged-in user may see them.
+    return ProductionStage.objects.filter(explanation_image=name).exists()
+
+
 def _thumbnail_allowed(user, name):
     # easy_thumbnails records each thumbnail it generates, with a link to its source
     # file. A thumbnail has the same access rule as the file it was made from.
@@ -79,6 +86,7 @@ NON_STAFF_RULES = {
     'device_images/': _device_image_allowed,
     'test_images/': _test_image_allowed,
     'clients/': _org_logo_allowed,
+    'production_stage_media/': _production_stage_media_allowed,
     settings.THUMBNAIL_BASEDIR + '/': _thumbnail_allowed,
 }
 

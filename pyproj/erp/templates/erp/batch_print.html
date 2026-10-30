@@ -65,9 +65,9 @@
                 </tr>
             </thead>
             <tbody>
-                {% for stage in batch.production_stages.all %}
+                {% for stage in batch_production_stages %}
                     <tr>
-                        <td>{{ stage.name }}</td>
+                        <td>{{ stage.production_stage.name }}</td>
                         <td>
                             <span class="status-dot" style="background-color: {{ stage.get_status_color }};"></span>{{ stage.get_status_display }}
                         </td>

@@ -11,7 +11,8 @@
 {% block content %}
     <p class="text-body-secondary">
         Production stages are the building blocks for production stage templates (e.g. "PCBs stocked", "Top SMT complete").
-        The colour is used to highlight the production stage in the UI.
+        The colour and icon highlight the production stage in the UI. Edit a stage to add an explanation, which
+        users can open from the info icon next to the stage on a batch.
     </p>
 
     <div class="card">
@@ -22,15 +23,20 @@
                         <th style="width: 30px;"></th>
                         <th style="width: 60px;">Colour</th>
                         <th>Name</th>
+                        <th style="width: 110px;">Explanation</th>
                         <th style="width: 90px;"></th>
                     </tr>
                 </thead>
                 <tbody id="production-stages-body" data-reorder-url="{% url 'erp:production_stage_reorder' %}">
                     {% for production_stage in production_stages %}
-                        <tr data-stage-id="{{ production_stage.pk }}">
+                        <tr data-stage-id="{{ production_stage.pk }}"{% if not production_stage.active %} class="text-body-secondary"{% endif %}>
                             <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
-                            <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ production_stage.color }};"></span></td>
-                            <td>{{ production_stage.name }}</td>
+                            <td>{% include "erp/partial-stage-swatch.html" with stage=production_stage %}</td>
+                            <td>
+                                {{ production_stage.name }}
+                                {% if not production_stage.active %}<span class="badge text-bg-secondary ms-1">Inactive</span>{% endif %}
+                            </td>
+                            <td>{% if production_stage.has_explanation %}<i class="bi bi-info-circle" title="Has an explanation"></i>{% endif %}</td>
                             <td class="text-nowrap">
                                 <div class="d-flex gap-1">
                                     <a href="{% url 'erp:production_stage_edit' production_stage.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit">
@@ -44,7 +50,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4"><i>There are no production stages yet.</i></td>
+                            <td colspan="5"><i>There are no production stages yet.</i></td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -58,6 +64,7 @@
                                 {{ form.name }}
                                 {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
                             </td>
+                            <td></td>
                             <td>
                                 <button type="submit" class="btn btn-sm btn-primary">Add</button>
                             </td>

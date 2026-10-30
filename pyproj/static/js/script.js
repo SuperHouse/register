@@ -230,6 +230,61 @@ function activateTabFromHash() {
     }
 }
 
+// Fills the shared production stage lightbox (erp/partial-stage-explainer-modal.html) from
+// the <template> of the stage whose info button opened it. Emptying it on close stops a
+// playing video.
+function initStageExplainers(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    const title = modal.querySelector('.modal-title');
+    const body = modal.querySelector('.modal-body');
+
+    modal.addEventListener('show.coreui.modal', function (e) {
+        const button = e.relatedTarget;
+        const content = document.getElementById('stage-explainer-' + button.dataset.explainerId);
+        title.textContent = button.dataset.stageName;
+        body.replaceChildren(content.content.cloneNode(true));
+    });
+    modal.addEventListener('hidden.coreui.modal', function () {
+        body.replaceChildren();
+    });
+}
+
+// Live preview of a production stage's colour square as its icon name and colour are
+// edited. Mirrors ProductionStage.icon_class and .icon_color in erp/models.py.
+function initStageIconPreview(iconInputId, colorInputId) {
+    const iconInput = document.getElementById(iconInputId);
+    const colorInput = document.getElementById(colorInputId);
+    const swatch = iconInput.previousElementSibling;
+
+    function luminance(hex) {
+        const linear = [1, 3, 5].map(function (i) {
+            const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+            return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+    }
+
+    function update() {
+        const name = iconInput.value.trim();
+        const background = luminance(colorInput.value);
+        const onLight = 1.05 / (background + 0.05);
+        const onDark = (background + 0.05) / (luminance('#212529') + 0.05);
+        swatch.style.backgroundColor = colorInput.value;
+        swatch.style.color = onLight >= onDark ? '#ffffff' : '#212529';
+        swatch.replaceChildren();
+        if (/^(bi|cil)-[a-z0-9-]+$/.test(name)) {
+            const icon = document.createElement('i');
+            icon.className = name.startsWith('bi-') ? 'bi ' + name : name;
+            icon.setAttribute('aria-hidden', 'true');
+            swatch.appendChild(icon);
+        }
+    }
+
+    iconInput.addEventListener('input', update);
+    colorInput.addEventListener('input', update);
+}
+
 // Opens each link matching selector (an <a href> pointing at an image) in a full-screen
 // overlay instead of following it; Escape or a click anywhere closes it. One overlay is
 // shared by all matching links. Started as the Part edit page's own lightbox, moved here when

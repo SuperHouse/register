@@ -4,6 +4,7 @@ import os
 import re
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 
@@ -23,17 +24,108 @@ def part_asset_upload_path(instance, filename):
     return f'part_assets/{instance.part_id}/{filename}'
 
 
+def production_stage_media_upload_path(instance, filename):
+    return f'production_stage_media/{instance.pk}/{filename}'
+
+
+# A Bootstrap Icons ("bi-truck") or CoreUI Icons ("cil-puzzle") class name. Register
+# loads both icon fonts; the sidebar uses CoreUI, page content mostly Bootstrap.
+STAGE_ICON_RE = re.compile(r'^(bi|cil)-[a-z0-9-]+$')
+
+# Accepts watch?v=, youtu.be/, /shorts/ and /embed/ links. YouTube video ids are 11
+# characters from [A-Za-z0-9_-].
+YOUTUBE_URL_RE = re.compile(
+    r'^https?://(?:www\.|m\.)?(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/)|youtu\.be/)([A-Za-z0-9_-]{11})'
+)
+
+
+def youtube_video_id(url):
+    match = YOUTUBE_URL_RE.match(url or '')
+    return match.group(1) if match else None
+
+
+ICON_LIGHT = '#ffffff'
+ICON_DARK = '#212529'
+
+
+def _relative_luminance(hex_color):
+    """WCAG relative luminance of a "#rrggbb" colour. Raises ValueError if it isn't one."""
+    if len(hex_color) != 7 or not hex_color.startswith('#'):
+        raise ValueError(hex_color)
+    channels = [int(hex_color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    linear = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+
 class ProductionStage(models.Model):
     """A stage that a batch can pass through during production (e.g. 'PCBs stocked', 'Top SMT complete')."""
     name = models.CharField(max_length=100, unique=True)
     color = models.CharField(max_length=7, default='#6c757d', help_text='Used to highlight this production stage in the UI')
+    icon = models.CharField(
+        max_length=50, blank=True,
+        help_text='A Bootstrap Icons (e.g. "bi-truck") or CoreUI Icons (e.g. "cil-puzzle") name, shown on the colour',
+    )
     order = models.PositiveIntegerField(default=0)
+    active = models.BooleanField(
+        default=True,
+        help_text="Inactive stages can't be added to batches or templates, but still show on batches that use them",
+    )
+    explanation = models.TextField(blank=True, help_text='Shown to users who click the info icon next to this stage')
+    explanation_image = models.ImageField(upload_to=production_stage_media_upload_path, blank=True)
+    explanation_video_url = models.URLField(blank=True, help_text='A YouTube link. Unlisted videos work.')
+    explanation_video_loop = models.BooleanField(
+        default=False, help_text='Play the video as a silent looping clip with no controls, like a GIF',
+    )
 
     class Meta:
         ordering = ['order']
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        errors = {}
+        if self.icon and not STAGE_ICON_RE.match(self.icon):
+            errors['icon'] = 'Enter an icon name starting with "bi-" or "cil-", e.g. "bi-truck".'
+        if self.explanation_video_url and not youtube_video_id(self.explanation_video_url):
+            errors['explanation_video_url'] = 'Enter a YouTube video link, e.g. https://youtu.be/abcdefghijk.'
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def icon_class(self):
+        """CSS classes for the icon: Bootstrap Icons need the "bi" base class, CoreUI Icons don't."""
+        if self.icon.startswith('bi-'):
+            return f'bi {self.icon}'
+        return self.icon
+
+    @property
+    def icon_color(self):
+        """White or near-black, whichever has the higher WCAG contrast on the stage colour."""
+        try:
+            background = _relative_luminance(self.color)
+        except ValueError:
+            return ICON_LIGHT
+        on_light = (_relative_luminance(ICON_LIGHT) + 0.05) / (background + 0.05)
+        on_dark = (background + 0.05) / (_relative_luminance(ICON_DARK) + 0.05)
+        return ICON_LIGHT if on_light >= on_dark else ICON_DARK
+
+    @property
+    def youtube_embed_url(self):
+        video_id = youtube_video_id(self.explanation_video_url)
+        if not video_id:
+            return ''
+        if self.explanation_video_loop:
+            # Looping a single video needs playlist=<same id>; autoplay only works muted.
+            return (
+                f'https://www.youtube-nocookie.com/embed/{video_id}'
+                f'?autoplay=1&mute=1&loop=1&playlist={video_id}&controls=0&playsinline=1&rel=0'
+            )
+        return f'https://www.youtube-nocookie.com/embed/{video_id}?rel=0'
+
+    @property
+    def has_explanation(self):
+        return bool(self.explanation or self.explanation_image or self.explanation_video_url)
 
 
 class ProductionStageTemplate(models.Model):
@@ -989,7 +1081,10 @@ class AssemblyCostSettings(models.Model):
 
 
 class BatchProductionStage(models.Model):
-    """A production stage on a Batch, snapshotted from a ProductionStage at the time it was added."""
+    """A ProductionStage on a Batch, with this batch's own progress through it.
+
+    Name, colour, icon and explanation are read live from the ProductionStage, so editing
+    a stage type updates every batch that uses it."""
     NOT_STARTED = 'NOT_STARTED'
     IN_PROGRESS = 'IN_PROGRESS'
     ON_HOLD = 'ON_HOLD'
@@ -1003,8 +1098,7 @@ class BatchProductionStage(models.Model):
     ]
 
     batch = models.ForeignKey(Batch, on_delete=models.CASCADE, related_name='production_stages')
-    name = models.CharField(max_length=100)
-    color = models.CharField(max_length=7, default='#6c757d')
+    production_stage = models.ForeignKey(ProductionStage, on_delete=models.PROTECT, related_name='batch_stages')
     order = models.PositiveIntegerField(default=0)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=NOT_STARTED)
     due_date = models.DateField(null=True, blank=True)
@@ -1014,7 +1108,7 @@ class BatchProductionStage(models.Model):
         ordering = ['order']
 
     def __str__(self):
-        return f'{self.batch}: {self.order}. {self.name}'
+        return f'{self.batch}: {self.order}. {self.production_stage}'
 
     def get_bootstrap_table_class(self):
         classes = {

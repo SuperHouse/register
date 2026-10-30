@@ -130,7 +130,8 @@ class PartCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(ProductionStage)
 class ProductionStageAdmin(admin.ModelAdmin):
-    list_display = ['name', 'color']
+    list_display = ['name', 'color', 'icon', 'active']
+    list_filter = ['active']
     search_fields = ['name']
 
 

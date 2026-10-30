@@ -1,0 +1,29 @@
+{# One shared lightbox for every stage's explanation (register#152). Each stage's content #}
+{# sits in a <template>, so its image and video only load when the lightbox opens. #}
+{% for stage in explained_stages %}
+    <template id="stage-explainer-{{ stage.pk }}">
+        {% if stage.youtube_embed_url %}
+            <div class="ratio ratio-16x9 mb-3">
+                <iframe src="{{ stage.youtube_embed_url }}" title="{{ stage.name }}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+            </div>
+        {% endif %}
+        {% if stage.explanation_image %}
+            <img src="{{ stage.explanation_image.url }}" alt="{{ stage.name }}" class="img-fluid rounded mb-3">
+        {% endif %}
+        {% if stage.explanation %}
+            {{ stage.explanation|linebreaks }}
+        {% endif %}
+    </template>
+{% endfor %}
+
+<div class="modal fade" id="stage-explainer-modal" tabindex="-1" aria-labelledby="stage-explainer-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="stage-explainer-modal-label"></h5>
+                <button type="button" class="btn-close" data-coreui-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body"></div>
+        </div>
+    </div>
+</div>

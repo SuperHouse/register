@@ -118,6 +118,35 @@ class ProductionStageForm(forms.ModelForm):
         }
 
 
+class ProductionStageEditForm(forms.ModelForm):
+    """The full edit page. The list page's inline add row uses ProductionStageForm, which
+    leaves out `active`: an unticked checkbox posts nothing, so it would add inactive stages."""
+
+    class Meta:
+        model = ProductionStage
+        fields = [
+            'name', 'color', 'icon', 'active',
+            'explanation', 'explanation_image', 'explanation_video_url', 'explanation_video_loop',
+        ]
+        labels = {
+            'explanation_image': 'Image',
+            'explanation_video_url': 'Video',
+            'explanation_video_loop': 'Play as a looping clip',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'color': forms.TextInput(attrs={'class': 'form-control form-control-color', 'type': 'color'}),
+            'icon': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. bi-truck'}),
+            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'explanation': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'explanation_image': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+            'explanation_video_url': forms.URLInput(
+                attrs={'class': 'form-control', 'placeholder': 'https://youtu.be/...'},
+            ),
+            'explanation_video_loop': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
 class ProductionStageTemplateForm(forms.ModelForm):
     class Meta:
         model = ProductionStageTemplate
@@ -135,6 +164,10 @@ class ProductionStageTemplateStepForm(forms.ModelForm):
         widgets = {
             'production_stage': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['production_stage'].queryset = ProductionStage.objects.filter(active=True)
 
 
 class AssemblyCostSettingsForm(forms.ModelForm):
@@ -208,7 +241,7 @@ class BatchApplyTemplateForm(forms.Form):
 
 class BatchProductionStageAddForm(forms.Form):
     production_stage = forms.ModelChoiceField(
-        queryset=ProductionStage.objects.all(),
+        queryset=ProductionStage.objects.filter(active=True),
         widget=forms.Select(attrs={'class': 'form-select'}),
     )
 

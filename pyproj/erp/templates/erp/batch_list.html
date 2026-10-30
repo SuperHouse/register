@@ -71,7 +71,7 @@
                                             {% for stage in batch.production_stages.all %}
                                                 <span class="rounded {{ stage.get_status_color_class }}"
                                                       style="width: 14px; height: 14px;"
-                                                      title="{{ stage.name }}: {{ stage.get_status_display }}"></span>
+                                                      title="{{ stage.production_stage.name }}: {{ stage.get_status_display }}"></span>
                                             {% endfor %}
                                         </div>
                                     </td>

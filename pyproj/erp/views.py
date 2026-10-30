@@ -50,6 +50,7 @@ from .forms import (
     PartsCartAddFromPartForm,
     PartsCartLineAddForm,
     PartSubstitutionForm,
+    ProductionStageEditForm,
     ProductionStageForm,
     ProductionStageTemplateForm,
     ProductionStageTemplateStepForm,
@@ -69,21 +70,21 @@ def _apply_template_to_batch(batch, template):
     last_stage = batch.production_stages.order_by('-order').first()
     next_order = (last_stage.order + 1) if last_stage else 1
 
-    existing_names = set(batch.production_stages.values_list('name', flat=True))
+    existing_stage_ids = set(batch.production_stages.values_list('production_stage_id', flat=True))
 
-    for step in template.steps.select_related('production_stage').order_by('order'):
-        if step.production_stage.name in existing_names:
+    # Inactive stages stay in their templates but aren't added to new work.
+    for step in template.steps.filter(production_stage__active=True).order_by('order'):
+        if step.production_stage_id in existing_stage_ids:
             continue
 
         BatchProductionStage.objects.create(
             batch=batch,
-            name=step.production_stage.name,
-            color=step.production_stage.color,
+            production_stage_id=step.production_stage_id,
             order=next_order,
             status=BatchProductionStage.NOT_STARTED,
         )
         next_order += 1
-        existing_names.add(step.production_stage.name)
+        existing_stage_ids.add(step.production_stage_id)
 
 
 @staff_member_required
@@ -142,15 +143,19 @@ def production_stage_edit(request, production_stage_id):
     production_stage = get_object_or_404(ProductionStage, pk=production_stage_id)
 
     if request.method == 'POST':
-        form = ProductionStageForm(request.POST, instance=production_stage)
+        old_image_name = production_stage.explanation_image.name
+        form = ProductionStageEditForm(request.POST, request.FILES, instance=production_stage)
         if form.is_valid():
             form.save()
+            # Replacing or clearing the image leaves the old file behind; remove it.
+            if old_image_name and production_stage.explanation_image.name != old_image_name:
+                production_stage.explanation_image.storage.delete(old_image_name)
             messages.success(request, 'Production stage updated.')
             return redirect('erp:production_stage_list')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
-        form = ProductionStageForm(instance=production_stage)
+        form = ProductionStageEditForm(instance=production_stage)
 
     ctx = {
         'form': form,
@@ -182,9 +187,15 @@ def production_stage_delete(request, production_stage_id):
     if request.method == 'POST':
         try:
             production_stage.delete()
+            if production_stage.explanation_image:
+                production_stage.explanation_image.delete(save=False)
             messages.success(request, 'Production stage deleted.')
         except ProtectedError:
-            messages.warning(request, 'This production stage cannot be deleted because it is used by one or more templates.')
+            messages.warning(
+                request,
+                'This production stage cannot be deleted because it is used by one or more templates or batches. '
+                'Edit it and untick Active instead, so it can no longer be added to new batches or templates.',
+            )
         return redirect('erp:production_stage_list')
 
     ctx = {
@@ -3947,7 +3958,7 @@ def batch_list(request):
     pcb_top_qs = DesignAsset.objects.filter(asset_type=DesignAsset.PCB_TOP)
     batches = Batch.objects.select_related('design__client').prefetch_related(
         Prefetch('design__designasset_set', queryset=pcb_top_qs, to_attr='pcb_top_assets'),
-        'production_stages',
+        'production_stages__production_stage',
     )
 
     if not request.user.is_staff:
@@ -3972,7 +3983,7 @@ def batch_list(request):
 
 def batch_list_data(request):
     """JSON snapshot of every batch's production stage statuses, for polling on the Batches list page."""
-    batches = Batch.objects.prefetch_related('production_stages')
+    batches = Batch.objects.prefetch_related('production_stages__production_stage')
 
     if not request.user.is_staff:
         clients = Org.objects.filter(users=request.user)
@@ -3984,7 +3995,7 @@ def batch_list_data(request):
                 'id': batch.pk,
                 'stages': [
                     {
-                        'name': stage.name,
+                        'name': stage.production_stage.name,
                         'status': stage.status,
                         'status_display': stage.get_status_display(),
                         'color_class': stage.get_status_color_class(),
@@ -4129,13 +4140,21 @@ def batch_edit(request, batch_id):
         clients = Org.objects.filter(users=request.user)
         batch = get_object_or_404(Batch, design__client__in=clients, pk=batch_id)
 
+    batch_production_stages = list(batch.production_stages.select_related('production_stage'))
+    explained_stages = {
+        batch_production_stage.production_stage_id: batch_production_stage.production_stage
+        for batch_production_stage in batch_production_stages
+        if batch_production_stage.production_stage.has_explanation
+    }
+
     if not request.user.is_staff:
         ctx = {
             'form': None,
             'batch': batch,
             'production_stages_with_forms': [
-                (batch_production_stage, None) for batch_production_stage in batch.production_stages.all()
+                (batch_production_stage, None) for batch_production_stage in batch_production_stages
             ],
+            'explained_stages': explained_stages.values(),
             'boards': batch.devices.order_by('pk'),
             'pcb_top': DesignAsset.objects.filter(
                 design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
@@ -4155,7 +4174,7 @@ def batch_edit(request, batch_id):
 
     production_stages_with_forms = [
         (batch_production_stage, BatchProductionStageUpdateForm(instance=batch_production_stage))
-        for batch_production_stage in batch.production_stages.all()
+        for batch_production_stage in batch_production_stages
     ]
 
     parts_required = _batch_parts_required(batch)
@@ -4173,6 +4192,7 @@ def batch_edit(request, batch_id):
         'form': form,
         'batch': batch,
         'production_stages_with_forms': production_stages_with_forms,
+        'explained_stages': explained_stages.values(),
         'apply_template_form': BatchApplyTemplateForm(),
         'add_production_stage_form': BatchProductionStageAddForm(),
         'parts_required': parts_required,
@@ -4193,6 +4213,7 @@ def batch_print(request, batch_id):
     batch_url = request.build_absolute_uri(reverse('erp:batch_edit', args=[batch.pk]))
     ctx = {
         'batch': batch,
+        'batch_production_stages': batch.production_stages.select_related('production_stage'),
         'batch_url': batch_url,
         'pcb_top': DesignAsset.objects.filter(
             design=batch.design, asset_type=DesignAsset.PCB_TOP).first(),
@@ -4232,8 +4253,7 @@ def batch_duplicate(request, batch_id):
     for stage in batch.production_stages.all():
         BatchProductionStage.objects.create(
             batch=new_batch,
-            name=stage.name,
-            color=stage.color,
+            production_stage_id=stage.production_stage_id,
             order=stage.order,
             status=BatchProductionStage.NOT_STARTED,
         )
@@ -4270,8 +4290,7 @@ def batch_production_stage_add(request, batch_id):
 
             BatchProductionStage.objects.create(
                 batch=batch,
-                name=production_stage.name,
-                color=production_stage.color,
+                production_stage=production_stage,
                 order=next_order,
                 status=BatchProductionStage.NOT_STARTED,
             )

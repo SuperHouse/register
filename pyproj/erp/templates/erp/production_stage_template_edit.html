@@ -56,8 +56,11 @@
                             {% for step in steps %}
                                 <tr data-stage-id="{{ step.pk }}">
                                     <td class="text-center" style="cursor: grab;"><i class="bi bi-grip-vertical"></i></td>
-                                    <td><span class="d-inline-block rounded" style="width: 24px; height: 24px; background-color: {{ step.production_stage.color }};"></span></td>
-                                    <td>{{ step.production_stage.name }}</td>
+                                    <td>{% include "erp/partial-stage-swatch.html" with stage=step.production_stage %}</td>
+                                    <td>
+                                        {{ step.production_stage.name }}
+                                        {% if not step.production_stage.active %}<span class="badge text-bg-secondary ms-1" title="Not added when this template is applied">Inactive</span>{% endif %}
+                                    </td>
                                     <td class="text-nowrap">
                                         <form method="post" action="{% url 'erp:production_stage_template_step_delete' step.pk %}">
                                             {% csrf_token %}
