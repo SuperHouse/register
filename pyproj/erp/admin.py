@@ -13,7 +13,8 @@ from .models import (
 @admin.register(AssemblyCostSettings)
 class AssemblyCostSettingsAdmin(admin.ModelAdmin):
     list_display = [
-        'smt_joint_cost_cents', 'pth_joint_cost_cents', 'labour_rate', 'kitting_margin_percent',
+        'smt_joint_cost_cents', 'pth_joint_cost_cents',
+        'consigned_smt_joint_cost_cents', 'consigned_pth_joint_cost_cents', 'labour_rate', 'kitting_margin_percent',
         'conformal_coating_charge', 'anti_shock_glue_charge',
     ]
 

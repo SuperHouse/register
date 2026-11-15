@@ -98,5 +98,6 @@ urlpatterns = [
     path('design-bom/<int:design_id>/populate/', views.design_bom_populate, name='design_bom_populate'),
     path('design-bom/<int:design_id>/add/', views.design_bom_entry_add, name='design_bom_entry_add'),
     path('design-bom/entry/<int:entry_id>/edit/', views.design_bom_entry_edit, name='design_bom_entry_edit'),
+    path('design-bom/entry/<int:entry_id>/set-supply/', views.design_bom_entry_set_supply, name='design_bom_entry_set_supply'),
     path('design-bom/entry/<int:entry_id>/delete/', views.design_bom_entry_delete, name='design_bom_entry_delete'),
 ]

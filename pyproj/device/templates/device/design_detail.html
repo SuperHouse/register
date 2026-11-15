@@ -462,13 +462,15 @@
                                             <th>Side</th>
                                             <th>SMT</th>
                                             <th>PTH</th>
+                                            <th title="Consigned: the client supplies this part">Client</th>
+                                            <th title="Do Not Place">DNP</th>
                                             <th>Cost</th>
                                             <th></th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for entry in bom_entries %}
-                                            <tr class="clickable-row" onclick="window.location='{% url 'erp:design_bom_entry_edit' entry.pk %}'" style="cursor:pointer">
+                                            <tr class="clickable-row{% if entry.supply == 'DNP' %} text-body-secondary{% endif %}" onclick="window.location='{% url 'erp:design_bom_entry_edit' entry.pk %}'" style="cursor:pointer">
                                                 <td>{{ entry.reference }}</td>
                                                 <td>{{ entry.part.name }}</td>
                                                 <td>{{ entry.part.device }}</td>
@@ -480,20 +482,35 @@
                                                 <td>{{ entry.get_side_display|default:"—" }}</td>
                                                 <td>
                                                     {% if entry.part.smt_joints == None %}
-                                                        <i class="bi bi-exclamation-triangle-fill text-warning" title="SMT Joints not set"></i>
+                                                        {% if entry.supply != 'DNP' %}<i class="bi bi-exclamation-triangle-fill text-warning" title="SMT Joints not set"></i>{% endif %}
                                                     {% elif entry.part.smt_joints %}
                                                         {{ entry.part.smt_joints }}
                                                     {% endif %}
                                                 </td>
                                                 <td>
                                                     {% if entry.part.pth_joints == None %}
-                                                        <i class="bi bi-exclamation-triangle-fill text-warning" title="PTH Joints not set"></i>
+                                                        {% if entry.supply != 'DNP' %}<i class="bi bi-exclamation-triangle-fill text-warning" title="PTH Joints not set"></i>{% endif %}
                                                     {% elif entry.part.pth_joints %}
                                                         {{ entry.part.pth_joints }}
                                                     {% endif %}
                                                 </td>
+                                                <td onclick="event.stopPropagation()">
+                                                    <input type="checkbox" class="form-check-input bom-supply-checkbox" data-supply="CONSIGNED"
+                                                           data-url="{% url 'erp:design_bom_entry_set_supply' entry.pk %}"
+                                                           title="Consigned: the client supplies this part"
+                                                           {% if entry.supply == 'CONSIGNED' %}checked{% endif %}>
+                                                </td>
+                                                <td onclick="event.stopPropagation()">
+                                                    <input type="checkbox" class="form-check-input bom-supply-checkbox" data-supply="DNP"
+                                                           data-url="{% url 'erp:design_bom_entry_set_supply' entry.pk %}"
+                                                           title="Do Not Place"
+                                                           {% if entry.supply == 'DNP' %}checked{% endif %}>
+                                                </td>
                                                 <td class="text-nowrap">
-                                                    {% if entry.unit_price_break %}
+                                                    {% if entry.supply == 'DNP' %}
+                                                    {% elif entry.supply == 'CONSIGNED' %}
+                                                        <span class="badge text-bg-secondary" title="Consigned: supplied by the client, not included in BoM cost">Client</span>
+                                                    {% elif entry.unit_price_break %}
                                                         {{ entry.unit_price_break.symbol }}{{ entry.unit_price_break.price|floatformat:-4 }} {{ entry.unit_price_break.currency }}
                                                     {% else %}
                                                         <span class="fst-italic text-body-secondary">—</span>
@@ -522,6 +539,8 @@
                                                 <td></td>
                                                 <td></td>
                                                 <td></td>
+                                                <td></td>
+                                                <td></td>
                                                 <td><button type="submit" class="btn btn-sm btn-primary">Add</button></td>
                                             </form>
                                         </tr>
@@ -532,6 +551,8 @@
                                                 <td colspan="9" class="text-end">Total:</td>
                                                 <td>{{ bom_total_smt_joints }}</td>
                                                 <td>{{ bom_total_pth_joints }}</td>
+                                                <td></td>
+                                                <td></td>
                                                 <td class="text-nowrap">
                                                     {% if bom_total_cost is not None %}
                                                         ${{ bom_total_cost|floatformat:2 }}
@@ -983,5 +1004,30 @@
 
             applySort();
         }());
+
+        // Bill of Materials "Client" (consigned) and "DNP" checkboxes (register#154/#155).
+        // Both set the entry's one `supply` value, so ticking one clears the other; unticking
+        // sets it back to NORMAL. Reloads on success, since the totals and Build Costing change.
+        document.querySelectorAll('.bom-supply-checkbox').forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                const body = new URLSearchParams();
+                body.append('supply', this.checked ? this.dataset.supply : 'NORMAL');
+                fetch(this.dataset.url, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': getCookie('csrftoken')},
+                    body: body,
+                })
+                    .then(function (response) { return response.json(); })
+                    .then(function (data) {
+                        if (!data.ok) { throw new Error(data.error || 'Update failed'); }
+                        history.replaceState(null, '', '#bom');
+                        location.reload();
+                    })
+                    .catch(function (error) {
+                        checkbox.checked = !checkbox.checked;
+                        alert('Could not update this BOM entry: ' + error.message);
+                    });
+            });
+        });
     </script>
 {% endblock extra_js %}

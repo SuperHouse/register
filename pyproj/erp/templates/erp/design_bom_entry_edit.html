@@ -32,6 +32,13 @@
                             {% if form.part.errors %}<div class="text-danger small mt-1">{{ form.part.errors }}</div>{% endif %}
                         </div>
 
+                        <div class="mb-3">
+                            <label for="{{ form.supply.id_for_label }}" class="form-label">Supply</label>
+                            {{ form.supply }}
+                            <div class="form-text">Consigned parts are supplied by the client: not included in BoM cost, and their joints are costed at the consigned rates. Do Not Place parts stay listed but aren't costed or counted at all.</div>
+                            {% if form.supply.errors %}<div class="text-danger small mt-1">{{ form.supply.errors }}</div>{% endif %}
+                        </div>
+
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">Save Changes</button>
                             <a href="{% url 'design_detail' entry.design_id %}#bom" class="btn btn-secondary">Cancel</a>

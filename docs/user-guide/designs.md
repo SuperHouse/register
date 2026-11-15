@@ -77,6 +77,15 @@ The **Populate from BOM** button on the Bill of Materials tab adds a row for eac
 
 Parts that KiCad excludes from position files, such as mounting holes, get a BOM row without a position.
 
+### Client-supplied and Do Not Place parts
+
+Each row of the Bill of Materials has two checkboxes. A row can have one of them ticked, or neither:
+
+- **Client**: the client supplies this part (a consigned part). The Cost column shows a **Client** label, and the part's cost is not in the BoM total. Its solder joints are costed at the consigned rates, which are set under **Settings → Assembly Costs**. On a batch, the part is still listed under Parts Required with a **Client** label, but there is no stock warning and no Add to Parts Cart button.
+- **DNP** (Do Not Place): the part is in the BOM but is not fitted. The row stays in the list, with its position, but greyed out. Its Cost cell is blank, and its cost and solder joints are not counted. It is left out of a batch's Parts Required.
+
+Ticking one box clears the other. You can also set this on the BOM entry's edit page. **Populate from BOM** does not change these settings on rows that already exist.
+
 ### Attachments
 
 Arbitrary files (extra firmware images, inspection photos, notes PDFs, etc.) can be added in the Attachments section. These don't replace each other — any number can be attached.

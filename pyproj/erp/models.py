@@ -444,6 +444,20 @@ class DesignBomEntry(models.Model):
     BOTTOM = 'BOTTOM'
     SIDE_CHOICES = [(TOP, 'Top'), (BOTTOM, 'Bottom')]
 
+    # How this placement is supplied (register#154, register#155). One field, not two
+    # booleans, because "consigned and also not placed" means nothing for costing.
+    # NORMAL: we buy the part; its cost counts in BoM Cost and its joints at the normal rates.
+    # CONSIGNED: the client supplies the part; no part cost, joints at the consigned rates.
+    # DNP: Do Not Place; listed only, with no part cost and no joints.
+    NORMAL = 'NORMAL'
+    CONSIGNED = 'CONSIGNED'
+    DNP = 'DNP'
+    SUPPLY_CHOICES = [
+        (NORMAL, 'Normal'),
+        (CONSIGNED, 'Consigned (supplied by the client)'),
+        (DNP, 'Do Not Place (DNP)'),
+    ]
+
     design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name='bom_entries')
     part = models.ForeignKey(Part, on_delete=models.PROTECT, related_name='design_bom_entries')
     reference = models.CharField(max_length=50, help_text='Reference designator (e.g. R3)')
@@ -451,6 +465,7 @@ class DesignBomEntry(models.Model):
     pos_y = models.DecimalField(max_digits=9, decimal_places=4, null=True, blank=True)
     rotation = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     side = models.CharField(max_length=6, choices=SIDE_CHOICES, blank=True)
+    supply = models.CharField(max_length=10, choices=SUPPLY_CHOICES, default=NORMAL)
 
     class Meta:
         ordering = ['reference']
@@ -1055,6 +1070,14 @@ class AssemblyCostSettings(models.Model):
     pth_joint_cost_cents = models.DecimalField(
         max_digits=8, decimal_places=4, default=0, verbose_name='Cost per PTH joint (cents)',
         help_text='e.g. 5 for five cents',
+    )
+    consigned_smt_joint_cost_cents = models.DecimalField(
+        max_digits=8, decimal_places=4, default=0, verbose_name='Cost per SMT joint, consigned parts (cents)',
+        help_text='Used instead of the SMT rate above for parts the client supplies',
+    )
+    consigned_pth_joint_cost_cents = models.DecimalField(
+        max_digits=8, decimal_places=4, default=0, verbose_name='Cost per PTH joint, consigned parts (cents)',
+        help_text='Used instead of the PTH rate above for parts the client supplies',
     )
     labour_rate = models.DecimalField(
         max_digits=10, decimal_places=2, default=0, verbose_name='Assembly labour rate',

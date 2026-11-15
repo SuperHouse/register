@@ -93,13 +93,15 @@ class Design(models.Model):
         if is_new or old_stock != self.pcb_stock or not self.pcb_stock_history.exists():
             self.pcb_stock_history.create(stock=self.pcb_stock)
 
-    def bom_part_counts(self):
+    def bom_part_counts(self, supply='NORMAL'):
         """Counter of {part_id: placement count} from this design's Bill of Materials —
-        how many of each part one board of this design needs. Shared by the Design detail
-        page's per-board BoM costing and (in future) Batch costing, which multiplies each
-        count by the batch's build quantity to get the total needed for the batch, before
-        passing that total to Part.cheapest_price_break_for_quantity()."""
-        return Counter(self.bom_entries.values_list('part_id', flat=True))
+        how many of each part one board of this design needs — counting only entries with
+        the given `erp.DesignBomEntry.supply` value. The default, 'NORMAL', is the parts we
+        buy, which is what BoM costing prices; pass 'CONSIGNED' for the client-supplied
+        ones (their joints are still costed). 'DNP' entries are never counted by costing.
+        A plain string rather than DesignBomEntry.NORMAL, since importing erp.models here
+        would be circular (erp.models imports device.models)."""
+        return Counter(self.bom_entries.filter(supply=supply).values_list('part_id', flat=True))
 
 
 class CreatedByMixin(models.Model):

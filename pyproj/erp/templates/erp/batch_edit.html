@@ -269,6 +269,9 @@
                                                        title="{% if row.part.has_no_sources and row.part.missing_joint_data %}No sources listed, and SMT/PTH joint counts not set{% elif row.part.has_no_sources %}No sources listed{% else %}SMT/PTH joint counts not set{% endif %}"></i>
                                                 {% endif %}
                                                 {{ row.part.name }}
+                                                {% if row.consigned %}
+                                                    <span class="badge text-bg-secondary ms-1" title="Consigned: supplied by the client, not included in BoM cost">Client</span>
+                                                {% endif %}
                                             </td>
                                             <td>{{ row.required }}</td>
                                             <td>
@@ -294,12 +297,14 @@
                                                 {% endif %}
                                             </td>
                                             <td onclick="event.stopPropagation()">
-                                                <form method="post" action="{% url 'erp:parts_cart_add_from_batch' batch.pk row.part.pk %}" class="d-inline">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-sm btn-link p-0" title="Add to Parts Cart">
-                                                        <i class="bi bi-cart-plus"></i>
-                                                    </button>
-                                                </form>
+                                                {% if not row.consigned %}
+                                                    <form method="post" action="{% url 'erp:parts_cart_add_from_batch' batch.pk row.part.pk %}" class="d-inline">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-link p-0" title="Add to Parts Cart">
+                                                            <i class="bi bi-cart-plus"></i>
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                     {% endfor %}

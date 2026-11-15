@@ -21,7 +21,7 @@ from .forms import DesignAddForm, DesignAssetEditForm, DesignAssetForm, DesignDe
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
-from erp.models import AssemblyCostSettings, Batch, Part
+from erp.models import AssemblyCostSettings, Batch, DesignBomEntry, Part
 from erp.views import build_costing_rows as get_build_costing_rows, compute_bom_pricing
 from testing.forms import CopyTestStepsFromForm, ManualCheckForm, TestStepTypeAddForm
 
@@ -232,17 +232,23 @@ def design_detail(request, design_id):
     # Cost is calculated per distinct Part (using its total quantity across the whole
     # design to pick the right price break), then applied as a per-unit price to every
     # row for that part - so summing the column gives the correct total BOM cost.
+    # Only the parts we buy are priced: client-supplied (consigned, register#154) rows show
+    # a "Client" badge instead, and DNP rows (register#155) show nothing, and neither adds
+    # to the total. Consigned joints are still counted, at their own rates; DNP joints aren't.
     parts_by_id = {entry.part_id: entry.part for entry in bom_entries}
     part_quantities = design.bom_part_counts()
-    price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints = compute_bom_pricing(
-        parts_by_id, part_quantities, part_quantities
+    consigned_quantities = design.bom_part_counts(supply=DesignBomEntry.CONSIGNED)
+    price_break_by_part_id, bom_total_cost, joints = compute_bom_pricing(
+        parts_by_id, part_quantities, part_quantities, consigned_quantities
     )
     for entry in bom_entries:
-        entry.unit_price_break = price_break_by_part_id[entry.part_id]
+        entry.unit_price_break = (
+            price_break_by_part_id[entry.part_id] if entry.supply == DesignBomEntry.NORMAL else None
+        )
 
     assembly_cost_settings = AssemblyCostSettings.get_solo()
     build_costing_rows, build_costing_total = get_build_costing_rows(
-        design, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints, assembly_cost_settings
+        design, bom_total_cost, joints, assembly_cost_settings
     )
 
     # Staff-only, same as pcb_stock itself (issue #100) - the JLCPCB order lines a human has
@@ -291,8 +297,8 @@ def design_detail(request, design_id):
         'pcb_top_asset': pcb_top_asset,
         'pcb_bottom_asset': pcb_bottom_asset,
         'bom_entries': bom_entries,
-        'bom_total_smt_joints': bom_total_smt_joints,
-        'bom_total_pth_joints': bom_total_pth_joints,
+        'bom_total_smt_joints': joints.total_smt,
+        'bom_total_pth_joints': joints.total_pth,
         'bom_total_cost': bom_total_cost,
         'bom_csv_asset': bom_csv_asset,
         'bom_entry_form': DesignBomEntryForm() if request.user.is_staff else None,

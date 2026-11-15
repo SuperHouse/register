@@ -13,6 +13,7 @@ import time
 import xml.etree.ElementTree as ET
 from urllib.parse import quote as urlquote
 from collections import Counter
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
@@ -40,6 +41,7 @@ from .forms import (
     BomExclusionRuleForm,
     BomLibrarySettingForm,
     BomSupplementRuleForm,
+    DesignBomEntryEditForm,
     DesignBomEntryForm,
     LocationForm,
     PartAssetForm,
@@ -794,16 +796,35 @@ def design_bom_entry_edit(request, entry_id):
     entry = get_object_or_404(DesignBomEntry, pk=entry_id)
 
     if request.method == 'POST':
-        form = DesignBomEntryForm(request.POST, instance=entry)
+        form = DesignBomEntryEditForm(request.POST, instance=entry)
         if form.is_valid():
             form.save()
             messages.success(request, 'BOM entry updated.')
             return redirect(reverse('design_detail', args=[entry.design_id]) + '#bom')
         messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
     else:
-        form = DesignBomEntryForm(instance=entry)
+        form = DesignBomEntryEditForm(instance=entry)
 
     return render(request, 'erp/design_bom_entry_edit.html', {'form': form, 'entry': entry})
+
+
+@staff_member_required
+def design_bom_entry_set_supply(request, entry_id):
+    """POST-only AJAX endpoint behind the Bill of Materials table's "Client" and "DNP"
+    checkboxes (register#154, register#155): sets one DesignBomEntry's `supply` to the
+    posted `supply` value (NORMAL, CONSIGNED or DNP). Returns {'ok': True, 'supply': ...};
+    the page reloads on success, since the totals and Build Costing all change."""
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    entry = get_object_or_404(DesignBomEntry, pk=entry_id)
+    supply = request.POST.get('supply', '')
+    if supply not in dict(DesignBomEntry.SUPPLY_CHOICES):
+        return JsonResponse({'ok': False, 'error': f'Unknown supply value: {supply!r}'}, status=400)
+
+    entry.supply = supply
+    entry.save(update_fields=['supply'])
+    return JsonResponse({'ok': True, 'supply': entry.supply})
 
 
 @staff_member_required
@@ -3606,11 +3627,14 @@ def parts_cart_add_from_batch(request, batch_id, part_id):
     batch = get_object_or_404(Batch, pk=batch_id)
     part = get_object_or_404(Part, pk=part_id)
 
-    required = next(
-        (row['required'] for row in _batch_parts_required(batch) if row['part'].pk == part.pk), None
-    )
+    rows = [row for row in _batch_parts_required(batch) if row['part'].pk == part.pk]
+    required = next((row['required'] for row in rows if not row['consigned']), None)
     if required is None:
-        messages.warning(request, f'{part.name} is not on {batch.design}\'s Bill of Materials.')
+        if rows:
+            # Only on the BoM as a client-supplied (consigned) part, so there's nothing to buy.
+            messages.warning(request, f'{part.name} is supplied by the client for {batch.design}, so isn\'t ordered.')
+        else:
+            messages.warning(request, f'{part.name} is not on {batch.design}\'s Bill of Materials.')
         return redirect('erp:batch_edit', batch_id=batch.pk)
 
     line, created = PartsCartLine.objects.get_or_create(
@@ -4042,7 +4066,27 @@ def batch_add(request):
     return render(request, 'erp/batch_edit.html', ctx)
 
 
-def compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities):
+@dataclass
+class JointTotals:
+    """Per-board solder joint totals for Build Costing, split by how the part is supplied
+    (register#154): `smt`/`pth` for parts we buy, `consigned_smt`/`consigned_pth` for parts
+    the client supplies, which AssemblyCostSettings prices at their own rates. DNP entries
+    (register#155) are in neither."""
+    smt: int = 0
+    pth: int = 0
+    consigned_smt: int = 0
+    consigned_pth: int = 0
+
+    @property
+    def total_smt(self):
+        return self.smt + self.consigned_smt
+
+    @property
+    def total_pth(self):
+        return self.pth + self.consigned_pth
+
+
+def compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities, consigned_counts=None):
     """For each distinct Part in `per_board_counts` (a {part_id: quantity} mapping — how many of
     that part one board needs, e.g. Design.bom_part_counts()), look up its cheapest reachable
     price break at the quantity given for that part in `pricing_quantities` (a separate
@@ -4054,49 +4098,66 @@ def compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities):
     bom_total_cost stays a per-board figure (the Batch detail page's Build Costing) — see
     Part.cheapest_price_break_for_quantity() for why buying in bulk can reach a cheaper break.
 
-    Returns (price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints).
+    `per_board_counts` holds only the parts we buy (DesignBomEntry.NORMAL). Client-supplied
+    parts (CONSIGNED, register#154) go in `consigned_counts` instead, in the same shape: they
+    get no price and add nothing to bom_total_cost, but their joints are counted, separately.
+    `parts_by_id` must cover the parts in both mappings. DNP entries (register#155) belong in
+    neither.
+
+    Returns (price_break_by_part_id, bom_total_cost, joints), where `joints` is a JointTotals.
     """
+    consigned_counts = consigned_counts or {}
     price_break_by_part_id = {
         part_id: parts_by_id[part_id].cheapest_price_break_for_quantity(pricing_quantities.get(part_id, 0))
         for part_id in per_board_counts
     }
-    bom_total_smt_joints = sum(
-        (parts_by_id[part_id].smt_joints or 0) * count for part_id, count in per_board_counts.items()
-    )
-    bom_total_pth_joints = sum(
-        (parts_by_id[part_id].pth_joints or 0) * count for part_id, count in per_board_counts.items()
+
+    def joint_sum(counts, attr):
+        return sum((getattr(parts_by_id[part_id], attr) or 0) * count for part_id, count in counts.items())
+
+    joints = JointTotals(
+        smt=joint_sum(per_board_counts, 'smt_joints'),
+        pth=joint_sum(per_board_counts, 'pth_joints'),
+        consigned_smt=joint_sum(consigned_counts, 'smt_joints'),
+        consigned_pth=joint_sum(consigned_counts, 'pth_joints'),
     )
     known_costs = [
         price_break_by_part_id[part_id].price * count
         for part_id, count in per_board_counts.items() if price_break_by_part_id[part_id]
     ]
     bom_total_cost = sum(known_costs) if known_costs else None
-    return price_break_by_part_id, bom_total_cost, bom_total_smt_joints, bom_total_pth_joints
+    return price_break_by_part_id, bom_total_cost, joints
 
 
-def build_costing_rows(design, bom_cost, bom_total_smt_joints, bom_total_pth_joints, assembly_cost_settings):
+def build_costing_rows(design, bom_cost, joints, assembly_cost_settings):
     """The Build Costing breakdown for one board of `design` — same rows shown on the Design
-    detail page — given a BoM cost and joint totals (see compute_bom_pricing()) and the global
+    detail page — given a BoM cost and JointTotals (see compute_bom_pricing()) and the global
     AssemblyCostSettings rates. Returns (rows, total) as a list of (label, Decimal) pairs and
     their Decimal sum; shared by the Design detail page and the Batch detail page (the latter
     prices the BoM Cost row at the batch's build volume via compute_bom_pricing(), but the
     other rows and this breakdown itself are unaffected by quantity and stay per-board).
+    Production Consumables is the sum of four products: SMT and PTH joints, each at the normal
+    rate for parts we buy and at the consigned rate for client-supplied parts (register#154).
     Conformal Coating and Anti-Shock Glue are omitted from the returned rows (though still
     included in `total`) when they come to zero, since most designs use neither."""
     bom_cost = bom_cost or Decimal('0')
+    s = assembly_cost_settings
+    consumables_cents = (
+        Decimal(joints.smt) * s.smt_joint_cost_cents
+        + Decimal(joints.pth) * s.pth_joint_cost_cents
+        + Decimal(joints.consigned_smt) * s.consigned_smt_joint_cost_cents
+        + Decimal(joints.consigned_pth) * s.consigned_pth_joint_cost_cents
+    )
     rows = [
         ('BoM Cost', bom_cost),
-        ('BoM Kitting Fee', bom_cost * assembly_cost_settings.kitting_margin_percent / Decimal('100')),
+        ('BoM Kitting Fee', bom_cost * s.kitting_margin_percent / Decimal('100')),
         ('Additional BoM', design.additional_materials),
         ('PCB', design.pcb_cost),
-        ('Production Consumables', (
-            Decimal(bom_total_pth_joints) * assembly_cost_settings.pth_joint_cost_cents
-            + Decimal(bom_total_smt_joints) * assembly_cost_settings.smt_joint_cost_cents
-        ) / Decimal('100')),
+        ('Production Consumables', consumables_cents / Decimal('100')),
         ('Packaging', design.packaging),
-        ('Conformal Coating', assembly_cost_settings.conformal_coating_charge if design.conformal_coating else Decimal('0')),
-        ('Anti-Shock Glue', assembly_cost_settings.anti_shock_glue_charge if design.anti_shock_glue else Decimal('0')),
-        ('Assembly Fee', Decimal(design.assembly_time_minutes) / Decimal('60') * assembly_cost_settings.labour_rate),
+        ('Conformal Coating', s.conformal_coating_charge if design.conformal_coating else Decimal('0')),
+        ('Anti-Shock Glue', s.anti_shock_glue_charge if design.anti_shock_glue else Decimal('0')),
+        ('Assembly Fee', Decimal(design.assembly_time_minutes) / Decimal('60') * s.labour_rate),
     ]
     total = sum(value for _, value in rows)
     hide_if_zero = {'Conformal Coating', 'Anti-Shock Glue'}
@@ -4109,27 +4170,39 @@ def _batch_parts_required(batch):
     DesignBomEntry rows for that part) multiplied by the batch's quantity. Each row also carries
     the per-board count on its own (`per_board`) — reused by batch_edit to price the Batch
     detail page's Build Costing section at the batch's actual order volume (see
-    compute_bom_pricing()) without recomputing the same counts twice."""
-    entries = batch.design.bom_entries.select_related('part').prefetch_related(
+    compute_bom_pricing()) without recomputing the same counts twice.
+
+    DNP entries (register#155) are left out: they aren't fitted, so aren't required.
+    Client-supplied entries (CONSIGNED, register#154) are kept, but in a row of their own with
+    `consigned` set, so a part placed both ways on one design gets two rows; a consigned row is
+    never flagged `short`, since the client provides the stock rather than us."""
+    entries = batch.design.bom_entries.exclude(supply=DesignBomEntry.DNP).select_related('part').prefetch_related(
         'part__sources__variants__price_breaks'
     )
 
     counts = Counter()
     parts_by_id = {}
     for entry in entries:
-        counts[entry.part_id] += 1
+        counts[(entry.part_id, entry.supply == DesignBomEntry.CONSIGNED)] += 1
         parts_by_id[entry.part_id] = entry.part
 
     rows = [
-        {'part': parts_by_id[part_id], 'per_board': count, 'required': count * batch.quantity}
-        for part_id, count in counts.items()
+        {
+            'part': parts_by_id[part_id],
+            'consigned': consigned,
+            'per_board': count,
+            'required': count * batch.quantity,
+        }
+        for (part_id, consigned), count in counts.items()
     ]
     # `short` flags a row whose required quantity exceeds the part's manually-tracked stock
     # (issue #137); a null stock counts as 0, same as _apply_part_stock_deltas.
     for row in rows:
         part = row['part']
-        row['short'] = not part.no_stock_required and row['required'] > (part.stock or 0)
-    rows.sort(key=lambda row: row['part'].name.lower())
+        row['short'] = (
+            not row['consigned'] and not part.no_stock_required and row['required'] > (part.stock or 0)
+        )
+    rows.sort(key=lambda row: (row['part'].name.lower(), row['consigned']))
     return rows
 
 
@@ -4179,13 +4252,13 @@ def batch_edit(request, batch_id):
 
     parts_required = _batch_parts_required(batch)
     parts_by_id = {row['part'].pk: row['part'] for row in parts_required}
-    per_board_counts = {row['part'].pk: row['per_board'] for row in parts_required}
-    pricing_quantities = {row['part'].pk: row['required'] for row in parts_required}
-    _, bom_cost, bom_total_smt_joints, bom_total_pth_joints = compute_bom_pricing(
-        parts_by_id, per_board_counts, pricing_quantities
-    )
+    bought = [row for row in parts_required if not row['consigned']]
+    per_board_counts = {row['part'].pk: row['per_board'] for row in bought}
+    pricing_quantities = {row['part'].pk: row['required'] for row in bought}
+    consigned_counts = {row['part'].pk: row['per_board'] for row in parts_required if row['consigned']}
+    _, bom_cost, joints = compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities, consigned_counts)
     build_costing_rows_data, build_costing_total = build_costing_rows(
-        batch.design, bom_cost, bom_total_smt_joints, bom_total_pth_joints, AssemblyCostSettings.get_solo()
+        batch.design, bom_cost, joints, AssemblyCostSettings.get_solo()
     )
 
     ctx = {

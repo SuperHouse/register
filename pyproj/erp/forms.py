@@ -174,12 +174,16 @@ class AssemblyCostSettingsForm(forms.ModelForm):
     class Meta:
         model = AssemblyCostSettings
         fields = [
-            'smt_joint_cost_cents', 'pth_joint_cost_cents', 'labour_rate', 'kitting_margin_percent',
+            'smt_joint_cost_cents', 'pth_joint_cost_cents',
+            'consigned_smt_joint_cost_cents', 'consigned_pth_joint_cost_cents',
+            'labour_rate', 'kitting_margin_percent',
             'conformal_coating_charge', 'anti_shock_glue_charge',
         ]
         widgets = {
             'smt_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
             'pth_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
+            'consigned_smt_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
+            'consigned_pth_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
             'labour_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'kitting_margin_percent': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'conformal_coating_charge': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -434,6 +438,25 @@ class DesignBomEntryForm(forms.ModelForm):
             'reference': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
         }
 
+
+class DesignBomEntryEditForm(DesignBomEntryForm):
+    """The BOM entry edit page's form: DesignBomEntryForm plus `supply`. Kept separate so the
+    Bill of Materials table's inline add row (DesignBomEntryForm), which has no supply
+    control, doesn't fail validation for a missing field."""
+    class Meta(DesignBomEntryForm.Meta):
+        fields = ['reference', 'part', 'supply']
+        widgets = {
+            **DesignBomEntryForm.Meta.widgets,
+            'supply': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['supply'].required = False
+
+    def clean_supply(self):
+        # A POST without `supply` leaves the entry's current value alone rather than failing.
+        return self.cleaned_data.get('supply') or self.instance.supply
 
 class PartsCartLineAddForm(forms.ModelForm):
     part = GroupedPartChoiceField(
