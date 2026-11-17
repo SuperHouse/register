@@ -4,10 +4,11 @@ import os
 from pathlib import Path
 
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q, Sum
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -17,7 +18,7 @@ import json
 from login_required import login_not_required
 
 from .cad_import import DEFAULT_PROJECT_LABEL, CadImportError, extract_and_save, extractor_for_upload, get_extractor
-from .forms import DesignAddForm, DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
+from .forms import DesignAddForm, DesignAssetEditForm, DesignAssetForm, DesignDetailsForm, DeviceAssetEditForm, DeviceAssetForm, ClientDeviceEventForm, DeviceEventForm, DeviceImageEditForm, DeviceImageForm, TestRecordForm
 from .models import Design, DesignAsset, Device, DeviceAsset, DeviceEvent, DeviceImage, TestRecord
 from crm.models import Org
 from erp.forms import DesignBomEntryForm
@@ -612,6 +613,12 @@ def device_detail(request, device_number):
         events = device.deviceevent_set.exclude(internal=True)
         assets = device.deviceasset_set.filter(internal=False)
 
+    # register#7: staff can manage every event; a customer user (already limited to
+    # their own orgs' devices above) can manage only customer-written notes.
+    events = list(events.select_related('created_by_user', 'created_by_tester'))
+    for event in events:
+        event.can_manage = request.user.is_staff or event.is_client_note
+
     device_images = device.deviceimage_set.all()
     attachments = assets.filter(asset_type=DeviceAsset.ATTACHMENT)
 
@@ -732,12 +739,42 @@ def device_asset_delete(request, asset_id):
     return render(request, 'device/device_asset_delete.html', ctx)
 
 
-@staff_member_required
+def _device_for_user(user, device_number):
+    """The device, if the user may see it: any device for staff, otherwise only devices
+    of the user's own orgs (404 for anything else, as device_detail does)."""
+    if user.is_staff:
+        return get_object_or_404(Device, pk=device_number)
+    clients = Org.objects.filter(users=user)
+    return get_object_or_404(Device, design__client__in=clients, pk=device_number)
+
+
+def _event_for_user(user, device_event_number):
+    """The event, if the user may edit or delete it (register#7).
+
+    Staff may manage any event. A customer user may manage only customer-written notes
+    (DeviceEvent.is_client_note) on devices of their own orgs, whoever in the org wrote
+    them. An event they can't see at all (another org's device, or an internal event)
+    is a 404. One they can see but not change (a staff note, a firmware or shipping
+    event) is a 403.
+    """
+    event = get_object_or_404(
+        DeviceEvent.objects.select_related('device__design', 'created_by_user'), pk=device_event_number,
+    )
+    if user.is_staff:
+        return event
+    if event.internal or not Org.objects.filter(users=user, pk=event.device.design.client_id).exists():
+        raise Http404('No DeviceEvent matches the given query.')
+    if not event.is_client_note:
+        raise PermissionDenied
+    return event
+
+
 def device_event_add(request, device_number):
-    device = get_object_or_404(Device, pk=device_number)
+    device = _device_for_user(request.user, device_number)
+    form_class = DeviceEventForm if request.user.is_staff else ClientDeviceEventForm
 
     if request.method == "POST":
-        form = DeviceEventForm(request.POST, initial={'device': device})
+        form = form_class(request.POST, initial={'device': device})
         if form.is_valid():
             form.instance.device = device
             form.instance.set_creator(user=request.user)
@@ -755,7 +792,7 @@ def device_event_add(request, device_number):
 
     else:
         # if a GET (or any other method) we'll create a blank form
-        form = DeviceEventForm()
+        form = form_class()
 
     ctx = {
         'form': form,
@@ -767,14 +804,16 @@ def device_event_add(request, device_number):
     return render(request, "device/device_event_edit.html", ctx)
 
 
-@staff_member_required
 def device_event_edit(request, device_event_number):
-    event = get_object_or_404(DeviceEvent, pk=device_event_number)
+    event = _event_for_user(request.user, device_event_number)
+    form_class = DeviceEventForm if request.user.is_staff else ClientDeviceEventForm
 
     if request.method == "POST":
-        form = DeviceEventForm(request.POST, instance=event)
+        form = form_class(request.POST, instance=event)
         if form.is_valid():
-            form.instance.event_dt = timezone.now()
+            # event_dt (when the event was added or imported) never changes. A web
+            # edit, by staff or a customer, records its own time in updated_dt instead.
+            form.instance.updated_dt = timezone.now()
             event = form.save()
 
             messages.success(request, 'Event saved.')
@@ -789,7 +828,7 @@ def device_event_edit(request, device_event_number):
 
     else:
         # if a GET (or any other method) we'll create a blank form
-        form = DeviceEventForm(instance=event)
+        form = form_class(instance=event)
 
     ctx = {
         'form': form,
@@ -800,9 +839,8 @@ def device_event_edit(request, device_event_number):
     return render(request, "device/device_event_edit.html", ctx)
 
 
-@staff_member_required
 def device_event_delete(request, device_event_number):
-    event = get_object_or_404(DeviceEvent, pk=device_event_number)
+    event = _event_for_user(request.user, device_event_number)
 
     if request.method == "POST":
         event.delete()

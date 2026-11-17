@@ -107,13 +107,26 @@ class ClientForm(forms.ModelForm):
 class DeviceEventForm(forms.ModelForm):
     class Meta:
         model = DeviceEvent
-        fields = ['event_dt', 'event_type', 'internal', 'description']
+        # No event_dt: a web-added event is stamped with the current time (the model
+        # default), and it never changes after that. An edit sets updated_dt instead
+        # (in the view). Only imported events carry their own event_dt.
+        fields = ['event_type', 'internal', 'description']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             # Disable the event type if the event already exists.
             self.fields['event_type'].disabled = True
+
+
+class ClientDeviceEventForm(forms.ModelForm):
+    """The note form a customer (non-staff) user sees - register#7. Only the text: a
+    customer note is always a public NOTE, so event_type and internal keep their model
+    defaults, and event_dt is set the same way as for DeviceEventForm."""
+    class Meta:
+        model = DeviceEvent
+        fields = ['description']
+        labels = {'description': 'Note'}
 
 
 class TestRecordForm(forms.ModelForm):

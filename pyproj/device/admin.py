@@ -28,6 +28,7 @@ class TestRecordInline(admin.StackedInline):
 class DeviceEventInline(admin.StackedInline):
     model = DeviceEvent
     extra = 0
+    readonly_fields = ['updated_dt']
 
 
 class DeviceAssetInline(admin.TabularInline):

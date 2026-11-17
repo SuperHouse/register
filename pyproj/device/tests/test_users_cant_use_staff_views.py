@@ -24,12 +24,14 @@ def test_users_cant_use_staff_views(
     u1tr = create_some_test_records['user1_test_record1']
     u1de = create_some_device_events['user1_device_event1']
 
+    # register#7: customers may add notes to their own devices, but u1de has no
+    # customer creator, so it stays read-only to them (see test_client_device_notes.py).
     response = client.get(reverse('device:device_event_add', args=[u1d.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 200
     response = client.get(reverse('device:device_event_edit', args=[u1de.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 403
     response = client.get(reverse('device:device_event_delete', args=[u1de.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 403
     response = client.get(reverse('device:test_record_add', args=[u1d.pk]))
     assert response.status_code == 302
     response = client.get(reverse('device:test_record_edit', args=[u1tr.pk]))
@@ -41,11 +43,11 @@ def test_users_cant_use_staff_views(
     u2de = create_some_device_events['user2_device_event1']
 
     response = client.get(reverse('device:device_event_add', args=[u2d.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 404
     response = client.get(reverse('device:device_event_edit', args=[u2de.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 404
     response = client.get(reverse('device:device_event_delete', args=[u2de.pk]))
-    assert response.status_code == 302
+    assert response.status_code == 404
     response = client.get(reverse('device:test_record_add', args=[u2tr.pk]))
     assert response.status_code == 302
     response = client.get(reverse('device:test_record_edit', args=[u2tr.pk]))

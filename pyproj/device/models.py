@@ -400,6 +400,10 @@ class DeviceEvent(CreatedByMixin, models.Model):
 
     device = models.ForeignKey(Device, on_delete=models.CASCADE)
     event_dt = models.DateTimeField(verbose_name='When', default=timezone.now)
+    # register#7 follow-up: event_dt is when the event happened (imported) or was added
+    # (web), and never changes after that. updated_dt records the last web edit, and is
+    # None for an event that has never been edited.
+    updated_dt = models.DateTimeField(verbose_name='Last changed', null=True, blank=True)
     event_type = models.CharField(max_length=50, choices=TYPE_CHOICES, default=NOTE)
     internal = models.BooleanField(default=False, help_text='Do not show this event to clients')
     description = models.TextField()
@@ -413,6 +417,24 @@ class DeviceEvent(CreatedByMixin, models.Model):
 
     def get_event_dt_as_string(self):
         return get_dt_as_string(self.event_dt)
+
+    def get_updated_dt_as_string(self):
+        return get_dt_as_string(self.updated_dt) if self.updated_dt else ''
+
+    @property
+    def is_client_note(self):
+        """True for a note written by a customer (non-staff) user - register#7.
+
+        Customer users in the device's organisation may edit or delete these. Every other
+        event (staff notes, firmware and shipping events, tester-created or legacy events
+        with no creator) is read-only to them.
+        """
+        return (
+            self.event_type == self.NOTE
+            and not self.internal
+            and self.created_by_user is not None
+            and not self.created_by_user.is_staff
+        )
 
     def get_type_display(self):
         return {

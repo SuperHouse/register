@@ -29,18 +29,18 @@ def test_device_event_add_edit_delete(client, create_some_device_events, django_
     fields = ('internal', 'description')
     data = {f: getattr(u1de, f) for f in fields}
     data['internal'] = True
-    data['event_dt'] = datetime.now().strftime(post_dt_fmt)
     response = client.post(reverse('device:device_event_edit', args=[u1de.pk]), data)
     assert response.status_code == 302
 
     updated_u1de = DeviceEvent.objects.get(pk=u1de.pk)
     assert updated_u1de.pk == u1de.pk
     assert updated_u1de.internal == True
-    assert updated_u1de.event_dt != old_de_dt
+    # An edit leaves the original time alone and records its own in updated_dt.
+    assert updated_u1de.event_dt == old_de_dt
+    assert updated_u1de.updated_dt is not None
 
     assert u1d.deviceevent_set.count() == 1
     data = {
-        'event_dt': datetime.now().strftime(post_dt_fmt),
         'event_type': 'NOTE',
         'description': 'Billed on invoice 31',
     }

@@ -40,6 +40,19 @@ Events record significant moments in a board's life. Types include:
 
 Staff users can see internal events (marked with a lock icon). Non-staff users see only non-internal events.
 
+#### Customer notes
+
+A customer user can add notes to the boards of their own organisation. Use notes to record things such as "Installed on truck ABC-123." or "In camera kit #27."
+
+1. Open the board.
+2. Under **Events**, click **Add**.
+3. Enter the note.
+4. Click **Save**.
+
+Any user in the organisation can edit or delete a note that a customer user wrote. Click **Edit** or **Del** on the note. A customer user cannot change staff notes or other events. Staff users can edit and delete all events, including customer notes. Register keeps no history of edits: an edit replaces the note, and a deletion removes it.
+
+Register sets the time of an event when you add it, and this time does not change. Events that Register imports from other systems keep their original times. When you edit an event, Register records the time of the edit separately. The board page shows it as "Changed" below the event time.
+
 ### Images
 
 Photos of the board (not tied to a specific test run) appear in the Images section. Staff can upload new images directly from this page.
