@@ -1,0 +1,160 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Edit Source - {{ part.name }} - {{ brand_name }} Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Edit Source: {{ part.name }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-lg-8 col-xl-6">
+            <form method="post">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">
+                        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+                    </div>
+                {% endif %}
+
+                <div class="card mb-4">
+                    <div class="card-header"><strong>Listing</strong></div>
+                    <div class="card-body">
+                        {% if sibling_count %}
+                            <p class="form-text mt-0">
+                                These fields are shared with the {{ sibling_count }} other SKU{{ sibling_count|pluralize }}
+                                in this listing.
+                            </p>
+                        {% endif %}
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="{{ form.supplier_name.id_for_label }}" class="form-label">Supplier Name</label>
+                                {{ form.supplier_name }}
+                                {% if form.supplier_name.errors %}<div class="text-danger small mt-1">{{ form.supplier_name.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="{{ form.manufacturer_sku.id_for_label }}" class="form-label">Manufacturer SKU</label>
+                                {{ form.manufacturer_sku }}
+                                {% if form.manufacturer_sku.errors %}<div class="text-danger small mt-1">{{ form.manufacturer_sku.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="{{ form.stock.id_for_label }}" class="form-label">Stock</label>
+                                {{ form.stock }}
+                                {% if form.stock.errors %}<div class="text-danger small mt-1">{{ form.stock.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header"><strong>SKU</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label for="{{ form.supplier_sku.id_for_label }}" class="form-label">Supplier SKU</label>
+                                {{ form.supplier_sku }}
+                                {% if form.supplier_sku.errors %}<div class="text-danger small mt-1">{{ form.supplier_sku.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label for="{{ form.packaging.id_for_label }}" class="form-label">Packaging</label>
+                                {{ form.packaging }}
+                                {% if form.packaging.errors %}<div class="text-danger small mt-1">{{ form.packaging.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-12">
+                                <label for="{{ form.url.id_for_label }}" class="form-label">Product URL</label>
+                                {{ form.url }}
+                                {% if form.url.errors %}<div class="text-danger small mt-1">{{ form.url.errors }}</div>{% endif %}
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <label for="{{ form.moq.id_for_label }}" class="form-label">MOQ</label>
+                                {{ form.moq }}
+                                {% if form.moq.errors %}<div class="text-danger small mt-1">{{ form.moq.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header"><strong>Price Breaks</strong></div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-6 col-md-3">
+                                <label for="{{ form.currency.id_for_label }}" class="form-label">Currency</label>
+                                {{ form.currency }}
+                            </div>
+                        </div>
+                        <table class="table table-sm align-middle mb-2">
+                            <thead>
+                                <tr>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th style="width: 50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="price-break-rows">
+                                {% for qty, price in break_rows %}
+                                    <tr>
+                                        <td><input type="number" name="break_quantity" value="{{ qty }}" min="1" step="1" class="form-control form-control-sm" aria-label="Quantity"></td>
+                                        <td><input type="number" name="break_price" value="{{ price }}" min="0" step="any" class="form-control form-control-sm" aria-label="Unit price"></td>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-outline-danger price-break-remove" title="Remove this price break">
+                                                <i class="cil-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="price-break-add">
+                            <i class="cil-plus"></i> Add Price Break
+                        </button>
+                        <div class="form-text">
+                            Enter a single price at quantity 1 if the supplier has no quantity discounts. Leave a row
+                            empty to ignore it.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="{% url 'erp:part_edit' part.pk %}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const rows = document.getElementById('price-break-rows');
+
+        function blankRow() {
+            const row = rows.querySelector('tr').cloneNode(true);
+            row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+            return row;
+        }
+
+        document.getElementById('price-break-add').addEventListener('click', function () {
+            const row = blankRow();
+            rows.appendChild(row);
+            row.querySelector('input').focus();
+        });
+
+        rows.addEventListener('click', function (e) {
+            const btn = e.target.closest('.price-break-remove');
+            if (!btn) return;
+            const row = btn.closest('tr');
+            // Keep one row in the table so there's always a template to clone.
+            if (rows.querySelectorAll('tr').length > 1) {
+                row.remove();
+            } else {
+                row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+            }
+        });
+    });
+</script>
+{% endblock extra_js %}

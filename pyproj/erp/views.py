@@ -48,6 +48,7 @@ from .forms import (
     PartCategoryForm,
     PartForm,
     PartReparentForm,
+    PartSourceEditForm,
     PartSourceForm,
     PartsCartAddFromPartForm,
     PartsCartLineAddForm,
@@ -65,6 +66,7 @@ from .models import (
     BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak,
     PartPriceBreakHistory, PartSource, PartSourceVariant, PartsCartLine, PartSubstitution, PartsOrder,
     PartsOrderLine, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep, STOCK_TREND_PERIOD,
+    api_supplier_key,
 )
 
 
@@ -1106,10 +1108,15 @@ def part_source_add(request, part_id):
             listing = _get_or_create_supplier_listing(
                 part, data['supplier_name'], data['manufacturer_sku'], data['stock'],
             )
-            PartSourceVariant.objects.create(
+            variant = PartSourceVariant.objects.create(
                 source=listing, supplier_sku=data['supplier_sku'], packaging=data['packaging'], url=data['url'],
                 moq=data['moq'],
+                # A manual source (register#153) is "refreshed" by hand, so it's up to date
+                # as of now. An API source is left None so the scheduled refresh picks it up.
+                last_refreshed=None if listing.has_api else timezone.now(),
             )
+            if data['price'] is not None:
+                _save_price_breaks(variant, [{'quantity': 1, 'price': data['price'], 'currency': data['currency']}])
             messages.success(request, 'Source added.')
         else:
             messages.warning(request, 'Please correct the errors below.')
@@ -1825,7 +1832,7 @@ def _refresh_variant(variant):
     listing = variant.source
     part = listing.part
     sku = variant.supplier_sku
-    supplier = listing.supplier_name.lower()
+    supplier = api_supplier_key(listing.supplier_name)
 
     try:
         import requests as http_requests
@@ -1851,7 +1858,7 @@ def _refresh_variant(variant):
             image_filename_prefix = f'lcsc_{p.product_code}'
             _save_price_breaks(variant, _lcsc_price_break_dicts(p.price_breaks))
 
-        elif 'digikey' in supplier:
+        elif supplier == 'digikey':
             client_id, access_token = _get_digikey_access_token()
             resp = http_requests.get(
                 _digikey_base_url() + f'/products/v4/search/{urlquote(sku, safe="")}/productdetails',
@@ -1931,7 +1938,7 @@ def _refresh_variant(variant):
             image_filename_prefix = f'mouser_{sku.replace("/", "_")}'
             _save_price_breaks(variant, _mouser_price_breaks(p))
 
-        elif 'element14' in supplier or 'farnell' in supplier or 'newark' in supplier:
+        elif supplier == 'element14':
             api_key = os.environ.get('ELEMENT14_API_KEY', '').strip()
             store_id = os.environ.get('ELEMENT14_STORE_ID', 'au.element14.com').strip()
             if not api_key:
@@ -2023,6 +2030,75 @@ def part_source_refresh(request, variant_id):
     variant.save(update_fields=['last_refreshed'])
 
     return JsonResponse(result)
+
+
+@staff_member_required
+def part_source_variant_edit(request, variant_id):
+    """Edit a manual source's SKU, its listing and its price breaks (register#153).
+
+    The by-hand equivalent of part_source_refresh for a supplier with no API integration.
+    API sources are refused: their next refresh would overwrite whatever was typed here.
+    """
+    variant = get_object_or_404(PartSourceVariant.objects.select_related('source__part'), pk=variant_id)
+    listing = variant.source
+    part = listing.part
+
+    if listing.has_api:
+        messages.warning(
+            request,
+            f'{listing.supplier_name} sources are updated from the supplier\'s API, so they can\'t be edited by hand.',
+        )
+        return redirect('erp:part_edit', part_id=part.pk)
+
+    breaks = list(variant.price_breaks.all())
+    if request.method == 'POST':
+        form = PartSourceEditForm(request.POST)
+        if form.is_valid():
+            data = form.cleaned_data
+            with transaction.atomic():
+                listing.supplier_name = data['supplier_name']
+                listing.manufacturer_sku = data['manufacturer_sku']
+                listing.stock = data['stock']
+                listing.save()
+
+                variant.supplier_sku = data['supplier_sku']
+                variant.packaging = data['packaging']
+                variant.url = data['url']
+                variant.moq = data['moq']
+                variant.last_refreshed = timezone.now()
+                variant.save()
+
+                _save_price_breaks(variant, data['price_breaks'])
+            messages.success(request, 'Source updated.')
+            return redirect('erp:part_edit', part_id=part.pk)
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = PartSourceEditForm(
+            initial={
+                'supplier_name': listing.supplier_name,
+                'manufacturer_sku': listing.manufacturer_sku,
+                'stock': listing.stock,
+                'supplier_sku': variant.supplier_sku,
+                'packaging': variant.packaging,
+                'url': variant.url,
+                'moq': variant.moq,
+                # Breaks are edited as one ladder, so they share one currency. Take it
+                # from the existing breaks if there are any.
+                **({'currency': breaks[0].currency} if breaks else {}),
+            },
+            break_rows=[(str(b.quantity), f'{b.price.normalize():f}') for b in breaks],
+        )
+
+    # Always offer at least one blank row to type a new break into.
+    break_rows = form.break_rows + [('', '')]
+    return render(request, 'erp/part_source_variant_edit.html', {
+        'form': form,
+        'variant': variant,
+        'listing': listing,
+        'part': part,
+        'break_rows': break_rows,
+        'sibling_count': listing.variants.count() - 1,
+    })
 
 
 @staff_member_required

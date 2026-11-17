@@ -26,7 +26,8 @@ Each part can have multiple supplier sources. A source records:
 - Supplier name, supplier SKU, manufacturer SKU
 - Packaging type (e.g. Tape & Reel, Cut Tape)
 - Stock level
-- URL
+- Product URL
+- Price (one price, or a ladder of quantity price breaks)
 
 ### Automatic lookup
 
@@ -43,9 +44,24 @@ Enter a supplier SKU and click the appropriate button to auto-populate the sourc
 
 The **refresh** button (↻) on an existing source re-fetches all fields from the supplier to update stock and pricing.
 
+### Manual sources
+
+A supplier that isn't in the table above is a **manual source**. Its details aren't fetched from an API, so you enter and update them yourself:
+
+1. Fill in **Supplier Name**, **Supplier SKU** and the other fields under the Sources table. Enter a **Unit Price** and **Currency** if you know the price.
+2. Click **Add Source**.
+
+To update a manual source later, click its **edit** button (pencil) in the Sources table. On the edit page you can change:
+
+- The supplier name, manufacturer SKU and stock. These are shared by every SKU in the same listing.
+- The supplier SKU, packaging, product URL and MOQ.
+- The price breaks. Add one row per quantity tier. For a single price with no quantity discounts, enter one row at quantity 1.
+
+A manual source has no refresh button and never shows the "stale data" warning. Hover over the edit button to see when it was last updated.
+
 ### Price breaks
 
-When a source is fetched or refreshed from a supported supplier, quantity-based price breaks are stored automatically. The **Price** column in the sources table shows the price at the lowest quantity. Hover over it to see the full price ladder (all quantity/price tiers).
+When a source is fetched or refreshed from a supported supplier, quantity-based price breaks are stored automatically. For a manual source, you enter them on its edit page. The **Price** column in the sources table shows the price at the lowest quantity. Hover over it to see the full price ladder (all quantity/price tiers).
 
 ## Possible Substitutions
 

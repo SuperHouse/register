@@ -20,6 +20,7 @@ urlpatterns = [
     path('parts/source/<int:source_id>/delete/', views.part_source_delete, name='part_source_delete'),
     path('parts/source/variant/<int:variant_id>/delete/', views.part_source_variant_delete, name='part_source_variant_delete'),
     path('parts/source/variant/<int:variant_id>/refresh/', views.part_source_refresh, name='part_source_refresh'),
+    path('parts/source/variant/<int:variant_id>/edit/', views.part_source_variant_edit, name='part_source_variant_edit'),
     path('parts/source/fetch-lcsc/', views.part_source_fetch_lcsc, name='part_source_fetch_lcsc'),
     path('parts/source/fetch-digikey/', views.part_source_fetch_digikey, name='part_source_fetch_digikey'),
     path('parts/source/fetch-mouser/', views.part_source_fetch_mouser, name='part_source_fetch_mouser'),

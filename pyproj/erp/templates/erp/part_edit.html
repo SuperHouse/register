@@ -242,7 +242,13 @@
                                             </td>
                                             <td>
                                                 <div class="d-flex gap-1">
-                                                    {% if forloop.first or 'digikey' not in source.supplier_name|lower %}
+                                                    {% if not source.has_api %}
+                                                        <a href="{% url 'erp:part_source_variant_edit' variant.pk %}"
+                                                           class="btn btn-sm btn-outline-secondary"
+                                                           title="Edit this manually maintained source (last updated: {% if variant.last_refreshed %}{{ variant.last_refreshed|date:'j-M-Y H:i' }}{% else %}never{% endif %})">
+                                                            <i class="cil-pencil"></i>
+                                                        </a>
+                                                    {% elif forloop.first or 'digikey' not in source.supplier_name|lower %}
                                                         <button type="button"
                                                                 class="btn btn-sm btn-outline-secondary source-refresh-btn"
                                                                 data-refresh-url="{% url 'erp:part_source_refresh' variant.pk %}"
@@ -308,7 +314,7 @@
                 <form method="post" action="{% url 'erp:part_source_add' part.pk %}" id="source-add-form">
                     {% csrf_token %}
                     <div class="row g-2 align-items-end mb-2">
-                        <div class="col-12">
+                        <div class="col-12 col-md-7">
                             <label class="form-label form-label-sm">Supplier SKU</label>
                             <div class="input-group input-group-sm">
                                 {{ source_form.supplier_sku }}
@@ -330,6 +336,10 @@
                                 </button>
                             </div>
                             <div id="source-fetch-error" class="text-danger small mt-1" style="display:none;"></div>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <label class="form-label form-label-sm">Product URL</label>
+                            {{ source_form.url }}
                         </div>
                     </div>
                     <div class="row g-2 align-items-end">
@@ -353,9 +363,13 @@
                             <label class="form-label form-label-sm">Stock</label>
                             {{ source_form.stock }}
                         </div>
-                        <div class="col-12 col-md-2">
-                            <label class="form-label form-label-sm">URL</label>
-                            {{ source_form.url }}
+                        <div class="col-6 col-md-1">
+                            <label class="form-label form-label-sm">Unit Price</label>
+                            {{ source_form.price }}
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label form-label-sm">Currency</label>
+                            {{ source_form.currency }}
                         </div>
                         <div class="col-6 col-md-2">
                             <button type="submit" class="btn btn-outline-primary w-100">
@@ -365,7 +379,10 @@
                     </div>
                     <div class="form-text">
                         A Manufacturer SKU matching an existing listing for the same supplier is filed under it as
-                        another orderable SKU, sharing that listing's stock figure.
+                        another orderable SKU, sharing that listing's stock figure. A supplier without an API
+                        integration (anything other than LCSC, DigiKey, Mouser or Element14) is a manual source: fill
+                        in the fields here, then use its <i class="cil-pencil"></i> button to update its price, stock
+                        or URL later.
                     </div>
                 </form>
             </div>

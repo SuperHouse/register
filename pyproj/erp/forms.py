@@ -1,13 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
+from decimal import Decimal, InvalidOperation
+from itertools import zip_longest
+
 from django import forms
 from django.db.models import Q
 
 from device.models import Design
 from .models import (
     AssemblyCostSettings, Batch, BatchProductionStage, BomEquivalenceRule, BomExclusionRule, BomLibrarySetting,
-    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartsCartLine, PartSubstitution,
-    ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
+    BomSupplementRule, DesignBomEntry, Location, Part, PartAsset, PartCategory, PartPriceBreak, PartsCartLine,
+    PartSubstitution, ProductionStage, ProductionStageTemplate, ProductionStageTemplateStep,
 )
 
 
@@ -333,6 +336,15 @@ class PartForm(forms.ModelForm):
         }
 
 
+# Currencies offered when a price is entered by hand (register#153): the ones the
+# Part page knows a display symbol for. AUD first, as the local currency (matching the
+# DigiKey locale default).
+MANUAL_CURRENCY_DEFAULT = 'AUD'
+MANUAL_CURRENCY_CHOICES = [(MANUAL_CURRENCY_DEFAULT, MANUAL_CURRENCY_DEFAULT)] + [
+    (code, code) for code in PartPriceBreak.CURRENCY_SYMBOLS if code != MANUAL_CURRENCY_DEFAULT
+]
+
+
 class PartSourceForm(forms.Form):
     """Spans both PartSource (listing) and PartSourceVariant (variant) tiers.
 
@@ -358,6 +370,101 @@ class PartSourceForm(forms.Form):
     stock = forms.IntegerField(
         required=False, min_value=0, widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
     )
+    # register#153: a manual source (a supplier with no API integration) has no other way
+    # to get a price. Saved as a single quantity-1 price break; the Edit Source page can
+    # add a full price ladder afterwards.
+    price = forms.DecimalField(
+        required=False, min_value=0, max_digits=12, decimal_places=6,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': 'any'}),
+    )
+    currency = forms.ChoiceField(
+        choices=MANUAL_CURRENCY_CHOICES, initial=MANUAL_CURRENCY_DEFAULT,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+
+class PartSourceEditForm(forms.Form):
+    """Edit a manual source's SKU (PartSourceVariant) and its listing (PartSource) in one
+    form - register#153.
+
+    supplier_name/manufacturer_sku/stock belong to the listing, so they're shared by every
+    SKU filed under it. Price breaks arrive as parallel break_quantity/break_price lists
+    (one pair per table row, any number of rows), not as declared fields, and are cleaned
+    into cleaned_data['price_breaks'] as the dict shape _save_price_breaks() expects. A
+    row with both cells blank is ignored, so an empty spare row is harmless.
+    """
+    supplier_name = forms.CharField(max_length=200, widget=forms.TextInput(attrs={'class': 'form-control'}))
+    manufacturer_sku = forms.CharField(
+        max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    stock = forms.IntegerField(
+        required=False, min_value=0, widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+    )
+    supplier_sku = forms.CharField(
+        max_length=200, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    packaging = forms.CharField(
+        max_length=100, required=False, widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    url = forms.URLField(
+        label='Product URL', required=False, assume_scheme='https',
+        widget=forms.URLInput(attrs={'class': 'form-control'}),
+    )
+    moq = forms.IntegerField(
+        required=False, min_value=0, widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+    )
+    currency = forms.ChoiceField(
+        choices=MANUAL_CURRENCY_CHOICES, initial=MANUAL_CURRENCY_DEFAULT,
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, break_rows=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound:
+            self.break_rows = list(zip_longest(
+                self.data.getlist('break_quantity'), self.data.getlist('break_price'), fillvalue='',
+            ))
+        else:
+            self.break_rows = list(break_rows or [])
+
+    def clean(self):
+        cleaned = super().clean()
+        breaks = []
+        seen = set()
+        errors = []
+        for raw_qty, raw_price in self.break_rows:
+            raw_qty, raw_price = raw_qty.strip(), raw_price.strip()
+            if not raw_qty and not raw_price:
+                continue
+            if not raw_qty or not raw_price:
+                errors.append('Each price break needs both a quantity and a price.')
+                continue
+            try:
+                qty = int(raw_qty)
+            except ValueError:
+                qty = 0
+            if qty < 1:
+                errors.append(f'Price break quantity "{raw_qty}" must be a whole number of 1 or more.')
+                continue
+            try:
+                price = Decimal(raw_price)
+            except InvalidOperation:
+                price = None
+            if price is None or not price.is_finite() or price < 0:
+                errors.append(f'Price "{raw_price}" must be a number of 0 or more.')
+                continue
+            if price.as_tuple().exponent < -6:
+                errors.append(f'Price "{raw_price}" has more than 6 decimal places.')
+                continue
+            if qty in seen:
+                errors.append(f'There is more than one price break for quantity {qty}.')
+                continue
+            seen.add(qty)
+            breaks.append({'quantity': qty, 'price': price, 'currency': cleaned.get('currency')})
+        if errors:
+            raise forms.ValidationError(errors)
+        cleaned['price_breaks'] = sorted(breaks, key=lambda b: b['quantity'])
+        return cleaned
 
 
 class PartSubstitutionForm(forms.ModelForm):

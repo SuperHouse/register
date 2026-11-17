@@ -6,11 +6,46 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 from device.models import Design
 
 STALE_REFRESH_THRESHOLD = timedelta(hours=48)
+
+
+def api_supplier_key(supplier_name):
+    """Map a PartSource.supplier_name to the supplier API integration that refreshes it:
+    'lcsc', 'digikey', 'mouser' or 'element14', or None for a supplier with no API
+    integration (a manual source, maintained by hand - register#153).
+
+    The single source of truth for which supplier names have an API, shared by
+    _refresh_variant() (erp/views.py), the refresh_part_sources command and
+    PartSource.has_api. Keep api_supplier_variant_q() below in step with it.
+    """
+    name = (supplier_name or '').lower()
+    if name == 'lcsc':
+        return 'lcsc'
+    if 'digikey' in name:
+        return 'digikey'
+    if name == 'mouser':
+        return 'mouser'
+    if 'element14' in name or 'farnell' in name or 'newark' in name:
+        return 'element14'
+    return None
+
+
+def api_supplier_variant_q():
+    """A Q, relative to PartSourceVariant, matching variants whose listing has a
+    supplier API integration - the queryset form of api_supplier_key() above."""
+    return (
+        Q(source__supplier_name__iexact='lcsc')
+        | Q(source__supplier_name__icontains='digikey')
+        | Q(source__supplier_name__iexact='mouser')
+        | Q(source__supplier_name__icontains='element14')
+        | Q(source__supplier_name__icontains='farnell')
+        | Q(source__supplier_name__icontains='newark')
+    )
 
 # The fixed window shown on the horizontal axis of the stock trend charts (Part edit
 # page's Stock History chart and each source's sparkline), regardless of how much
@@ -540,9 +575,19 @@ class PartSource(models.Model):
             self.stock_history.create(stock=self.stock)
 
     @property
+    def has_api(self):
+        """True if this listing's supplier has an API integration that refreshes it.
+        False for a manual source (register#153), whose details are kept up to date by
+        hand on the Edit Source page instead."""
+        return api_supplier_key(self.supplier_name) is not None
+
+    @property
     def has_stale_variant_data(self):
         """True if any of this listing's variants has never been refreshed, or was last
-        refreshed more than STALE_REFRESH_THRESHOLD ago."""
+        refreshed more than STALE_REFRESH_THRESHOLD ago. Always False for a manual source:
+        nothing can refresh it, so the 48-hour warning would show permanently."""
+        if not self.has_api:
+            return False
         cutoff = timezone.now() - STALE_REFRESH_THRESHOLD
         return any(
             variant.last_refreshed is None or variant.last_refreshed < cutoff

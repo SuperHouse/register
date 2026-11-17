@@ -8,7 +8,7 @@ from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
 
-from erp.models import PartSourceVariant
+from erp.models import PartSourceVariant, api_supplier_key, api_supplier_variant_q
 from erp.views import _refresh_variant
 
 REFRESH_INTERVAL = timedelta(hours=24)
@@ -27,16 +27,7 @@ DEFAULT_MIN_INTERVAL = 2.0
 
 def _supplier_bucket(supplier_name):
     """Map a PartSource.supplier_name to the same supplier grouping _refresh_variant uses."""
-    name = supplier_name.lower()
-    if name == 'lcsc':
-        return 'lcsc'
-    if 'digikey' in name:
-        return 'digikey'
-    if name == 'mouser':
-        return 'mouser'
-    if 'element14' in name or 'farnell' in name or 'newark' in name:
-        return 'element14'
-    return 'other'
+    return api_supplier_key(supplier_name) or 'other'
 
 
 class Command(BaseCommand):
@@ -60,13 +51,16 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        total_variants = PartSourceVariant.objects.count()
+        # Manual sources (register#153) have no supplier API, so there's nothing to
+        # refresh them from - leave them out of both the batch sizing and the due list.
+        api_variants = PartSourceVariant.objects.filter(api_supplier_variant_q())
+        total_variants = api_variants.count()
         if total_variants == 0:
             self.stdout.write('No part source variants to refresh.')
             return
 
         cutoff = timezone.now() - REFRESH_INTERVAL
-        due_qs = PartSourceVariant.objects.filter(
+        due_qs = api_variants.filter(
             Q(last_refreshed__isnull=True) | Q(last_refreshed__lt=cutoff)
         ).select_related('source').order_by('last_refreshed')
         total_due = due_qs.count()
