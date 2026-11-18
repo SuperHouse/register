@@ -4,7 +4,14 @@ A Batch tracks a production run of a Design through an ordered checklist of prod
 
 ## Batch list
 
-The Batches page (`/batches/`) lists all production runs, most recent first. Each row shows the design, an optional purchase order number, and the quantity of boards in the run.
+The Batches page (`/batches/`) lists all production runs. Each row shows the design, an optional purchase order number, and the quantity of boards in the run.
+
+Batches are grouped into **New**, **In Progress** and **Complete**. The page reads from top to bottom: new batches start at the top, move down into In Progress, then into Complete. Within New and In Progress, the most urgent batch (soonest due) is at the bottom of the group, and batches due later are above it:
+
+- A batch with a **due date** sorts by that date.
+- A batch with no due date is treated as due a set number of days after it was created (the **Typical assembly time (days)** under **Settings → Assembly Costs and Times**, 21 by default). The Due column shows this implied date in grey italics with a `~` in front, e.g. *~22-Oct-2026*.
+
+So an old batch with no due date moves down the list over time, past batches due later. Of batches due on the same day, the oldest is lowest. Complete batches are listed most recent first.
 
 ## Creating a batch
 
@@ -13,6 +20,7 @@ Click **Add Batch** or use the **Add New Batch** button on a Design's detail pag
 - **Design** — which board type is being produced
 - **Quantity** — how many boards in this run
 - **Purchase Order** — optional purchase order number
+- **Due date** — optional; sets where the batch sorts on the Batches page
 - **Notes** — optional free-text notes
 
 ## Production stages

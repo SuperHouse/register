@@ -181,6 +181,7 @@ def test_assembly_cost_settings_page_saves_consigned_rates(client, staff_user):
         'consigned_smt_joint_cost_cents': '0.75', 'consigned_pth_joint_cost_cents': '6',
         'labour_rate': '0', 'kitting_margin_percent': '0',
         'conformal_coating_charge': '0', 'anti_shock_glue_charge': '0',
+        'typical_assembly_days': '21',
     })
     settings = AssemblyCostSettings.get_solo()
     assert settings.consigned_smt_joint_cost_cents == Decimal('0.75')

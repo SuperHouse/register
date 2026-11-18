@@ -8,6 +8,15 @@
     Batches
 {% endblock h1 %}
 
+{% block extra_head %}
+    <style>
+        /* A red line above the first overdue batch in a group: every batch below it is past due. */
+        tr.first-overdue > td {
+            border-top: 2px solid var(--cui-danger);
+        }
+    </style>
+{% endblock extra_head %}
+
 {% block content %}
     <div class="d-flex justify-content-end gap-2 mb-3">
         <button id="display-mode-btn" class="btn btn-sm btn-outline-secondary"
@@ -50,7 +59,7 @@
                                 <th colspan="9">{{ title }}</th>
                             </tr>
                             {% for batch in group %}
-                                <tr data-batch-id="{{ batch.pk }}" data-category="{{ category }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                                <tr{% if batch.first_overdue %} class="first-overdue"{% endif %} data-batch-id="{{ batch.pk }}" data-category="{{ category }}" style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
                                     <td>#{{ batch.pk }}</td>
                                     <td style="width: 70px; padding: 4px 8px;">
                                         {% with batch.design.pcb_top_assets|first as pcb_top %}
@@ -65,7 +74,14 @@
                                     <td>{{ batch.po }}</td>
                                     <td>{{ batch.quantity }}</td>
                                     <td>{{ batch.created_dt|date:"j-M-Y" }}</td>
-                                    <td>{{ batch.due_date|date:"j-M-Y"|default:"" }}</td>
+                                    <td>
+                                        {% if batch.due_date %}
+                                            <span{% if batch.overdue %} class="text-danger"{% endif %}>{{ batch.due_date|date:"j-M-Y" }}</span>
+                                        {% elif batch.implied_due %}
+                                            <span class="{% if batch.overdue %}text-danger{% else %}text-body-secondary{% endif %} fst-italic"
+                                                  title="No due date set. Sorted as if due {{ lead_time_days }} days after it was created.">~{{ batch.implied_due|date:"j-M-Y" }}</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <div class="d-flex gap-1 batch-progress">
                                             {% for stage in batch.production_stages.all %}
@@ -121,7 +137,15 @@
             return 'in_progress';
         }
 
+        // The Overdue dividers depend on today's date, so a page left open (e.g. in Display
+        // mode) reloads once the day changes.
+        const pageLoadedDay = new Date().toDateString();
+
         async function updateBatchList() {
+            if (new Date().toDateString() !== pageLoadedDay) {
+                reloadPreservingDisplayMode();
+                return;
+            }
             try {
                 const response = await fetch('{% url "erp:batch_list_data" %}');
                 if (!response.ok) {

@@ -206,6 +206,21 @@ class Batch(models.Model):
             return f'{self.design} ({self.po})'
         return f'{self.design} x{self.quantity}'
 
+    def implied_due_date(self, lead_time_days):
+        """The date this batch is treated as due when it has no due_date: its creation date
+        plus lead_time_days, normally AssemblyCostSettings.typical_assembly_days (register#157).
+        The lead time is passed in so a list of batches reads the setting only once."""
+        return timezone.localdate(self.created_dt) + timedelta(days=lead_time_days)
+
+    def effective_due_date(self, lead_time_days):
+        """due_date if set, else implied_due_date(). Used to sort the Batches list."""
+        return self.due_date or self.implied_due_date(lead_time_days)
+
+    def queue_sort_key(self, lead_time_days):
+        """Sort key for the Batches list's New and In Progress groups: soonest effective due
+        date first, ties broken oldest-created first, then by pk."""
+        return (self.effective_due_date(lead_time_days), self.created_dt, self.pk)
+
     @property
     def progress_category(self):
         """Overall progress bucket for the Batches list: 'new', 'in_progress', or 'complete'.
@@ -1134,6 +1149,10 @@ class AssemblyCostSettings(models.Model):
     )
     conformal_coating_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     anti_shock_glue_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    typical_assembly_days = models.PositiveIntegerField(
+        default=21, verbose_name='Typical assembly time (days)',
+        help_text='A batch with no due date is sorted on the Batches page as if due this many days after it was created',
+    )
 
     class Meta:
         verbose_name = 'Assembly cost settings'

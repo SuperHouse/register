@@ -181,6 +181,7 @@ class AssemblyCostSettingsForm(forms.ModelForm):
             'consigned_smt_joint_cost_cents', 'consigned_pth_joint_cost_cents',
             'labour_rate', 'kitting_margin_percent',
             'conformal_coating_charge', 'anti_shock_glue_charge',
+            'typical_assembly_days',
         ]
         widgets = {
             'smt_joint_cost_cents': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.0001'}),
@@ -191,6 +192,7 @@ class AssemblyCostSettingsForm(forms.ModelForm):
             'kitting_margin_percent': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'conformal_coating_charge': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'anti_shock_glue_charge': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'typical_assembly_days': forms.NumberInput(attrs={'class': 'form-control', 'step': '1', 'min': '0'}),
         }
 
 

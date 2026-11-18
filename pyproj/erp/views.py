@@ -104,7 +104,7 @@ def assembly_cost_settings_edit(request):
         form = AssemblyCostSettingsForm(request.POST, instance=settings_obj)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Assembly cost settings updated.')
+            messages.success(request, 'Assembly cost and time settings updated.')
             return redirect('erp:assembly_cost_settings_edit')
         else:
             messages.warning(request, 'Some field values have errors. Please review, and amend as required.')
@@ -4069,6 +4069,28 @@ def batch_list(request):
     for batch in batches:
         groups[batch.progress_category].append(batch)
 
+    # Unfinished batches are a work queue: order them by when they should be done, with
+    # undated batches given an implied due date (register#157). The page reads top to bottom
+    # as the flow New -> In Progress -> Complete, so each group is reversed: the most urgent
+    # batch is at the bottom of its group, next to the group it moves into. Complete stays
+    # newest first.
+    lead_time_days = AssemblyCostSettings.get_solo().typical_assembly_days
+    today = timezone.localdate()
+    for group in (groups['new'], groups['in_progress']):
+        group.sort(key=lambda b: b.queue_sort_key(lead_time_days), reverse=True)
+        for batch in group:
+            batch.implied_due = batch.implied_due_date(lead_time_days)
+        # Overdue = effective due date before today. Being sorted, the overdue batches are a
+        # block at the bottom of the group; the template draws a red line above
+        # the first one.
+        first_overdue = None
+        for batch in group:
+            batch.overdue = batch.effective_due_date(lead_time_days) < today
+            if batch.overdue and first_overdue is None:
+                first_overdue = batch
+        if first_overdue:
+            first_overdue.first_overdue = True
+
     ctx = {
         'batch_groups': [
             ('New', 'new', groups['new']),
@@ -4076,6 +4098,7 @@ def batch_list(request):
             ('Complete', 'complete', groups['complete']),
         ],
         'has_batches': any(groups.values()),
+        'lead_time_days': lead_time_days,
     }
 
     return render(request, 'erp/batch_list.html', ctx)
