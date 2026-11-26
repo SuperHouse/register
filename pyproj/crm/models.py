@@ -12,7 +12,7 @@ hostname_validator = RegexValidator(
 class Org(models.Model):
     company_name = models.CharField(max_length=255)
     logo = models.ImageField(upload_to='clients/', null=True, blank=True)
-    users = models.ManyToManyField(settings.AUTH_USER_MODEL)
+    users = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True)
 
     is_client = models.BooleanField(default=True)
     is_manufacturer = models.BooleanField(default=False)

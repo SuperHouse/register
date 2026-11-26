@@ -84,22 +84,32 @@ class DesignAddForm(forms.ModelForm):
             'packaging': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Orgs that are not clients (Org.is_client unticked) are left out of the list.
+        self.fields['client'].queryset = Org.get_clients().order_by('company_name')
+
 
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Org
-        fields = ['company_name', 'logo', 'users']
+        fields = ['company_name', 'is_client', 'logo', 'users']
         widgets = {
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'is_client': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'logo': forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
             'users': forms.SelectMultiple(attrs={'class': 'form-control', 'size': '10'}),
         }
         labels = {
             'company_name': 'Company Name',
+            'is_client': 'Client',
             'logo': 'Logo',
             'users': 'Users',
         }
         help_texts = {
+            'is_client': 'Tick for an organisation you do client work for. An organisation that is '
+                         'not a client is left out of selection lists (new designs, projects, user '
+                         'memberships), and all its data stays.',
             'users': 'Hold Ctrl (Cmd on Mac) to select multiple users',
         }
 

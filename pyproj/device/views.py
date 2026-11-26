@@ -61,7 +61,8 @@ def dashboard(request):
             chart_data.append(item['count'])
     
     context = {
-        'client_count': clients.count(),
+        # Only orgs flagged as clients; `clients` itself also scopes the other counts, so it stays unfiltered.
+        'client_count': clients.filter(is_client=True).count(),
         'design_count': designs.count(),
         'device_count': devices.count(),
         'part_count': Part.objects.count(),

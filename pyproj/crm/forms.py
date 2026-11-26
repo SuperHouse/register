@@ -102,8 +102,13 @@ class UserForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Orgs that are not clients (Org.is_client unticked) are left out, except the user's own orgs:
+        # an org missing from the list would be dropped from the user on save.
+        orgs = Org.get_clients()
         if self.instance.pk:
             self.fields['orgs'].initial = self.instance.org_set.all()
+            orgs = orgs | self.instance.org_set.all()
+        self.fields['orgs'].queryset = orgs.distinct().order_by('company_name')
 
     def save(self, commit=True):
         user = super().save(commit=commit)

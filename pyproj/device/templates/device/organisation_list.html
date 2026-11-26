@@ -40,6 +40,7 @@
                                                     {% endif %}
                                                 </div>
                                                 <span>{{ client.company_name }}</span>
+                                                {% if client.is_client %}<span class="badge bg-primary ms-2">Client</span>{% endif %}
                                             </div>
                                         </td>
                                     </tr>
