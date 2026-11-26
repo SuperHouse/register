@@ -1,21 +1,32 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 SuperHouse Automation Pty Ltd <info@superhouse.tv>
-"""Staff pages for Projects (register#159). Client access comes with register#160."""
+"""Project pages (register#159, #160).
+
+Staff users see every project and can add, edit and link designs. A customer user can view the
+list and the detail page of their own orgs' projects only, read-only.
+"""
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
-from crm.models import Org
+from erp.models import Batch
 
 from .forms import ProjectDesignLinkForm, ProjectForm
 from .models import Project
 
 
-@staff_member_required
+def _projects_for_user(user):
+    """Every project for staff; otherwise only projects of the user's own orgs."""
+    if user.is_staff:
+        return Project.objects.all()
+    return Project.objects.filter(org__users=user).distinct()
+
+
 def project_list(request):
-    projects = Project.objects.select_related('org').annotate(design_count=Count('designs'))
+    visible = _projects_for_user(request.user)
+    projects = visible.select_related('org').annotate(design_count=Count('designs', distinct=True))
 
     q = request.GET.get('q', '').strip()
     org_id = request.GET.get('org', '')
@@ -36,7 +47,8 @@ def project_list(request):
 
     ctx = {
         'projects': projects.order_by('org__company_name', '-created_dt'),
-        'orgs': Org.objects.filter(projects__isnull=False).distinct().order_by('company_name'),
+        # Only orgs that have a project the user can see; hidden when there is just one.
+        'orgs': sorted({p.org for p in visible.select_related('org')}, key=lambda org: org.company_name),
         'phase_choices': Project.PHASE_CHOICES,
         'status_choices': Project.STATUS_CHOICES,
         'q': q,
@@ -83,13 +95,23 @@ def project_edit(request, project_id):
     return render(request, 'project/project_edit.html', {'form': form, 'project': project})
 
 
-@staff_member_required
 def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related('org'), pk=project_id)
+    # Another org's project is a 404 for a customer user, so its existence is not confirmed.
+    project = get_object_or_404(_projects_for_user(request.user).select_related('org'), pk=project_id)
+    designs = project.designs.order_by('sku', 'hw_version')
+    # Prototype (and later) builds: every batch of the linked designs. A design shared with
+    # another project shows its batches on both (register#160 chose not to add Batch.project yet).
+    batches = (
+        Batch.objects.filter(design__in=designs)
+        .select_related('design')
+        .prefetch_related('production_stages')
+        .order_by('-created_dt')
+    )
     ctx = {
         'project': project,
-        'designs': project.designs.order_by('sku', 'hw_version'),
-        'link_form': ProjectDesignLinkForm(project),
+        'designs': designs,
+        'batches': batches,
+        'link_form': ProjectDesignLinkForm(project) if request.user.is_staff else None,
     }
     return render(request, 'project/project_detail.html', ctx)
 

@@ -33,6 +33,7 @@ nav:
   - User Guide:
     - Overview: user-guide/index.md
     - Dashboard: user-guide/dashboard.md
+    - Projects: user-guide/projects.md
     - Boards: user-guide/boards.md
     - Designs: user-guide/designs.md
     - Test Suites: user-guide/test-suites.md

@@ -21,6 +21,10 @@ class ProjectForm(forms.ModelForm):
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
             'target_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
         }
+        help_texts = {
+            'name': 'The client sees this.',
+            'description': 'The client sees this. Keep internal notes out of it.',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

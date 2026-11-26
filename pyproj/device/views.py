@@ -285,8 +285,15 @@ def design_detail(request, design_id):
         test_suite_copy_steps_form = None
         test_suite_has_other_active_designs = False
 
+    # Projects that use this design (register#159/#160). A customer sees only their own
+    # orgs' projects, in case the admin ever linked a design to another org's project.
+    design_projects = design.projects.order_by('-created_dt')
+    if not request.user.is_staff:
+        design_projects = design_projects.filter(org__users=request.user).distinct()
+
     context = {
         'design': design,
+        'design_projects': design_projects,
         'devices': devices,
         'device_count': devices.count(),
         'core_assets': core_assets,

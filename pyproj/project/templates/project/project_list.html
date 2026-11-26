@@ -16,14 +16,16 @@
                 <input type="text" name="q" class="form-control" placeholder="Filter by name or code..." value="{{ q }}">
             </div>
         </div>
-        <div class="col-6 col-md-3">
-            <select name="org" class="form-select" aria-label="Organisation" onchange="this.form.submit()">
-                <option value="">All organisations</option>
-                {% for org in orgs %}
-                    <option value="{{ org.pk }}"{% if selected_org == org.pk|stringformat:"d" %} selected{% endif %}>{{ org.company_name }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        {% if orgs|length > 1 %}
+            <div class="col-6 col-md-3">
+                <select name="org" class="form-select" aria-label="Organisation" onchange="this.form.submit()">
+                    <option value="">All organisations</option>
+                    {% for org in orgs %}
+                        <option value="{{ org.pk }}"{% if selected_org == org.pk|stringformat:"d" %} selected{% endif %}>{{ org.company_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
         <div class="col-6 col-md-2">
             <select name="phase" class="form-select" aria-label="Phase" onchange="this.form.submit()">
                 <option value="">All phases</option>
@@ -41,11 +43,13 @@
                 <option value="all"{% if selected_status == 'all' %} selected{% endif %}>All statuses</option>
             </select>
         </div>
-        <div class="col-6 col-md-1 text-end">
-            <a href="{% url 'project:project_add' %}" class="btn btn-primary text-nowrap">
-                <i class="cil-plus"></i> Add
-            </a>
-        </div>
+        {% if user.is_staff %}
+            <div class="col-6 col-md-1 text-end">
+                <a href="{% url 'project:project_add' %}" class="btn btn-primary text-nowrap">
+                    <i class="cil-plus"></i> Add
+                </a>
+            </div>
+        {% endif %}
     </form>
 
     <div class="card">
@@ -57,7 +61,7 @@
                             <tr class="highlight">
                                 <th>Code</th>
                                 <th>Name</th>
-                                <th>Organisation</th>
+                                {% if orgs|length > 1 %}<th>Organisation</th>{% endif %}
                                 <th>Phase</th>
                                 <th>Status</th>
                                 <th>Target date</th>
@@ -69,7 +73,7 @@
                                 <tr style="cursor: pointer;" onclick="window.location='{% url 'project:project_detail' project.pk %}'">
                                     <td class="text-nowrap"><a href="{% url 'project:project_detail' project.pk %}">{{ project.code }}</a></td>
                                     <td>{{ project.name }}</td>
-                                    <td>{{ project.org.company_name }}</td>
+                                    {% if orgs|length > 1 %}<td>{{ project.org.company_name }}</td>{% endif %}
                                     <td>{{ project.get_phase_display }}</td>
                                     <td>{% include "project/partial-status-badge.html" %}</td>
                                     <td class="text-nowrap">{{ project.target_date|date:"j M Y"|default:"" }}</td>

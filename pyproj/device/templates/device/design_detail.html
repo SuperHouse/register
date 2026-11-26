@@ -225,10 +225,10 @@
                         </div>
                     </div>
 
-                    {% if user.is_staff %}
+                    {% if user.is_staff or design_projects %}
                         <div class="mb-3" id="design-projects">
                             <strong>Projects:</strong>
-                            {% for project in design.projects.all %}
+                            {% for project in design_projects %}
                                 <a href="{% url 'project:project_detail' project.pk %}">{{ project.code }} {{ project.name }}</a>{% if not forloop.last %}, {% endif %}
                             {% empty %}
                                 <span class="text-body-secondary fst-italic">None. Link this design from a project's page.</span>

@@ -13,9 +13,11 @@
         <a href="{% url 'project:project_list' %}" class="btn btn-secondary">
             <i class="cil-arrow-left"></i> Back to Projects
         </a>
-        <a href="{% url 'project:project_edit' project.pk %}" class="btn btn-primary">
-            <i class="cil-pencil"></i> Edit
-        </a>
+        {% if user.is_staff %}
+            <a href="{% url 'project:project_edit' project.pk %}" class="btn btn-primary">
+                <i class="cil-pencil"></i> Edit
+            </a>
+        {% endif %}
     </div>
 
     <div class="card mb-4">
@@ -23,7 +25,7 @@
             <table class="table table-bordered mb-0">
                 <tr>
                     <th style="width: 220px;">Organisation:</th>
-                    <td><a href="{% url 'organisation_detail' project.org.pk %}">{{ project.org.company_name }}</a></td>
+                    <td>{% if user.is_staff %}<a href="{% url 'organisation_detail' project.org.pk %}">{{ project.org.company_name }}</a>{% else %}{{ project.org.company_name }}{% endif %}</td>
                 </tr>
                 <tr>
                     <th>Phase:</th>
@@ -63,7 +65,7 @@
                             <th>SKU</th>
                             <th>Name</th>
                             <th>Version</th>
-                            <th style="width: 60px;"></th>
+                            {% if user.is_staff %}<th style="width: 60px;"></th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -75,6 +77,7 @@
                                     {% if design.obsolete %}<span class="badge bg-secondary ms-1">Obsolete</span>{% endif %}
                                 </td>
                                 <td>{{ design.hw_version }}</td>
+                                {% if user.is_staff %}
                                 <td class="text-end">
                                     <form method="post" action="{% url 'project:project_design_unlink' project.pk design.pk %}"
                                           onsubmit="return confirm('Unlink {{ design.sku|escapejs }} v{{ design.hw_version|escapejs }} from this project? The design itself is not changed.');">
@@ -84,15 +87,17 @@
                                         </button>
                                     </form>
                                 </td>
+                                {% endif %}
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             {% else %}
-                <p class="text-body-secondary fst-italic">No designs are linked to this project.</p>
+                <p class="text-body-secondary fst-italic{% if not user.is_staff %} mb-0{% endif %}">No designs are linked to this project.</p>
             {% endif %}
 
-            {% if link_form.fields.design.queryset.exists %}
+            {% if not link_form %}
+            {% elif link_form.fields.design.queryset.exists %}
                 <form method="post" action="{% url 'project:project_design_link' project.pk %}" class="d-flex gap-2" style="max-width: 600px;">
                     {% csrf_token %}
                     {{ link_form.design }}
@@ -104,6 +109,44 @@
                 <p class="text-body-secondary small mb-0">
                     {% if designs %}All of {{ project.org.company_name }}’s designs are linked.{% else %}{{ project.org.company_name }} has no designs to link yet.{% endif %}
                 </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <h5 class="mt-4">Builds</h5>
+    <div class="card">
+        <div class="card-body">
+            {% if batches %}
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr class="highlight">
+                            <th>Design</th>
+                            <th class="text-end">Quantity</th>
+                            <th>Purchase order</th>
+                            <th>Created</th>
+                            <th>Due</th>
+                            <th>Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for batch in batches %}
+                            <tr style="cursor: pointer;" onclick="window.location='{% url 'erp:batch_edit' batch.pk %}'">
+                                <td><a href="{% url 'erp:batch_edit' batch.pk %}">{{ batch.design.sku }} v{{ batch.design.hw_version }}</a></td>
+                                <td class="text-end">{{ batch.quantity }}</td>
+                                <td>{{ batch.po }}</td>
+                                <td class="text-nowrap">{{ batch.created_dt|date:"j M Y" }}</td>
+                                <td class="text-nowrap">{{ batch.due_date|date:"j M Y"|default:"" }}</td>
+                                <td>
+                                    {% with category=batch.progress_category %}
+                                        {% if category == 'complete' %}<span class="badge bg-success">Complete</span>{% elif category == 'in_progress' %}<span class="badge bg-info text-dark">In progress</span>{% else %}<span class="badge bg-secondary">New</span>{% endif %}
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic mb-0">No batches have been built of this project's designs yet.</p>
             {% endif %}
         </div>
     </div>

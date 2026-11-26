@@ -14,6 +14,7 @@ The left sidebar provides links to the main sections:
 | Section | Description |
 |---|---|
 | [Dashboard](dashboard.md) | Summary statistics and assembly chart |
+| [Projects](projects.md) | R&D client work, from enquiry to production |
 | [Batches](batches.md) | Production run tracking |
 | [Boards](boards.md) | Individual PCBs by serial number |
 | [Designs](designs.md) | Board types and their associated files |

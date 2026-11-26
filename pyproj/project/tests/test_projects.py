@@ -202,25 +202,8 @@ def test_link_requires_post(client, data):
 
 
 @pytest.mark.django_db
-def test_design_page_lists_projects_for_staff_only(client, data):
-    project = Project.objects.create(org=data['org1'], name='Design Backlink')
-    project.designs.add(data['design1'])
-    url = reverse('design_detail', args=[data['design1'].pk])
-
-    client.force_login(data['staff'])
-    assert 'Design Backlink' in client.get(url).content.decode()
-
-    client.force_login(data['customer'])
-    response = client.get(url)
-    assert response.status_code == 200
-    assert 'Design Backlink' not in response.content.decode()
-
-
-@pytest.mark.django_db
 @pytest.mark.parametrize('name, kwargs', [
-    ('project:project_list', {}),
     ('project:project_add', {}),
-    ('project:project_detail', {'project_id': 'PK'}),
     ('project:project_edit', {'project_id': 'PK'}),
 ])
 def test_customer_cannot_use_staff_pages(client, data, name, kwargs):

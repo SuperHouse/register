@@ -6,7 +6,7 @@ The dashboard (`/`) gives a live overview of the system.
 
 The top row shows counts for:
 
-- **Clients** — number of organisations in the system
+- **Clients** — number of organisations that have the **Client** flag (see [Organisations](organisations.md))
 - **Designs** — number of board types
 - **Boards** — total number of individual boards registered
 
