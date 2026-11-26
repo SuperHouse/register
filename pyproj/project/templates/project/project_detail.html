@@ -1,0 +1,110 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    {{ project.code }} {{ project.name }} - {{ brand_name }} Device Register
+{% endblock title %}
+
+{% block h1 %}
+    <span class="text-body-secondary">{{ project.code }}</span> {{ project.name }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="d-flex gap-2 mb-3">
+        <a href="{% url 'project:project_list' %}" class="btn btn-secondary">
+            <i class="cil-arrow-left"></i> Back to Projects
+        </a>
+        <a href="{% url 'project:project_edit' project.pk %}" class="btn btn-primary">
+            <i class="cil-pencil"></i> Edit
+        </a>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <table class="table table-bordered mb-0">
+                <tr>
+                    <th style="width: 220px;">Organisation:</th>
+                    <td><a href="{% url 'organisation_detail' project.org.pk %}">{{ project.org.company_name }}</a></td>
+                </tr>
+                <tr>
+                    <th>Phase:</th>
+                    <td>{{ project.get_phase_display }}</td>
+                </tr>
+                <tr>
+                    <th>Status:</th>
+                    <td>{% include "project/partial-status-badge.html" %}</td>
+                </tr>
+                <tr>
+                    <th>Start date:</th>
+                    <td>{{ project.start_date|date:"j M Y"|default:"<i>Not set</i>" }}</td>
+                </tr>
+                <tr>
+                    <th>Target date:</th>
+                    <td>{{ project.target_date|date:"j M Y"|default:"<i>Not set</i>" }}</td>
+                </tr>
+                <tr>
+                    <th>Description:</th>
+                    <td>{{ project.description|linebreaksbr|default:"<i>Not set</i>" }}</td>
+                </tr>
+                <tr>
+                    <th>Created:</th>
+                    <td>{{ project.created_dt|date:"j M Y" }}</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <h5>Designs</h5>
+    <div class="card">
+        <div class="card-body">
+            {% if designs %}
+                <table class="table table-hover align-middle">
+                    <thead>
+                        <tr class="highlight">
+                            <th>SKU</th>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th style="width: 60px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for design in designs %}
+                            <tr>
+                                <td><a href="{% url 'design_detail' design.pk %}">{{ design.sku }}</a></td>
+                                <td>
+                                    {{ design.name }}
+                                    {% if design.obsolete %}<span class="badge bg-secondary ms-1">Obsolete</span>{% endif %}
+                                </td>
+                                <td>{{ design.hw_version }}</td>
+                                <td class="text-end">
+                                    <form method="post" action="{% url 'project:project_design_unlink' project.pk design.pk %}"
+                                          onsubmit="return confirm('Unlink {{ design.sku|escapejs }} v{{ design.hw_version|escapejs }} from this project? The design itself is not changed.');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Unlink">
+                                            <i class="cil-link-broken"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic">No designs are linked to this project.</p>
+            {% endif %}
+
+            {% if link_form.fields.design.queryset.exists %}
+                <form method="post" action="{% url 'project:project_design_link' project.pk %}" class="d-flex gap-2" style="max-width: 600px;">
+                    {% csrf_token %}
+                    {{ link_form.design }}
+                    <button type="submit" class="btn btn-outline-primary text-nowrap">
+                        <i class="cil-link"></i> Link Design
+                    </button>
+                </form>
+            {% else %}
+                <p class="text-body-secondary small mb-0">
+                    {% if designs %}All of {{ project.org.company_name }}’s designs are linked.{% else %}{{ project.org.company_name }} has no designs to link yet.{% endif %}
+                </p>
+            {% endif %}
+        </div>
+    </div>
+{% endblock content %}

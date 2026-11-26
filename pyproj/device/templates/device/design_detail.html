@@ -225,6 +225,17 @@
                         </div>
                     </div>
 
+                    {% if user.is_staff %}
+                        <div class="mb-3" id="design-projects">
+                            <strong>Projects:</strong>
+                            {% for project in design.projects.all %}
+                                <a href="{% url 'project:project_detail' project.pk %}">{{ project.code }} {{ project.name }}</a>{% if not forloop.last %}, {% endif %}
+                            {% empty %}
+                                <span class="text-body-secondary fst-italic">None. Link this design from a project's page.</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
                     {% if user.is_staff or has_core_assets %}
                         <h5 class="mt-4">Design Files</h5>
                         <div class="card border-0 mb-3">

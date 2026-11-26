@@ -20,11 +20,13 @@ def _flush_app_data(include_users=False):
     from crm.models import Org
     from easy_thumbnails.models import Source, Thumbnail
     from testing.models import ManualCheck, Tester, TestModule, TestModuleType, TestStep, TestSuite
+    from project.models import Project
 
     if include_users:
         from django.contrib.auth import get_user_model
         get_user_model().objects.all().delete()
 
+    Project.objects.all().delete()
     TestModule.objects.all().delete()
     TestModuleType.objects.all().delete()
     Tester.objects.all().delete()

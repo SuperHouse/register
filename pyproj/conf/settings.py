@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'crm',
     'erp',
     'testing',
+    'project',
     'pcba',
     "pcba.designs"
 ]

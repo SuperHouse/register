@@ -11,7 +11,7 @@ from django.conf import settings
 from django.core import management
 from django.core.management.base import BaseCommand
 
-EXPORT_APPS = ['crm', 'device', 'erp', 'testing']
+EXPORT_APPS = ['crm', 'device', 'erp', 'testing', 'project']
 
 
 class Command(BaseCommand):

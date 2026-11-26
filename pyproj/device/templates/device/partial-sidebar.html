@@ -79,6 +79,13 @@
                 </li>
                 {% if user.is_staff %}
                     <li class="nav-item">
+                        <a class="nav-link {% if app_name == 'project' %}active{% endif %}"
+                           href="{% url 'project:project_list' %}">
+                            <i class="nav-icon cil-briefcase"></i>
+                            Projects
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if app_name == 'erp' and url_name|slice:":5" == "part_" and url_name|slice:":6" != "part_c" and url_name != "part_import_filter_list" %}active{% endif %}"
                            href="{% url 'erp:part_list' %}">
                             <i class="nav-icon cil-puzzle"></i>
