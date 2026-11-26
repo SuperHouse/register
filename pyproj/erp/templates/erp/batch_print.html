@@ -43,7 +43,13 @@
                 </tr>
                 <tr>
                     <th>Due</th>
-                    <td>{{ batch.due_date|date:"j-M-Y"|default:"" }}</td>
+                    <td>
+                        {% if batch.due_date %}
+                            {{ batch.due_date|date:"j-M-Y" }}
+                        {% elif implied_due %}
+                            <span class="implied-date" title="No due date set. Sorted as if due {{ lead_time_days }} days after it was created.">~{{ implied_due|date:"j-M-Y" }}</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% if batch.notes %}
                     <tr>

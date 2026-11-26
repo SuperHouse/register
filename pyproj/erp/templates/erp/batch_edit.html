@@ -73,6 +73,9 @@
                         <div class="mb-3">
                             <label for="{{ form.due_date.id_for_label }}" class="form-label">{{ form.due_date.label }}</label>
                             {{ form.due_date }}
+                            {% if implied_due %}
+                                <div class="form-text">No due date set. Treated as due <span class="fst-italic">~{{ implied_due|date:"j-M-Y" }}</span>, {{ lead_time_days }} days after the batch was created.</div>
+                            {% endif %}
                             {% if form.due_date.errors %}<div class="text-danger small">{{ form.due_date.errors }}</div>{% endif %}
                         </div>
 
@@ -108,7 +111,15 @@
                                 </tr>
                                 <tr>
                                     <th>Due:</th>
-                                    <td>{{ batch.due_date|date:"j-M-Y"|default:"—" }}</td>
+                                    <td>
+                                        {% if batch.due_date %}
+                                            {{ batch.due_date|date:"j-M-Y" }}
+                                        {% elif implied_due %}
+                                            <span class="text-body-secondary fst-italic" title="No due date set. Sorted as if due {{ lead_time_days }} days after it was created.">~{{ implied_due|date:"j-M-Y" }}</span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>PO:</th>

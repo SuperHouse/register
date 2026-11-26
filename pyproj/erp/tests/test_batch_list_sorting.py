@@ -150,3 +150,94 @@ def test_batch_list_no_divider_when_nothing_overdue(client, django_user_model, d
     client.force_login(staff)
     response = client.get(reverse('erp:batch_list'))
     assert '<tr class="first-overdue"' not in response.content.decode()
+
+
+# --- Print page (register#167) ---
+
+@pytest.fixture
+def staff_client(client, django_user_model):
+    staff = django_user_model.objects.create_user(email='printstaff@example.com', password='x', is_staff=True)
+    client.force_login(staff)
+    return client
+
+
+@pytest.mark.django_db
+def test_batch_print_shows_implied_due_date(staff_client, design):
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    content = staff_client.get(reverse('erp:batch_print', args=[batch.pk])).content.decode()
+    assert '~22-Oct-2026' in content
+    assert 'class="implied-date"' in content
+
+
+@pytest.mark.django_db
+def test_batch_print_shows_set_due_date_plainly(staff_client, design):
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1),
+                                 due_date=date(2026, 12, 1))
+    content = staff_client.get(reverse('erp:batch_print', args=[batch.pk])).content.decode()
+    assert '1-Dec-2026' in content
+    assert '~' not in content.split('<th>Due</th>')[1].split('</tr>')[0]
+    assert 'class="implied-date"' not in content
+
+
+@pytest.mark.django_db
+def test_batch_print_has_no_implied_date_for_complete_batch(staff_client, design):
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    stage = ProductionStage.objects.create(name='Done Stage', color='#00ff00', order=1)
+    BatchProductionStage.objects.create(batch=batch, production_stage=stage, order=1,
+                                        status=BatchProductionStage.DONE)
+    content = staff_client.get(reverse('erp:batch_print', args=[batch.pk])).content.decode()
+    assert '~22-Oct-2026' not in content
+
+
+# --- Batch page (register#167) ---
+
+@pytest.mark.django_db
+def test_shown_implied_due_date_rule(design):
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    assert batch.shown_implied_due_date(21) == date(2026, 10, 22)
+    batch.due_date = date(2026, 12, 1)
+    assert batch.shown_implied_due_date(21) is None
+
+
+@pytest.mark.django_db
+def test_batch_page_card_shows_implied_due_date_to_customer(client, django_user_model, design):
+    member = django_user_model.objects.create_user(email='cardmember@example.com', password='x')
+    design.client.users.add(member)
+    undated = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    dated = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1),
+                                 due_date=date(2026, 12, 1))
+    client.force_login(member)
+
+    content = client.get(reverse('erp:batch_edit', args=[undated.pk])).content.decode()
+    assert '~22-Oct-2026' in content
+
+    content = client.get(reverse('erp:batch_edit', args=[dated.pk])).content.decode()
+    assert '1-Dec-2026' in content
+    assert '~' not in content.split('<th>Due:</th>')[1].split('</tr>')[0]
+
+
+@pytest.mark.django_db
+def test_batch_page_card_shows_dash_for_complete_undated_batch(client, django_user_model, design):
+    member = django_user_model.objects.create_user(email='donemember@example.com', password='x')
+    design.client.users.add(member)
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    stage = ProductionStage.objects.create(name='Done Stage', color='#00ff00', order=1)
+    BatchProductionStage.objects.create(batch=batch, production_stage=stage, order=1,
+                                        status=BatchProductionStage.DONE)
+    client.force_login(member)
+    content = client.get(reverse('erp:batch_edit', args=[batch.pk])).content.decode()
+    assert '~22-Oct-2026' not in content
+    assert '—' in content.split('<th>Due:</th>')[1].split('</tr>')[0]
+
+
+@pytest.mark.django_db
+def test_batch_page_form_hints_implied_due_date_to_staff(staff_client, design):
+    batch = Batch.objects.create(design=design, quantity=1, created_dt=_created(2026, 10, 1))
+    content = staff_client.get(reverse('erp:batch_edit', args=[batch.pk])).content.decode()
+    assert 'Treated as due' in content
+    assert '~22-Oct-2026' in content
+
+    batch.due_date = date(2026, 12, 1)
+    batch.save()
+    content = staff_client.get(reverse('erp:batch_edit', args=[batch.pk])).content.decode()
+    assert 'Treated as due' not in content

@@ -99,6 +99,12 @@ table.print-fields th {
     background: #f5f5f5;
 }
 
+/* A due date Register worked out, not one set by hand (register#167). Same look as the Batches list. */
+.implied-date {
+    font-style: italic;
+    color: #6c757d;
+}
+
 .batch-print-details {
     display: flex;
     align-items: flex-start;

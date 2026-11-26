@@ -4319,10 +4319,17 @@ def batch_edit(request, batch_id):
         if batch_production_stage.production_stage.has_explanation
     }
 
+    # Worked out before a POST binds the form, so it reflects the saved due date (register#167).
+    assembly_settings = AssemblyCostSettings.get_solo()
+    lead_time_days = assembly_settings.typical_assembly_days
+    implied_due = batch.shown_implied_due_date(lead_time_days)
+
     if not request.user.is_staff:
         ctx = {
             'form': None,
             'batch': batch,
+            'implied_due': implied_due,
+            'lead_time_days': lead_time_days,
             'production_stages_with_forms': [
                 (batch_production_stage, None) for batch_production_stage in batch_production_stages
             ],
@@ -4357,12 +4364,14 @@ def batch_edit(request, batch_id):
     consigned_counts = {row['part'].pk: row['per_board'] for row in parts_required if row['consigned']}
     _, bom_cost, joints = compute_bom_pricing(parts_by_id, per_board_counts, pricing_quantities, consigned_counts)
     build_costing_rows_data, build_costing_total = build_costing_rows(
-        batch.design, bom_cost, joints, AssemblyCostSettings.get_solo()
+        batch.design, bom_cost, joints, assembly_settings
     )
 
     ctx = {
         'form': form,
         'batch': batch,
+        'implied_due': implied_due,
+        'lead_time_days': lead_time_days,
         'production_stages_with_forms': production_stages_with_forms,
         'explained_stages': explained_stages.values(),
         'apply_template_form': BatchApplyTemplateForm(),
@@ -4383,8 +4392,11 @@ def batch_edit(request, batch_id):
 def batch_print(request, batch_id):
     batch = get_object_or_404(Batch.objects.select_related('design__client'), pk=batch_id)
     batch_url = request.build_absolute_uri(reverse('erp:batch_edit', args=[batch.pk]))
+    lead_time_days = AssemblyCostSettings.get_solo().typical_assembly_days
     ctx = {
         'batch': batch,
+        'implied_due': batch.shown_implied_due_date(lead_time_days),
+        'lead_time_days': lead_time_days,
         'batch_production_stages': batch.production_stages.select_related('production_stage'),
         'batch_url': batch_url,
         'pcb_top': DesignAsset.objects.filter(

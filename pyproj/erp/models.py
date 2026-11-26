@@ -212,6 +212,16 @@ class Batch(models.Model):
         The lead time is passed in so a list of batches reads the setting only once."""
         return timezone.localdate(self.created_dt) + timedelta(days=lead_time_days)
 
+    def shown_implied_due_date(self, lead_time_days):
+        """implied_due_date() when a page should show it, else None (register#167).
+
+        Shown only for an unfinished batch with no due_date, the same as the Batches list,
+        which gives no implied date to Complete batches. Used by the Batch page and its print page.
+        """
+        if self.due_date or self.progress_category == 'complete':
+            return None
+        return self.implied_due_date(lead_time_days)
+
     def effective_due_date(self, lead_time_days):
         """due_date if set, else implied_due_date(). Used to sort the Batches list."""
         return self.due_date or self.implied_due_date(lead_time_days)
