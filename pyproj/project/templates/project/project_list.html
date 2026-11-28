@@ -18,8 +18,8 @@
         </div>
         {% if orgs|length > 1 %}
             <div class="col-6 col-md-3">
-                <select name="org" class="form-select" aria-label="Organisation" onchange="this.form.submit()">
-                    <option value="">All organisations</option>
+                <select name="org" class="form-select" aria-label="Client" onchange="this.form.submit()">
+                    <option value="">All clients</option>
                     {% for org in orgs %}
                         <option value="{{ org.pk }}"{% if selected_org == org.pk|stringformat:"d" %} selected{% endif %}>{{ org.company_name }}</option>
                     {% endfor %}
@@ -61,7 +61,7 @@
                             <tr class="highlight">
                                 <th>Code</th>
                                 <th>Name</th>
-                                {% if orgs|length > 1 %}<th>Organisation</th>{% endif %}
+                                {% if orgs|length > 1 %}<th>Client</th>{% endif %}
                                 <th>Phase</th>
                                 <th>Status</th>
                                 <th>Target date</th>

@@ -9,12 +9,14 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from erp.models import Batch
 
-from .forms import ProjectDesignLinkForm, ProjectForm
-from .models import Project
+from .forms import ProjectDesignLinkForm, ProjectForm, ProjectLogEntryForm
+from .models import Project, ProjectLogEntry
 
 
 def _projects_for_user(user):
@@ -107,11 +109,21 @@ def project_detail(request, project_id):
         .prefetch_related('production_stages')
         .order_by('-created_dt')
     )
+    # Log entries (register#161). visible_to() hides internal entries from client users, and
+    # every count below is taken from it, so a count cannot reveal an internal entry either.
+    log_entries = ProjectLogEntry.visible_to(request.user, project).select_related('created_by_user')
+    decisions = log_entries.filter(kind=ProjectLogEntry.DECISION)
+    log_view = 'decisions' if request.GET.get('log') == 'decisions' else 'all'
     ctx = {
         'project': project,
         'designs': designs,
         'batches': batches,
         'link_form': ProjectDesignLinkForm(project) if request.user.is_staff else None,
+        'log_view': log_view,
+        'log_entries': decisions if log_view == 'decisions' else log_entries,
+        'log_entry_count': log_entries.count(),
+        'decision_count': decisions.count(),
+        'log_form': ProjectLogEntryForm() if request.user.is_staff else None,
     }
     return render(request, 'project/project_detail.html', ctx)
 
@@ -126,7 +138,7 @@ def project_design_link(request, project_id):
         project.designs.add(design)
         messages.success(request, f'Linked {design}.')
     else:
-        messages.warning(request, 'Choose one of this organisation’s designs to link.')
+        messages.warning(request, 'Choose one of this client’s designs to link.')
     return redirect('project:project_detail', project_id=project.pk)
 
 
@@ -138,3 +150,51 @@ def project_design_unlink(request, project_id, design_id):
     project.designs.remove(design)
     messages.success(request, f'Unlinked {design}.')
     return redirect('project:project_detail', project_id=project.pk)
+
+
+def _log_redirect(entry_or_project):
+    project = getattr(entry_or_project, 'project', entry_or_project)
+    return redirect(reverse('project:project_detail', args=[project.pk]) + '#log')
+
+
+@staff_member_required
+@require_POST
+def project_log_add(request, project_id):
+    project = get_object_or_404(Project, pk=project_id)
+    form = ProjectLogEntryForm(request.POST)
+    if form.is_valid():
+        entry = form.save(commit=False)
+        entry.project = project
+        entry.set_creator(user=request.user)
+        entry.save()
+        messages.success(request, f'{entry.get_kind_display()} added to the log.')
+    else:
+        errors = '; '.join(f'{form.fields[f].label}: {" ".join(e)}' for f, e in form.errors.items())
+        messages.warning(request, f'The log entry was not added. {errors}')
+    return _log_redirect(project)
+
+
+@staff_member_required
+def project_log_edit(request, entry_id):
+    entry = get_object_or_404(ProjectLogEntry.objects.select_related('project'), pk=entry_id)
+    if request.method == 'POST':
+        form = ProjectLogEntryForm(request.POST, instance=entry)
+        if form.is_valid():
+            entry = form.save(commit=False)
+            entry.updated_dt = timezone.now()
+            entry.save()
+            messages.success(request, 'Log entry updated.')
+            return _log_redirect(entry)
+        messages.warning(request, 'Please correct the errors below.')
+    else:
+        form = ProjectLogEntryForm(instance=entry)
+    return render(request, 'project/project_log_edit.html', {'form': form, 'entry': entry, 'project': entry.project})
+
+
+@staff_member_required
+@require_POST
+def project_log_delete(request, entry_id):
+    entry = get_object_or_404(ProjectLogEntry.objects.select_related('project'), pk=entry_id)
+    entry.delete()
+    messages.success(request, 'Log entry deleted.')
+    return _log_redirect(entry)

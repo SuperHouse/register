@@ -1,0 +1,26 @@
+{% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+<div class="row">
+    <div class="mb-3 col-md-4">
+        <label for="{{ form.date.id_for_label }}" class="form-label">{{ form.date.label }}</label>
+        {{ form.date }}
+        {% if form.date.errors %}<div class="text-danger small mt-1">{{ form.date.errors }}</div>{% endif %}
+    </div>
+    <div class="mb-3 col-md-4">
+        <label for="{{ form.kind.id_for_label }}" class="form-label">{{ form.kind.label }}</label>
+        {{ form.kind }}
+        {% if form.kind.errors %}<div class="text-danger small mt-1">{{ form.kind.errors }}</div>{% endif %}
+    </div>
+</div>
+<div class="mb-3">
+    <label for="{{ form.body.id_for_label }}" class="form-label">{{ form.body.label }}</label>
+    {{ form.body }}
+    <div class="form-text">{{ form.body.help_text }}</div>
+    {% if form.body.errors %}<div class="text-danger small mt-1">{{ form.body.errors }}</div>{% endif %}
+</div>
+<div class="mb-3">
+    <div class="form-check">
+        {{ form.client_visible }}
+        <label for="{{ form.client_visible.id_for_label }}" class="form-check-label">{{ form.client_visible.label }}</label>
+    </div>
+    <div class="form-text">{{ form.client_visible.help_text }}</div>
+</div>

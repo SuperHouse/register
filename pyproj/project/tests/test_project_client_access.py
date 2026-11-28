@@ -47,7 +47,7 @@ def test_customer_list_shows_only_own_projects(client, data):
     assert 'Secret Gadget' not in content
     # No Add button, and no org filter or column for a single-org user.
     assert reverse('project:project_add') not in content
-    assert 'All organisations' not in content
+    assert 'All clients' not in content
 
 
 @pytest.mark.django_db
@@ -63,7 +63,7 @@ def test_customer_in_two_orgs_gets_org_filter(client, data):
     client.force_login(data['user1'])
     content = client.get(reverse('project:project_list')).content.decode()
     assert 'Secret Gadget' in content
-    assert 'All organisations' in content
+    assert 'All clients' in content
 
 
 @pytest.mark.django_db

@@ -1,0 +1,29 @@
+{% extends "device/base-with-sidebar.html" %}
+
+{% block title %}
+    Edit Log Entry - {{ project.code }} - {{ brand_name }} Device Register
+{% endblock title %}
+
+{% block h1 %}
+    Edit Log Entry: <span class="text-body-secondary">{{ project.code }}</span> {{ project.name }}
+{% endblock h1 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col-12 col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {% include "project/partial-log-entry-fields.html" %}
+                        <p class="small text-body-secondary">Added by {{ entry.get_creator_display }}{% if entry.updated_dt %}, last changed {{ entry.updated_dt|date:"j M Y H:i" }}{% endif %}.</p>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                            <a href="{% url 'project:project_detail' project.pk %}#log" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

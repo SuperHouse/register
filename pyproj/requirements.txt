@@ -20,4 +20,5 @@ digikey-api>=1.1.0
 zipfile-zstd>=0.0.4
 qrcode>=8.0
 lcsc-toolkit>=0.2.0
+markdown-it-py>=3.0
 # gunicorn

@@ -5,7 +5,7 @@ from django import forms
 from crm.models import Org
 from device.models import Design
 
-from .models import Project
+from .models import Project, ProjectLogEntry
 
 
 class ProjectForm(forms.ModelForm):
@@ -44,7 +44,7 @@ class ProjectForm(forms.ModelForm):
             # Linked designs must belong to the project's org, or the client would see
             # another org's designs on their project page.
             if self.instance.designs.exclude(client=org).exists():
-                self.add_error('org', 'Unlink the designs that belong to the current organisation first.')
+                self.add_error('org', 'Unlink the designs that belong to the current client first.')
         return cleaned
 
 
@@ -61,3 +61,17 @@ class ProjectDesignLinkForm(forms.Form):
             .order_by('obsolete', 'sku', 'hw_version')
         )
         self.fields['design'].empty_label = 'Choose a design…'
+
+
+class ProjectLogEntryForm(forms.ModelForm):
+    class Meta:
+        model = ProjectLogEntry
+        fields = ['date', 'kind', 'body', 'client_visible']
+        widgets = {
+            'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}, format='%Y-%m-%d'),
+            'kind': forms.Select(attrs={'class': 'form-select'}),
+            'body': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'client_visible': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {'body': 'Entry'}
+        help_texts = {'body': 'Markdown: **bold**, *italic*, - lists, [links](https://example.com), | tables |.'}

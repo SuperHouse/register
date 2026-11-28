@@ -4,7 +4,7 @@ from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 from crm.models import Org
-from device.models import Design
+from device.models import CreatedByMixin, Design
 
 
 class Project(models.Model):
@@ -46,7 +46,7 @@ class Project(models.Model):
         max_length=20, unique=True, editable=False,
         help_text='Set automatically when the project is created, e.g. P-2026-014.',
     )
-    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name='projects', verbose_name='Organisation')
+    org = models.ForeignKey(Org, on_delete=models.PROTECT, related_name='projects', verbose_name='Client')
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     phase = models.CharField(max_length=20, choices=PHASE_CHOICES, default=ENQUIRY)
@@ -87,3 +87,55 @@ class Project(models.Model):
             except IntegrityError:
                 if attempt == 4:
                     raise
+
+
+class ProjectLogEntry(CreatedByMixin):
+    """A dated entry in a project's timeline: a note, call, meeting, email, decision or
+    milestone (register#161).
+
+    Entries are internal by default. A client user sees only entries with client_visible set;
+    every page gets them through visible_to(), so there is one place that applies the rule.
+    """
+
+    NOTE = 'NOTE'
+    PHONE_CALL = 'PHONE_CALL'
+    MEETING = 'MEETING'
+    EMAIL = 'EMAIL'
+    DECISION = 'DECISION'
+    MILESTONE = 'MILESTONE'
+    KIND_CHOICES = [
+        (NOTE, 'Note'),
+        (PHONE_CALL, 'Phone call'),
+        (MEETING, 'Meeting'),
+        (EMAIL, 'Email'),
+        (DECISION, 'Decision'),
+        (MILESTONE, 'Milestone reached'),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='log_entries')
+    date = models.DateField(default=timezone.localdate)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=NOTE)
+    body = models.TextField(help_text='Markdown.')
+    client_visible = models.BooleanField(
+        'Client can see this', default=False,
+        help_text='Leave unticked for internal notes. Only ticked entries show to the client.',
+    )
+    created_dt = models.DateTimeField(default=timezone.now, editable=False)
+    updated_dt = models.DateTimeField('Last changed', null=True, blank=True, editable=False)
+
+    # A subclass Meta must inherit CreatedByMixin.Meta, or its single-creator constraint is lost.
+    class Meta(CreatedByMixin.Meta):
+        abstract = False
+        ordering = ['-date', '-created_dt']
+        verbose_name_plural = 'project log entries'
+
+    def __str__(self):
+        return f'{self.project.code} {self.date} {self.get_kind_display()}'
+
+    @classmethod
+    def visible_to(cls, user, project=None):
+        """Entries the user may see: all for staff, only client_visible ones otherwise."""
+        entries = cls.objects.all() if project is None else project.log_entries.all()
+        if not user.is_staff:
+            entries = entries.filter(client_visible=True)
+        return entries

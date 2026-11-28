@@ -7,7 +7,7 @@ A Project records a piece of client work before and around production: the first
 | Field | Meaning |
 |---|---|
 | **Code** | Set by Register when the project is added, for example `P-2026-014`. Numbering starts again at 001 each year. The code never changes, so you can use it as a reference with the client. |
-| **Organisation** | The client the work is for. Only organisations with the **Client** flag are offered. |
+| **Client** | The organisation the work is for. Only organisations with the **Client** flag are offered. |
 | **Name** and **Description** | The client sees both. Keep internal notes out of them. |
 | **Phase** | Where the work is: Enquiry, Quoting, Quoted, Design, Prototyping, Pre-production or Production. |
 | **Status** | Whether the work is moving: Active, On hold, Closed or Declined. The status is separate from the phase, so a project on hold still shows the phase it stopped in. |
@@ -18,7 +18,7 @@ A Project records a piece of client work before and around production: the first
 
 The Projects page (`/projects/`) lists projects with their code, phase, status, target date and number of designs. Click a row to open the project.
 
-By default the list shows only open projects (Active or On hold). Use the filters to choose a phase or a status, or **All statuses** to see every project. The search box finds text in the code, name or description. If you can see projects of more than one organisation, you can also filter by organisation.
+By default the list shows only open projects (Active or On hold). Use the filters to choose a phase or a status, or **All statuses** to see every project. The search box finds text in the code, name or description. If you can see projects of more than one client, you can also filter by client.
 
 ## Project page
 
@@ -40,7 +40,7 @@ Users of an organisation see the Projects page with that organisation's projects
 ### Add a project
 
 1. On the Projects page, click **Add**.
-2. Choose the organisation, and type a name.
+2. Choose the client, and type a name.
 3. Optionally, fill in the description, phase, status and dates. A new project starts in the Enquiry phase with the Active status.
 4. Click **Add Project**. Register opens the new project's page.
 
@@ -49,9 +49,37 @@ Users of an organisation see the Projects page with that organisation's projects
 1. Open the project and click **Edit**.
 2. Change the fields, and click **Save Changes**.
 
-You cannot move a project to a different organisation while it has designs of the current organisation. Unlink those designs first.
+You cannot move a project to a different client while it has designs of the current client. Unlink those designs first.
 
 ### Link or unlink a design
 
-- To link a design, choose it in the list under **Designs** and click **Link Design**. The list offers only the designs of the project's organisation.
+- To link a design, choose it in the list under **Designs** and click **Link Design**. The list offers only the designs of the project's client.
 - To unlink a design, click the unlink button on its row. This changes only the project. The design and its boards and batches stay as they are.
+
+## Project log
+
+The **Log** on the project page is a dated timeline of the project. Each entry has a date, a kind (Note, Phone call, Meeting, Email, Decision or Milestone reached) and the entry text.
+
+The log has two tabs:
+
+- **All entries**: every entry, newest date first.
+- **Decisions**: only the Decision entries. Use it as the list of what was decided and when.
+
+The number on each tab is the number of entries you can see.
+
+### Who sees an entry
+
+A new entry is **internal**: only staff users see it. To show an entry to the client, tick **Client can see this**. On the staff view, entries that the client can see have a **Client can see** badge.
+
+Client users see only the entries that have that box ticked, and cannot add, change or delete entries. They do not see who added an entry.
+
+### Add, edit or delete an entry (staff)
+
+1. On the project page, under **Log**, click **Add Log Entry**.
+2. Set the date and the kind, and type the entry.
+3. If the client should see the entry, tick **Client can see this**.
+4. Click **Add Entry**.
+
+To change an entry, click its edit button. To delete it, click its delete button and confirm.
+
+The entry text uses Markdown: `**bold**`, `*italic*`, lists that start with `-`, links such as `[text](https://example.com)`, and tables. A new line in the text starts a new line on the page. HTML in the text shows as plain text.

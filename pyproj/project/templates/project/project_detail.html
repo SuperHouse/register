@@ -1,4 +1,5 @@
 {% extends "device/base-with-sidebar.html" %}
+{% load project_tags %}
 
 {% block title %}
     {{ project.code }} {{ project.name }} - {{ brand_name }} Device Register
@@ -24,7 +25,7 @@
         <div class="card-body">
             <table class="table table-bordered mb-0">
                 <tr>
-                    <th style="width: 220px;">Organisation:</th>
+                    <th style="width: 220px;">Client:</th>
                     <td>{% if user.is_staff %}<a href="{% url 'organisation_detail' project.org.pk %}">{{ project.org.company_name }}</a>{% else %}{{ project.org.company_name }}{% endif %}</td>
                 </tr>
                 <tr>
@@ -113,6 +114,80 @@
         </div>
     </div>
 
+    <h5 class="mt-4" id="log">Log</h5>
+    <div class="card">
+        <div class="card-body">
+            <ul class="nav nav-pills mb-3">
+                <li class="nav-item">
+                    <a class="nav-link{% if log_view == 'all' %} active{% endif %}" href="?#log">All entries <span class="badge bg-secondary ms-1">{{ log_entry_count }}</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link{% if log_view == 'decisions' %} active{% endif %}" href="?log=decisions#log">Decisions <span class="badge bg-secondary ms-1">{{ decision_count }}</span></a>
+                </li>
+            </ul>
+
+            {% if log_entries %}
+                <table class="table align-middle project-log">
+                    <thead>
+                        <tr class="highlight">
+                            <th style="width: 120px;">Date</th>
+                            {% if log_view == 'all' %}<th style="width: 150px;">Kind</th>{% endif %}
+                            <th>{% if log_view == 'decisions' %}Decision{% else %}Entry{% endif %}</th>
+                            {% if user.is_staff %}<th style="width: 110px;"></th>{% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in log_entries %}
+                            <tr>
+                                <td class="text-nowrap align-top">{{ entry.date|date:"j M Y" }}</td>
+                                {% if log_view == 'all' %}
+                                    <td class="align-top">
+                                        {{ entry.get_kind_display }}
+                                        {% if user.is_staff and entry.client_visible %}
+                                            <div><span class="badge bg-info text-dark" title="The client can see this entry"><i class="cil-people"></i> Client can see</span></div>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                                <td class="align-top">
+                                    <div class="log-body">{{ entry.body|markdown }}</div>
+                                    {% if user.is_staff %}
+                                        <div class="small text-body-secondary">
+                                            {{ entry.get_creator_display }}{% if entry.updated_dt %} · Changed {{ entry.updated_dt|date:"j M Y H:i" }}{% endif %}
+                                            {% if log_view == 'decisions' and entry.client_visible %}<span class="badge bg-info text-dark ms-1"><i class="cil-people"></i> Client can see</span>{% endif %}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                {% if user.is_staff %}
+                                    <td class="text-end align-top text-nowrap">
+                                        <a href="{% url 'project:project_log_edit' entry.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="cil-pencil"></i></a>
+                                        <form method="post" action="{% url 'project:project_log_delete' entry.pk %}" class="d-inline"
+                                              onsubmit="return confirm('Delete this log entry?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete"><i class="cil-trash"></i></button>
+                                        </form>
+                                    </td>
+                                {% endif %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="text-body-secondary fst-italic">{% if log_view == 'decisions' %}No decisions have been logged yet.{% else %}No log entries yet.{% endif %}</p>
+            {% endif %}
+
+            {% if log_form %}
+                <details class="mt-2"{% if not log_entry_count %} open{% endif %}>
+                    <summary class="btn btn-outline-primary btn-sm"><i class="cil-plus"></i> Add Log Entry</summary>
+                    <form method="post" action="{% url 'project:project_log_add' project.pk %}" class="mt-3" style="max-width: 800px;">
+                        {% csrf_token %}
+                        {% include "project/partial-log-entry-fields.html" with form=log_form %}
+                        <button type="submit" class="btn btn-primary">Add Entry</button>
+                    </form>
+                </details>
+            {% endif %}
+        </div>
+    </div>
+
     <h5 class="mt-4">Builds</h5>
     <div class="card">
         <div class="card-body">
@@ -151,3 +226,14 @@
         </div>
     </div>
 {% endblock content %}
+
+{% block extra_head %}
+    <style>
+        /* Markdown in log entries: no gap below the last paragraph or list, and bordered tables. */
+        .log-body > :last-child { margin-bottom: 0; }
+        .log-body table { border-collapse: collapse; margin-bottom: 0.5rem; }
+        .log-body th, .log-body td { border: 1px solid var(--cui-border-color, #dee2e6); padding: 0.25rem 0.5rem; }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+{% endblock extra_head %}
