@@ -12,7 +12,7 @@ upward.** Each plan is parked until the one below it in this list is resolved.
 | 1 | [STOCK_CONSUMPTION_PLAN.md](STOCK_CONSUMPTION_PLAN.md) — register#129, stock consumption/allocation | the original ask | Parked — blocked by #2 |
 | 2 | [BATCH_STATUS_PLAN.md](BATCH_STATUS_PLAN.md) — `Batch.status` (Draft/Ready/In Progress/Complete/On Hold/Cancelled) | designing #1's "batch cancelled → release allocations" step and finding `Batch` has no status field | Parked — blocked by #3 |
 | 3 | [DEVICE_GENERATION_PLAN.md](DEVICE_GENERATION_PLAN.md) — in-app Device/serial-number generation, replacing spreadsheet import | refining #2's "should a Device be linkable to a Draft batch" question | Parked — blocked by #4 |
-| 4 | *(not yet named)* | refining #3 — the user identified another piece of work to complete first | **Awaiting description — resume here** |
+| 4 | *(lost)* | refining #3 — the user identified another piece of work to complete first | **Lost (2026-11-28).** It was never written down, and Jon can't remember it. Resume at #3 |
 
 **Amended 2026-10-13:** decisions reached further down the chain (#2 and #3) have been folded back
 into #1, so `STOCK_CONSUMPTION_PLAN.md`'s body now describes the current design rather than its
@@ -22,7 +22,7 @@ that file.
 
 ## Why this order, working backwards
 
-- #4 blocks #3 because the user wants it done before returning to Device Generation.
+- #4 was lost (2026-11-28), so it no longer blocks #3. #3's open "separate serial field" question is decided in [IDENTIFIERS_PLAN.md](IDENTIFIERS_PLAN.md): no separate field, the serial stays the `pk`.
 - #3 blocks #2 in practice (not strictly — #2 could ship alone) but #3's answer to "can a Device
   attach to a Draft batch" and its reshaping of #1's stock-consumption trigger make more sense
   once #2 exists, so finishing #2 before #3 avoids rework.

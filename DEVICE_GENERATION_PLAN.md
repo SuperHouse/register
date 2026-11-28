@@ -49,7 +49,11 @@ on demand via a button — that's the point where this stops being "fix eventual
   later without ever renumbering anything already printed on a board. Real cost: a migration, and
   touching every place that currently treats `pk` as "the serial."
 
-**Not resolved — this is a decision about the physical labeling process, not something inferable
+**Resolved 2026-11-28 (see [IDENTIFIERS_PLAN.md](IDENTIFIERS_PLAN.md)): keep `pk == serial`.**
+Jon decided board serials stay one global number, with no prefix and no separate field. The
+sequence check under "Sequence/pk collision risk" below still applies.
+
+**Original note — this is a decision about the physical labeling process, not something inferable
 from the code.** Lean recorded above (favour the separate field, given this feature is about to
 make serial-minting routine rather than a one-off import artifact), but it's the user's call.
 
